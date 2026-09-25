@@ -1,0 +1,23 @@
+/*
+ * D15 (GPIO15) is ADC2 channel 3 on the ESP32.
+ */
+
+/ {
+	zephyr,user {
+		io-channels = <&adc1 3>;
+	};
+};
+
+&adc1 {
+	status = "okay";
+	#address-cells = <1>;
+	#size-cells = <0>;
+
+	channel@3 {
+		reg = <3>;
+		zephyr,gain = "ADC_GAIN_1_4";
+		zephyr,reference = "ADC_REF_INTERNAL";
+		zephyr,acquisition-time = <ADC_ACQ_TIME_DEFAULT>;
+		zephyr,resolution = <12>;
+	};
+};
