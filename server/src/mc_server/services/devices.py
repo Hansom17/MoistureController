@@ -75,12 +75,15 @@ async def _gateway_for(uow: Uow, household_id: str) -> tuple[str, str, int]:
 
 async def _install_key(uow: Uow, device: Device) -> dict:
     gateway, host, port = await _gateway_for(uow, device.household_id)
+    was_hub = device.gateway == "hub"
     psk = ids.new_psk()
     device.psk_enc = uow.ctx.keys.encrypt(psk)
     device.gateway = gateway
     uow.broker_files_changed()  # cloud PSK file, or the hub's ACL on the cloud broker
-    if gateway == "hub":
+    if gateway == "hub" or was_hub:
         await hubs.publish_keys(uow, device.household_id)
+    if gateway == "hub":
+        await hubs.republish_snapshot(uow, device.household_id)  # device joins the snapshot
     return {"device_id": device.id, "mqtt": {"host": host, "port": port, "psk": psk}}
 
 

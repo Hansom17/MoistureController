@@ -18,13 +18,17 @@ chmod 600 "$PASSWD"
 mosquitto_passwd -b "$PASSWD" "${MC_BROKER_USER:?}" "$(cat "${MC_BROKER_PASSWORD_FILE:?}")"
 
 # 2. Generated files must exist before Mosquitto starts.
+# The backend (cloud) or the agent (hub) owns these files; the broker only
+# reads them, so wait until they exist.
 if [ "$ROLE" = "hub" ]; then
-  mkdir -p "$WATCH_DIR/conf.d"
-  [ -f "$WATCH_DIR/psk" ] || : > "$WATCH_DIR/psk"
+  need="$WATCH_DIR/psk $WATCH_DIR/conf.d"
 else
-  [ -f "$WATCH_DIR/psk" ] || echo "waiting for the backend to write $WATCH_DIR/psk"
-  while [ ! -f "$WATCH_DIR/psk" ] || [ ! -f "$WATCH_DIR/acl" ]; do sleep 1; done
+  need="$WATCH_DIR/psk $WATCH_DIR/acl"
 fi
+for f in $need; do
+  [ -e "$f" ] || echo "waiting for $f"
+  while [ ! -e "$f" ]; do sleep 1; done
+done
 
 checksum() { cat "$WATCH_DIR/conf.d/"*.conf 2>/dev/null | md5sum; }
 

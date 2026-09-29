@@ -166,3 +166,15 @@ async def test_remove_hub(household, owner, client, ctx):
     assert created  # device kept, must be re-paired via rekey
     rekey = await owner.req("POST", f"/households/{h}/devices/{created['device']['id']}/rekey")
     assert rekey.status_code == 200 and rekey.json()["mqtt"]["host"] == "mqtt.example.com"
+
+
+async def test_claim_moves_cloud_devices_to_no_gateway_until_rekey(setup, owner, client, ctx):
+    h, dev = setup["h"], setup["device"]
+    await online_hub(client, owner, ctx, h)
+    assert (await owner.get(f"/households/{h}/devices"))[0]["gateway"] == "none"
+    bundle = (await owner.req("POST", f"/households/{h}/devices/{dev.id}/rekey")).json()
+    assert bundle["mqtt"]["host"] == "192.168.1.20"
+    keys = json.loads((await outbox(ctx, "down/keys"))[-1].payload)
+    assert [d["id"] for d in keys["devices"]] == [dev.id]
+    snap = json.loads((await outbox(ctx, "down/snapshot"))[-1].payload)
+    assert [d["id"] for d in snap["devices"]] == [dev.id]

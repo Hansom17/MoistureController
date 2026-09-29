@@ -176,6 +176,12 @@ async def claim(uow: Uow, household: Household, user_code: str, uid: str) -> Hub
     enrollment.claimed_household_id = household.id
     enrollment.claimed_by = uid
     enrollment.hub_id = hub.id
+    # Gateway change (§8.1): devices on the cloud broker must be re-paired to
+    # the hub (rekey); their cloud keys are removed from the broker files.
+    for d in await uow.s.scalars(select(Device).where(
+            Device.household_id == household.id, Device.deleted_at.is_(None))):
+        d.gateway = "none"
+    uow.emit(household.id, "device", {})
     await uow.s.flush()
     # Waiting for the bridge as retained messages (§9.1).
     await publish_keys(uow, household.id)
