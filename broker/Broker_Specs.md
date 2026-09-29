@@ -47,7 +47,13 @@ flowchart LR
 ## 2. Common settings (both brokers)
 
 ```conf
-per_listener_settings true
+per_listener_settings false      # see below — must stay false
+
+allow_anonymous false
+allow_zero_length_clientid false
+psk_file <generated psk file>    # identities for 8883
+password_file /mosquitto/data/passwd   # internal user for 1883
+acl_file <acl file>              # devices, hubs and the internal user
 
 persistence true
 persistence_location /mosquitto/data/
@@ -58,7 +64,6 @@ max_inflight_messages 20
 max_packet_size 262144           # 256 KB: hub snapshots (hub.md §5)
 persistent_client_expiration 30d
 max_keepalive 120
-allow_zero_length_clientid false
 retain_available true
 
 log_dest stdout
@@ -69,6 +74,7 @@ connection_messages true
 log_timestamp_format %Y-%m-%dT%H:%M:%S
 ```
 
+- **Global security settings (`per_listener_settings false`).** With per-listener settings Mosquitto cannot ACL-check messages for a *disconnected* client (it has no listener at that moment) and drops them instead of queueing — commands for sleeping devices would never arrive. Found in the first end-to-end test (2026-09-29). One PSK file, one password file and one ACL file therefore apply to both listeners; PSK clients can't authenticate by password and vice versa, since the PSK identity always becomes the username on 8883.
 - **Persistence** is mandatory: it keeps queued commands for sleeping devices and the hub's bridge queue across restarts. Mosquitto writes it on shutdown and every 60 s, so a *crash* can lose up to 60 s of queued messages — acceptable (devices re-send telemetry with new `seq`; commands expire and can be re-issued).
 - `max_queued_messages 100000` per client: covers a hub offline for weeks and the backend being down for hours.
 - `persistent_client_expiration 30d`: sessions of devices/hubs that never come back are cleaned up. Devices re-subscribe on every connect (mqtt.md §3), so an expired session only loses expired commands.
@@ -79,12 +85,9 @@ log_timestamp_format %Y-%m-%dT%H:%M:%S
 listener 8883
 protocol mqtt
 psk_hint mc
-psk_file <generated psk file>
 use_identity_as_username true
 tls_version tlsv1.2
 ciphers PSK-AES128-GCM-SHA256
-allow_anonymous false
-acl_file <acl file>
 max_connections 5000             # hub broker: 200
 ```
 
@@ -98,13 +101,10 @@ max_connections 5000             # hub broker: 200
 ```conf
 listener 1883
 protocol mqtt
-allow_anonymous false
-password_file /mosquitto/config/passwd
-# no acl_file → authenticated clients on this listener have full access
 ```
 
 - Only reachable on the container network (port not published). One user: `mc-backend` (cloud) or `mc-agent` (hub); password from a secret file, hashed into `passwd` at container start.
-- No ACL on purpose: the backend and the agent need wildcard subscriptions (`mc/v1/+/#`), and they are fully trusted components of the same stack.
+- The internal user has a `user mc-backend` / `user mc-agent` block with `topic readwrite mc/#` in the ACL file: it needs wildcard subscriptions (`mc/v1/+/#`) and is a fully trusted component of the same stack.
 
 ### 2.3 Device ACL patterns
 
@@ -293,7 +293,7 @@ The compose files (`server/docker-compose.yml`, `hub/docker-compose.yml`) refere
 These are behaviours the design relies on; each gets an automated test in the broker integration suite:
 
 1. The pinned `eclipse-mosquitto` image supports TLS-PSK on listeners **and** for bridges (`bridge_identity` / `bridge_psk`) with OpenSSL 3 and `PSK-AES128-GCM-SHA256`.
-2. `SIGHUP` reloads `psk_file` and `acl_file` with `per_listener_settings true`, without dropping connections.
+2. `SIGHUP` reloads `psk_file` and `acl_file` with global security settings, without dropping connections.
 3. A hub user with the §3.2 ACL: subscribing to another device's `cmd` is refused; publishing another household's telemetry is dropped; wildcard subscribe `mc/v1/+/cmd` is refused.
 4. Bridge queueing: with the cloud unreachable, 10 000 device messages queue on the hub and all arrive in order after reconnect, including across a hub broker restart.
 5. The ESP32 (Zephyr + Mbed TLS) completes a TLS-PSK handshake with Mosquitto; measure handshake time and total wake time vs. plain TCP.

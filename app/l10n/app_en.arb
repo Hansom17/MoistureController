@@ -1,0 +1,358 @@
+{
+  "@@locale": "en",
+  "appTitle": "Moisture",
+  "navPlants": "Plants",
+  "navDevices": "Devices",
+  "navAlerts": "Alerts",
+  "navSettings": "Settings",
+  "switchHousehold": "Switch household",
+  "roleViewer": "Viewer",
+  "roleMember": "Member",
+  "roleAdmin": "Admin",
+  "roleOwner": "Owner",
+  "hubOfflineBanner": "Hub offline since {time}. Watering is delivered when it's back.",
+  "@hubOfflineBanner": {
+    "placeholders": {
+      "time": {
+        "type": "String"
+      }
+    }
+  },
+  "noPlantsTitle": "Start with your first plant",
+  "noPlantsBody": "Add a device to start measuring moisture.",
+  "noHouseholdTitle": "Create your first household",
+  "noHouseholdBody": "Or join one with an invite link.",
+  "retry": "Retry",
+  "errorGeneric": "Something went wrong.",
+  "errorForbidden": "Your role no longer allows this.",
+  "errorSafetyLimit": "That's longer than this pump's limit.",
+  "errorHubOffline": "The hub is offline.",
+  "errorTooLate": "The device already picked this up.",
+  "errorBusy": "The device is busy. Try again shortly.",
+  "moistureSemantics": "Moisture {percent} percent",
+  "@moistureSemantics": {
+    "placeholders": {
+      "percent": {
+        "type": "int"
+      }
+    }
+  },
+  "percentValue": "{value} %",
+  "@percentValue": {
+    "placeholders": {
+      "value": {
+        "type": "int"
+      }
+    }
+  },
+  "secondsValue": "{value} s",
+  "@secondsValue": {
+    "placeholders": {
+      "value": {
+        "type": "int"
+      }
+    }
+  },
+  "hoursValue": "{value} h",
+  "@hoursValue": {
+    "placeholders": {
+      "value": {
+        "type": "int"
+      }
+    }
+  },
+  "justNow": "just now",
+  "minutesAgo": "{n} min ago",
+  "@minutesAgo": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "hoursAgo": "{n} h ago",
+  "@hoursAgo": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "daysAgo": "{n} d ago",
+  "@daysAgo": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "deviceOnline": "Online",
+  "deviceSleeping": "Sleeping",
+  "deviceLate": "Late",
+  "deviceOffline": "Offline",
+  "lastSeen": "last seen {ago}",
+  "@lastSeen": {
+    "placeholders": {
+      "ago": {
+        "type": "String"
+      }
+    }
+  },
+  "lastReading": "Last reading {ago}",
+  "@lastReading": {
+    "placeholders": {
+      "ago": {
+        "type": "String"
+      }
+    }
+  },
+  "batteryValue": "Battery {percent} %",
+  "@batteryValue": {
+    "placeholders": {
+      "percent": {
+        "type": "int"
+      }
+    }
+  },
+  "trendFalling": "Drying",
+  "trendSteady": "Steady",
+  "trendRising": "Rising",
+  "pendingCommand": "Watering pending",
+  "waterNow": "Water now",
+  "waterFor": "Water for {seconds} s",
+  "@waterFor": {
+    "placeholders": {
+      "seconds": {
+        "type": "int"
+      }
+    }
+  },
+  "waterSheetTitle": "Water {plant}",
+  "@waterSheetTitle": {
+    "placeholders": {
+      "plant": {
+        "type": "String"
+      }
+    }
+  },
+  "waterSheetHint": "Devices sleep between readings. Watering starts on the next wake.",
+  "pumpLimit": "Pump limit: {seconds} s",
+  "@pumpLimit": {
+    "placeholders": {
+      "seconds": {
+        "type": "int"
+      }
+    }
+  },
+  "waterQueued": "Watering queued",
+  "waterQueuedHubOffline": "Queued. It's delivered when the hub is back online.",
+  "cancel": "Cancel",
+  "cancelCommand": "Cancel watering",
+  "cancelCommandHint": "Best effort — it may already have run.",
+  "commandTitle": "{seconds} s watering",
+  "@commandTitle": {
+    "placeholders": {
+      "seconds": {
+        "type": "int"
+      }
+    }
+  },
+  "commandQueued": "Queued · device expected ~{time}",
+  "@commandQueued": {
+    "placeholders": {
+      "time": {
+        "type": "String"
+      }
+    }
+  },
+  "commandDelivered": "Delivered",
+  "commandRunning": "Running until {time}",
+  "@commandRunning": {
+    "placeholders": {
+      "time": {
+        "type": "String"
+      }
+    }
+  },
+  "commandDone": "Done",
+  "commandFailed": "Failed",
+  "commandExpired": "Expired",
+  "commandCancelled": "Cancelled",
+  "originUser": "Manual",
+  "originCloudRule": "Rule (cloud)",
+  "originHubRule": "Rule (hub)",
+  "historyTitle": "Moisture history",
+  "range24h": "24 h",
+  "range7d": "7 d",
+  "range30d": "30 d",
+  "range1y": "1 y",
+  "chartSummary": "Moisture between {min} and {max} % in this period",
+  "@chartSummary": {
+    "placeholders": {
+      "min": {
+        "type": "int"
+      },
+      "max": {
+        "type": "int"
+      }
+    }
+  },
+  "commandsTitle": "Watering",
+  "noCommands": "No watering yet.",
+  "rulesTitle": "Rules",
+  "noRules": "Add a rule to water automatically.",
+  "addRule": "Add rule",
+  "editRule": "Edit rule",
+  "deleteRule": "Delete rule",
+  "ruleSummary": "Below {percent} % → water {seconds} s, at most every {hours} h",
+  "@ruleSummary": {
+    "placeholders": {
+      "percent": {
+        "type": "int"
+      },
+      "seconds": {
+        "type": "int"
+      },
+      "hours": {
+        "type": "int"
+      }
+    }
+  },
+  "ruleBelow": "Water when moisture is below",
+  "ruleDuration": "Watering duration",
+  "ruleInterval": "At most every",
+  "ruleEnabled": "Rule enabled",
+  "save": "Save",
+  "delete": "Delete",
+  "noDevices": "Add your first device",
+  "firmwareValue": "Firmware {version}",
+  "@firmwareValue": {
+    "placeholders": {
+      "version": {
+        "type": "String"
+      }
+    }
+  },
+  "signalValue": "Signal {rssi} dBm",
+  "@signalValue": {
+    "placeholders": {
+      "rssi": {
+        "type": "int"
+      }
+    }
+  },
+  "configInSync": "Config in sync",
+  "configPending": "Config pending (rev {rev})",
+  "@configPending": {
+    "placeholders": {
+      "rev": {
+        "type": "int"
+      }
+    }
+  },
+  "configRejected": "Config rejected",
+  "deviceDetails": "Details",
+  "board": "Board",
+  "wakeInterval": "Wake interval",
+  "everyMinutes": "every {minutes} min",
+  "@everyMinutes": {
+    "placeholders": {
+      "minutes": {
+        "type": "int"
+      }
+    }
+  },
+  "nextExpected": "Next wake expected",
+  "slots": "Slots",
+  "slotLabel": "Slot {index}",
+  "@slotLabel": {
+    "placeholders": {
+      "index": {
+        "type": "int"
+      }
+    }
+  },
+  "pinLabel": "GPIO {pin}",
+  "@pinLabel": {
+    "placeholders": {
+      "pin": {
+        "type": "int"
+      }
+    }
+  },
+  "identify": "Identify",
+  "reboot": "Reboot",
+  "serviceMode": "Service mode",
+  "deviceActionSent": "Sent. The device acts on its next wake.",
+  "openAlerts": "Open",
+  "closedAlerts": "Closed",
+  "noAlerts": "All plants are fine",
+  "alertDeviceOffline": "{subject} is offline",
+  "@alertDeviceOffline": {
+    "placeholders": {
+      "subject": {
+        "type": "String"
+      }
+    }
+  },
+  "alertBatteryLow": "{subject}: battery low",
+  "@alertBatteryLow": {
+    "placeholders": {
+      "subject": {
+        "type": "String"
+      }
+    }
+  },
+  "alertSensorSuspect": "{subject}: sensor readings look wrong",
+  "@alertSensorSuspect": {
+    "placeholders": {
+      "subject": {
+        "type": "String"
+      }
+    }
+  },
+  "alertCommandFailed": "{subject}: watering failed",
+  "@alertCommandFailed": {
+    "placeholders": {
+      "subject": {
+        "type": "String"
+      }
+    }
+  },
+  "acknowledge": "Acknowledge",
+  "acknowledgedAgo": "Acknowledged {ago}",
+  "@acknowledgedAgo": {
+    "placeholders": {
+      "ago": {
+        "type": "String"
+      }
+    }
+  },
+  "appearance": "Appearance",
+  "themeSystem": "System",
+  "themeLight": "Light",
+  "themeDark": "Dark",
+  "language": "Language",
+  "household": "Household",
+  "timezone": "Time zone",
+  "yourRole": "Your role",
+  "demoSection": "Demo",
+  "demoRole": "Demo role in this household",
+  "demoRoleHint": "Only in the dev build without a backend.",
+  "notAllowed": "Your role doesn't allow this.",
+  "battery": "Battery",
+  "signal": "Signal",
+  "firmware": "Firmware",
+  "noReading": "No reading yet",
+  "alertOther": "{subject}: {kind}",
+  "@alertOther": {
+    "placeholders": {
+      "subject": {
+        "type": "String"
+      },
+      "kind": {
+        "type": "String"
+      }
+    }
+  }
+}

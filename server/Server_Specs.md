@@ -30,7 +30,7 @@ Out of scope: login UI and identity (Firebase), the web app (Firebase Hosting), 
 
 | Concern | Choice | Notes |
 |---|---|---|
-| Language / runtime | Python 3.12 | |
+| Language / runtime | Python 3.13 | 3.13 for `ssl` TLS-PSK support, which `tools/fake_device.py` needs; backend and hub use the same version. |
 | Web framework | FastAPI + Uvicorn | OpenAPI generated from code. |
 | Shared code | `core/` package | Contract models (mqtt.md, hub.md), rules engine, command checks, pin rules — identical on backend and hub. |
 | Validation | Pydantic v2 | |

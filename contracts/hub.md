@@ -75,7 +75,7 @@ Response `201`:
 
 ### 3.3 `POST /hub/v1/enroll/poll`
 
-Request: `{ "enroll_id": "01J9…", "secret": "<hex>" }` — the cloud checks `sha256(secret) == secret_sha256`.
+Request: `{ "enroll_id": "01J9…", "secret": "<hex>" }` — the cloud checks `sha256(secret) == secret_sha256`. `secret` is the 32 random bytes as 64 hex chars; the hash is taken over the **raw bytes**, and `secret_sha256` is its hex digest.
 
 | Response | Meaning |
 |---|---|

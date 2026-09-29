@@ -1,0 +1,282 @@
+"""Command service: creation, cancel, acks, expiry (Server_Specs §7)."""
+
+import logging
+from datetime import timedelta
+
+from sqlalchemy import select
+
+from mc_core.commands import CommandRejected, check_pump_run, expiry
+from mc_core.contract import topics
+from mc_core.contract.device import CmdAck
+from mc_core.contract.hub import HubCmd
+
+from ..context import Uow
+from ..db.models import CommandRow, Device, Household, Plant
+from ..db.types import utcnow
+from ..errors import Problem, not_found
+from . import alerts
+from .common import get_hub, now_ts, to_dt, to_ts
+from .devices import actuator
+
+log = logging.getLogger(__name__)
+
+OPEN = ("queued", "delivered", "cancelling")
+ORPHAN_ACK_TTL_S = 600
+
+
+# --- views ---------------------------------------------------------------------
+
+
+def view(c: CommandRow) -> dict:
+    now = utcnow()
+    # "running" is what the app shows for a delivered pump run still on.
+    running = c.status == "delivered" and c.ends_at is not None and c.ends_at > now
+    return {
+        "id": c.id,
+        "device_id": c.device_id,
+        "plant_id": c.plant_id,
+        "action": c.action,
+        "args": c.args,
+        "seconds": c.args.get("seconds"),
+        "status": c.status,
+        "state": "running" if running else c.status,
+        "reason": c.reason,
+        "source": c.source,
+        "origin": c.origin,
+        "rule_id": c.rule_id,
+        "created_at": c.created_at,
+        "exp": c.exp,
+        "delivered_at": c.delivered_at,
+        "ends_at": c.ends_at,
+        "finished_at": c.finished_at,
+    }
+
+
+# --- creation (§7.1) -------------------------------------------------------------
+
+
+async def _pending_pump(uow: Uow, device_id: str, slot: int) -> bool:
+    rows = await uow.s.scalars(select(CommandRow).where(
+        CommandRow.device_id == device_id, CommandRow.action == "pump.run",
+        CommandRow.status.in_(OPEN)))
+    return any(r.args.get("slot") == slot for r in rows)
+
+
+async def _last_run_end(uow: Uow, device_id: str, slot: int) -> int | None:
+    rows = await uow.s.scalars(select(CommandRow).where(
+        CommandRow.device_id == device_id, CommandRow.action == "pump.run",
+        CommandRow.status == "done").order_by(CommandRow.finished_at.desc()).limit(10))
+    for r in rows:
+        if r.args.get("slot") == slot:
+            return to_ts(r.finished_at)
+    return None
+
+
+def _insert(uow: Uow, device: Device, action: str, args: dict, *, source: str,
+            created_by: str | None, plant_id: str | None = None, rule_id: str | None = None,
+            cancel_of: str | None = None, command_id: str | None = None,
+            origin: str = "cloud", exp: int | None = None,
+            created_at: int | None = None) -> CommandRow:
+    now = created_at or now_ts()
+    cmd = CommandRow(household_id=device.household_id, device_id=device.id, plant_id=plant_id,
+                     action=action, args=args, status="queued", source=source, origin=origin,
+                     created_by=created_by, rule_id=rule_id, cancel_of=cancel_of,
+                     created_at=to_dt(now),
+                     exp=to_dt(exp if exp is not None else expiry(now, device.wake_interval_s)))
+    if command_id:
+        cmd.id = command_id
+    uow.s.add(cmd)
+    return cmd
+
+
+async def _send(uow: Uow, cmd: CommandRow) -> None:
+    await uow.s.flush()
+    uow.publish(topics.device(cmd.device_id, "cmd"), {
+        "id": cmd.id, "action": cmd.action, "exp": to_ts(cmd.exp), "args": cmd.args})
+    uow.emit(cmd.household_id, "command", {"id": cmd.id, "plant_id": cmd.plant_id,
+                                           "status": cmd.status})
+
+
+async def create_pump_run(uow: Uow, household_id: str, plant: Plant, seconds: int, *,
+                          source: str, created_by: str | None,
+                          rule_id: str | None = None) -> tuple[CommandRow, list[str]]:
+    """Returns the queued command and warnings (e.g. `hub_offline`)."""
+    if plant.pump_device_id is None or plant.pump_slot is None:
+        raise CommandRejected("slot_not_actuator", "plant has no pump")
+    device = await uow.s.get(Device, plant.pump_device_id)
+    if device is None or device.deleted_at is not None:
+        raise CommandRejected("slot_not_actuator", "pump device removed")
+    if device.gateway == "none":
+        raise CommandRejected("no_gateway", status=409)
+    check_pump_run(
+        seconds, actuator(device, plant.pump_slot), now=now_ts(),
+        last_run_ended_at=await _last_run_end(uow, device.id, plant.pump_slot),
+        pending=await _pending_pump(uow, device.id, plant.pump_slot))
+    cmd = _insert(uow, device, "pump.run", {"slot": plant.pump_slot, "seconds": seconds},
+                  source=source, created_by=created_by, plant_id=plant.id, rule_id=rule_id)
+    await _send(uow, cmd)
+    warnings = []
+    hub = await get_hub(uow, household_id)
+    if hub is not None and not hub.bridge_connected:
+        warnings.append("hub_offline")
+    return cmd, warnings
+
+
+DEVICE_ACTIONS = {
+    "identify": ("device.identify", {"seconds": 10}),
+    "service": ("device.service", {"minutes": 15}),
+    "reboot": ("device.reboot", {}),
+}
+
+
+async def device_action(uow: Uow, device: Device, action: str, args: dict | None,
+                        uid: str) -> CommandRow:
+    if action not in DEVICE_ACTIONS:
+        raise Problem(422, "unknown_action")
+    if device.gateway == "none":
+        raise CommandRejected("no_gateway", status=409)
+    wire_action, defaults = DEVICE_ACTIONS[action]
+    cmd = _insert(uow, device, wire_action, {**defaults, **(args or {})}, source="manual",
+                  created_by=uid)
+    await _send(uow, cmd)
+    await uow.commit()
+    return cmd
+
+
+# --- cancel (§7.3) ---------------------------------------------------------------
+
+
+async def get_command(uow: Uow, household_id: str, command_id: str) -> CommandRow:
+    cmd = await uow.s.scalar(select(CommandRow).where(
+        CommandRow.id == command_id, CommandRow.household_id == household_id))
+    if cmd is None:
+        raise not_found("command")
+    return cmd
+
+
+async def cancel(uow: Uow, household_id: str, command_id: str, uid: str) -> CommandRow:
+    cmd = await get_command(uow, household_id, command_id)
+    device = await uow.s.get(Device, cmd.device_id)
+    if cmd.status == "queued":
+        cmd.status = "cancelling"
+        cancel_cmd = _insert(uow, device, "cmd.cancel", {"target": cmd.id}, source="manual",
+                             created_by=uid, cancel_of=cmd.id, plant_id=cmd.plant_id)
+        await _send(uow, cancel_cmd)
+    elif cmd.status == "delivered" and cmd.action == "pump.run":
+        stop = _insert(uow, device, "pump.stop", {"slot": cmd.args.get("slot")},
+                       source="manual", created_by=uid, cancel_of=cmd.id, plant_id=cmd.plant_id)
+        await _send(uow, stop)
+    else:
+        raise Problem(409, "too_late", f"command is {cmd.status}")
+    uow.emit(household_id, "command", {"id": cmd.id, "plant_id": cmd.plant_id})
+    await uow.commit()
+    return cmd
+
+
+# --- acks (§7.2) -----------------------------------------------------------------
+
+
+async def handle_ack(uow: Uow, device: Device, ack: CmdAck) -> None:
+    cmd = await uow.s.scalar(select(CommandRow).where(
+        CommandRow.id == ack.id, CommandRow.device_id == device.id))
+    if cmd is None:
+        if await get_hub(uow, device.household_id) is not None:
+            # Hub-created command whose up/cmd hasn't arrived yet.
+            uow.ctx.orphan_acks[(device.id, ack.id)] = (ack.model_dump(), now_ts())
+        else:
+            log.info("ack for unknown command %s from %s", ack.id, device.id)
+        return
+    await _apply_ack(uow, device, cmd, ack)
+
+
+async def _apply_ack(uow: Uow, device: Device, cmd: CommandRow, ack: CmdAck) -> None:
+    now = utcnow()
+    before = cmd.status
+    if ack.status == "running":
+        if cmd.status in ("queued", "cancelling"):
+            cmd.status, cmd.delivered_at = "delivered", now
+            cmd.ends_at = to_dt(ack.ends_at) if ack.ends_at else None
+    elif ack.status == "done":
+        if cmd.status in ("queued", "delivered", "cancelling"):
+            cmd.status, cmd.finished_at = "done", to_dt(ack.ts) if ack.ts else now
+            cmd.delivered_at = cmd.delivered_at or now
+    elif ack.status == "cancelled":
+        if cmd.status in ("queued", "cancelling"):
+            cmd.status, cmd.finished_at = "cancelled", now
+    elif ack.status in ("rejected", "failed"):
+        if cmd.status in ("queued", "delivered", "cancelling"):
+            expired = ack.status == "rejected" and ack.reason == "expired"
+            cmd.status = "expired" if expired and before != "delivered" else "failed"
+            cmd.reason, cmd.finished_at = ack.reason, now
+            if cmd.status == "failed" and cmd.action == "pump.run":
+                await alerts.open_alert(uow, device.household_id, "command_failed", "command",
+                                        cmd.id, device.name, {"reason": ack.reason})
+    if cmd.status != before:
+        uow.emit(device.household_id, "command",
+                 {"id": cmd.id, "plant_id": cmd.plant_id, "status": cmd.status})
+
+
+# --- hub-created commands (§9.3) ---------------------------------------------------
+
+
+async def record_hub_command(uow: Uow, household_id: str, msg: HubCmd) -> None:
+    if await uow.s.get(CommandRow, msg.id) is not None:
+        return  # duplicate after reconnect
+    device = await uow.s.get(Device, msg.device)
+    if device is None or device.household_id != household_id:
+        log.warning("hub command for foreign device %s", msg.device)
+        return
+    plant_id = None
+    if msg.action == "pump.run":
+        plant_id = await uow.s.scalar(select(Plant.id).where(
+            Plant.household_id == household_id, Plant.pump_device_id == device.id,
+            Plant.pump_slot == msg.args.get("slot"), Plant.archived_at.is_(None)))
+    cmd = _insert(uow, device, msg.action, msg.args, source=msg.source, created_by=msg.rule_id,
+                  plant_id=plant_id, rule_id=msg.rule_id, command_id=msg.id, origin="hub",
+                  exp=msg.exp, created_at=msg.created_at)
+    await uow.s.flush()
+    uow.emit(household_id, "command", {"id": cmd.id, "plant_id": plant_id, "status": "queued"})
+    orphan = uow.ctx.orphan_acks.pop((device.id, msg.id), None)
+    if orphan is not None:
+        await _apply_ack(uow, device, cmd, CmdAck.model_validate(orphan[0]))
+
+
+# --- expiry job (§7.2) ---------------------------------------------------------------
+
+
+async def expire_overdue(uow: Uow) -> None:
+    now = utcnow()
+    cutoff = now_ts() - ORPHAN_ACK_TTL_S
+    for key, (_, received) in list(uow.ctx.orphan_acks.items()):
+        if received < cutoff:
+            log.warning("dropping ack for unknown hub command %s", key)
+            uow.ctx.orphan_acks.pop(key, None)
+
+    rows = (await uow.s.execute(
+        select(CommandRow, Device, Household.id)
+        .join(Device, Device.id == CommandRow.device_id)
+        .join(Household, Household.id == CommandRow.household_id)
+        .where(CommandRow.status.in_(OPEN)))).all()
+    paused: dict[str, bool] = {}
+    for cmd, device, hid in rows:
+        if hid not in paused:
+            hub = await get_hub(uow, hid)
+            # Paused while the hub is offline, plus one grace interval after.
+            paused[hid] = hub is not None and (
+                not hub.bridge_connected or (hub.bridge_changed_at is not None and
+                                             now - hub.bridge_changed_at <
+                                             timedelta(seconds=2 * device.wake_interval_s)))
+        if paused[hid]:
+            continue
+        grace = timedelta(seconds=2 * device.wake_interval_s)
+        if cmd.status in ("queued", "cancelling") and now > cmd.exp + grace:
+            cmd.status, cmd.reason, cmd.finished_at = "expired", "no_ack", now
+        elif cmd.status == "delivered" and cmd.ends_at and now > cmd.ends_at + grace:
+            cmd.status, cmd.reason, cmd.finished_at = "failed", "no_final_ack", now
+            if cmd.action == "pump.run":
+                await alerts.open_alert(uow, hid, "command_failed", "command", cmd.id,
+                                        device.name, {"reason": "no_final_ack"})
+        else:
+            continue
+        uow.emit(hid, "command", {"id": cmd.id, "plant_id": cmd.plant_id, "status": cmd.status})
+    await uow.commit()

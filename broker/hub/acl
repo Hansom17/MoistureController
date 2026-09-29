@@ -1,0 +1,12 @@
+# Hub broker: devices reach only their own subtree (Broker_Specs §2.3).
+pattern write mc/v1/%u/status
+pattern write mc/v1/%u/telemetry
+pattern write mc/v1/%u/event
+pattern write mc/v1/%u/cmd/ack
+pattern write mc/v1/%u/config/state
+pattern read mc/v1/%u/cmd
+pattern read mc/v1/%u/config/desired
+
+# The hub agent on the internal listener: everything.
+user mc-agent
+topic readwrite mc/#

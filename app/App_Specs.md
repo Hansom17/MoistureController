@@ -25,7 +25,7 @@ Phones first; tablets and desktop browsers get a two-pane layout on wide screens
 | Concern | Choice | Notes |
 |---|---|---|
 | Framework | Flutter (stable channel), Dart 3 | |
-| State management | **Riverpod** (`flutter_riverpod`, code generation) | Providers per household scope; easy invalidation on SSE events |
+| State management | **Riverpod** (`flutter_riverpod`; code generation planned — v1 uses hand-written providers) | Providers per household scope; easy invalidation on SSE events |
 | Routing | `go_router` | Deep links `/join`, `/hub`, notification taps |
 | API client | Generated from `contracts/api.yaml` (`openapi-generator`, `dart-dio`) | Never hand-written; regenerated in CI when the spec changes |
 | HTTP | `dio` with interceptors (auth, errors, app version) | |
