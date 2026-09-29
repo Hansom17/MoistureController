@@ -110,7 +110,7 @@ class _ClaimFormState extends ConsumerState<_ClaimForm> {
     super.dispose();
   }
 
-  /// 8 Crockford base32 chars, dash and spaces optional (hub.md §3.1).
+  /// 8 Crockford base32 chars, dash and spaces optional (gateway_api.md §3.1).
   static bool _valid(String code) => RegExp(
     r'^[0-9A-Za-z]{8}$',
   ).hasMatch(code.replaceAll(RegExp(r'[\s-]'), ''));

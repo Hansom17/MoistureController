@@ -15,7 +15,7 @@ from mc_core.rules import Decision, RuleContext, RuleSpec, evaluate, start_of_da
 
 def test_ids_have_contract_shape():
     assert len(ids.new_device_id()) == 19 and ids.new_device_id().startswith("mc-")
-    assert ids.new_hub_id().startswith("hub-") and len(ids.new_hub_id()) == 20
+    assert ids.new_gateway_id().startswith("gw-") and len(ids.new_gateway_id()) == 19
     assert len(ids.new_id()) == 26
     code = ids.new_user_code()
     assert len(code) == 9 and code[4] == "-"
@@ -28,9 +28,8 @@ def test_ids_have_contract_shape():
 
 def test_topic_parse():
     t = topics.parse("mc/v1/mc-abc/cmd/ack")
-    assert (t.kind, t.id, t.suffix) == ("device", "mc-abc", "cmd/ack")
-    t = topics.parse("mc/hub/v1/hub-x/up/state")
-    assert (t.kind, t.id, t.suffix) == ("hub", "hub-x", "up/state")
+    assert (t.id, t.suffix) == ("mc-abc", "cmd/ack")
+    assert topics.parse("mc/hub/v1/hub-x/up/state") is None
     assert topics.parse("other/topic") is None
 
 

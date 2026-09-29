@@ -13,7 +13,6 @@ from sqlalchemy import select
 from mc_core.contract.device import ConfigDesired
 
 from .auth.verify import Principal
-from .broker_files.generate import BrokerFiles
 from .config import Settings
 from .context import AppContext
 from .crypto import KeyBox
@@ -22,7 +21,6 @@ from .db.session import create_all, make_engine, make_sessionmaker
 from .notify.push import PushSender
 from .realtime.bus import EventBus
 from .services import devices, households, plants
-from .services.common import get_hub
 
 DEV_CONFIG = ConfigDesired(rev=2, wake_interval_s=600, slots=[
     {"slot": 0, "module": "moisture_capacitive", "pin": 34, "cal": {"dry": 3000, "wet": 1200}},
@@ -33,21 +31,10 @@ DEV_CONFIG = ConfigDesired(rev=2, wake_interval_s=600, slots=[
 
 
 async def _bundle(uow, ctx: AppContext, device: Device, uid: str) -> dict:
-    """The existing key if the device is on the right gateway, else a rekey.
-
-    Reusing the key keeps a running simulator connected; a rekey is only
-    needed after a gateway change (hub added or removed, §8.1).
-    """
-    hub = await get_hub(uow, device.household_id)
-    wanted = "hub" if hub is not None else "cloud"
-    if device.psk_enc is None or device.gateway != wanted:
-        return await devices.rekey(uow, device, uid)  # hub must be online for this
-    if hub is not None:
-        state = hub.last_state or {}
-        host = hub.lan_host_override or state.get("lan_host")
-        port = int(state.get("lan_port", 8883))
-    else:
-        host, port = ctx.settings.broker_public_host, ctx.settings.broker_public_port
+    """The existing key (reusing it keeps a running simulator connected)."""
+    if device.psk_enc is None:
+        return await devices.rekey(uow, device, uid)
+    host, port = ctx.settings.broker_public_host, ctx.settings.broker_public_port
     return {"device_id": device.id,
             "mqtt": {"host": host, "port": port, "psk": ctx.keys.decrypt(device.psk_enc)}}
 
@@ -91,9 +78,6 @@ async def seed(uid: str) -> None:
             await plants.create(uow, household.id, {
                 "name": "Monstera", "sensor_device_id": device.id, "sensor_slot": 1}, uid)
 
-    # This process isn't the backend: write the broker's psk/acl files now so
-    # the simulator can connect without waiting for a backend restart.
-    await BrokerFiles(ctx, settings.broker_files_dir).regenerate()
     await engine.dispose()
     # Bundle on stdout (redirect into a file), messages on stderr.
     print(json.dumps(bundle, indent=2))

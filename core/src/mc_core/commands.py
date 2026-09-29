@@ -1,4 +1,4 @@
-"""Command checks shared by the backend and the hub (Server_Specs §7.1).
+"""Command checks shared by the API server and the gateway (Api_Specs §7.1).
 
 The device checks again and remains the final authority.
 """

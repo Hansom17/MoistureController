@@ -1,4 +1,8 @@
-"""FastAPI application: API, MQTT connection, SSE and jobs in one process (§2)."""
+"""FastAPI application: API, SSE and jobs in one process.
+
+v1 code kept as the starting point for api/ (PROJECT.md §11); the gateway
+WebSocket endpoint replaces the removed MQTT connection.
+"""
 
 import asyncio
 import logging
@@ -11,16 +15,14 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from mc_core.commands import CommandRejected
 
-from .api import activity, devices, export, households, hub, me, plants
+from .api import activity, devices, export, households, me, plants
 from .auth.verify import DevVerifier, FirebaseVerifier, TokenVerifier
-from .broker_files.generate import BrokerFiles
 from .config import Settings
 from .context import AppContext
 from .crypto import KeyBox
 from .db.session import create_all, make_engine, make_sessionmaker
 from .errors import Problem, command_rejected_handler, problem_handler, problem_response
 from .jobs import runner
-from .mqtt.client import MqttService
 from .notify.push import FcmPushSender, PushSender
 from .realtime.bus import EventBus
 
@@ -56,21 +58,11 @@ def create_app(settings: Settings | None = None, *, verifier: TokenVerifier | No
         ctx = AppContext(settings=settings, engine=engine,
                          sessionmaker=make_sessionmaker(engine),
                          keys=KeyBox(settings.key_encryption_key), bus=EventBus(), push=push)
-        files = BrokerFiles(ctx, settings.broker_files_dir)
-        ctx.broker_files_changed = files.schedule
         app.state.ctx = ctx
         app.state.verifier = verifier
-        app.state.broker_files = files
         tasks: list[asyncio.Task] = []
         if background:
-            await files.regenerate()  # never drift from the DB for long (§10.3)
             tasks.append(asyncio.create_task(runner.run_forever(ctx), name="jobs"))
-            if settings.mqtt_host:
-                mqtt = MqttService(ctx)
-                app.state.mqtt = mqtt
-                tasks.append(asyncio.create_task(mqtt.run_forever(), name="mqtt"))
-            else:
-                log.warning("MC_MQTT_HOST not set: MQTT disabled")
         yield
         for t in tasks:
             t.cancel()
@@ -114,9 +106,8 @@ def create_app(settings: Settings | None = None, *, verifier: TokenVerifier | No
                            expose_headers=["Content-Disposition"])
 
     for r in (me.router, households.router, devices.router, plants.router, activity.router,
-              hub.router, export.router):
+              export.router):
         app.include_router(r, prefix=API_PREFIX)
-    app.include_router(hub.enroll_router)
 
     @app.get("/healthz", include_in_schema=False)
     async def healthz():

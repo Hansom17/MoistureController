@@ -24,4 +24,4 @@ dart run tool/gen_color_scheme.dart
 
 Done: theme + design tokens, dashboard, household switcher, plant detail (chart, water now, commands, rules), devices, device detail, alerts, settings (theme, language), role-aware UI, live-update wiring, DE/EN.
 
-Not yet: real API client (needs `contracts/api.yaml` from the backend) and `main_prod.dart`, Firebase login/push, BLE pairing, slot editor, members/invites, hub screen, export, Widgetbook catalog.
+Not yet: generated API client (needs `contracts/api.yaml` from the API server) and `main_prod.dart`, Firebase login/push, BLE pairing, slot editor, members/invites, export, Widgetbook catalog. The hub screen becomes the gateway screen (App_Specs §12, PROJECT D33).

@@ -1,6 +1,6 @@
-"""Shared code of the MoistureController backend and hub.
+"""Shared code of the MoistureController API server and gateway.
 
-Everything here must behave identically in the cloud and on a hub: contract
-models (contracts/mqtt.md, contracts/hub.md), pin rules, command checks and the
-rules engine.
+Everything here must behave identically wherever it runs: contract models
+(contracts/mqtt.md, contracts/gateway_api.md), pin rules, command checks and
+the rules engine.
 """

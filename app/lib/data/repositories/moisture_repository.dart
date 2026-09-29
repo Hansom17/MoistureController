@@ -36,7 +36,7 @@ abstract interface class MoistureRepository {
   /// The household's hub, or null if it has none.
   Future<HubInfo?> hub(String householdId);
 
-  /// Claims an enrolling hub by the code it shows (hub.md §3.2).
+  /// Claims an enrolling hub by the code it shows (gateway_api.md §3.2).
   Future<HubInfo> claimHub(String householdId, String userCode);
   Future<HubInfo> setHubLanHost(String householdId, String? lanHostOverride);
   Future<void> removeHub(String householdId);

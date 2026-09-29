@@ -5,7 +5,7 @@ import 'package:web/web.dart' as web;
 
 import 'sse.dart';
 
-/// Event names the backend sends (Server_Specs §6.2 + ping).
+/// Event names the backend sends (Api_Specs §6.2 + ping).
 const _kinds = [
   'reading',
   'command',

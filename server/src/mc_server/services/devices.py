@@ -1,4 +1,4 @@
-"""Devices, keys, pairing bundles and config sync (Server_Specs §8)."""
+"""Devices, keys, pairing bundles and config sync (Api_Specs §8)."""
 
 from sqlalchemy import select
 
@@ -11,8 +11,7 @@ from ..context import Uow
 from ..db.models import CommandRow, ConfigRevision, Device, Plant
 from ..db.types import utcnow
 from ..errors import Problem
-from . import hubs
-from .common import audit, get_hub
+from .common import audit
 
 DEFAULT_WAKE_S = 600
 BATTERY_EMPTY_MV, BATTERY_FULL_MV = 3300, 4150
@@ -58,33 +57,19 @@ def actuator(d: Device, slot: int) -> Actuator | None:
 # --- adding, re-keying, removing ------------------------------------------------
 
 
-async def _gateway_for(uow: Uow, household_id: str) -> tuple[str, str, int]:
-    """(gateway, host, port) for a new pairing bundle (§8.1 step 2)."""
-    hub = await get_hub(uow, household_id)
-    if hub is None:
-        s = uow.ctx.settings
-        return "cloud", s.broker_public_host, s.broker_public_port
-    if not hub.bridge_connected:
-        raise Problem(409, "hub_offline")
-    state = hub.last_state or {}
-    host = hub.lan_host_override or state.get("lan_host")
-    if not host:
-        raise Problem(409, "hub_offline", "hub has not reported its LAN address yet")
-    return "hub", host, int(state.get("lan_port", 8883))
-
-
 async def _install_key(uow: Uow, device: Device) -> dict:
-    gateway, host, port = await _gateway_for(uow, device.household_id)
-    was_hub = device.gateway == "hub"
+    """New PSK + pairing bundle.
+
+    Migration state: the bundle still points to MC_BROKER_PUBLIC_HOST; in v2 the
+    key goes to the household's gateway and the bundle to its LAN address
+    (Api_Specs §8.1).
+    """
+    s = uow.ctx.settings
     psk = ids.new_psk()
     device.psk_enc = uow.ctx.keys.encrypt(psk)
-    device.gateway = gateway
-    uow.broker_files_changed()  # cloud PSK file, or the hub's ACL on the cloud broker
-    if gateway == "hub" or was_hub:
-        await hubs.publish_keys(uow, device.household_id)
-    if gateway == "hub":
-        await hubs.republish_snapshot(uow, device.household_id)  # device joins the snapshot
-    return {"device_id": device.id, "mqtt": {"host": host, "port": port, "psk": psk}}
+    device.gateway = "cloud"
+    return {"device_id": device.id,
+            "mqtt": {"host": s.broker_public_host, "port": s.broker_public_port, "psk": psk}}
 
 
 async def create_device(uow: Uow, household_id: str, name: str, uid: str) -> tuple[Device, dict]:
@@ -126,10 +111,6 @@ async def delete_device(uow: Uow, device: Device, uid: str) -> None:
             p.sensor_device_id, p.sensor_slot = None, None
         if p.pump_device_id == device.id:
             p.pump_device_id, p.pump_slot = None, None
-    uow.broker_files_changed()
-    if await get_hub(uow, hid) is not None:
-        await hubs.publish_keys(uow, hid)
-    await hubs.republish_snapshot(uow, hid)
     audit(uow, hid, uid, "device.delete", {"device_id": device.id})
     uow.emit(hid, "device", {"id": device.id, "deleted": True})
     await uow.commit()
@@ -160,20 +141,10 @@ async def put_config(uow: Uow, device: Device, base_rev: int, wake_interval_s: i
     if errors:
         raise Problem(422, errors[0].code, errors[0].detail,
                       errors=[e.model_dump(exclude_none=True) for e in errors])
-    # The hub snapshot is rebuilt when the device *reports* the new config
-    # (ingest), since command checks use the reported limits.
     await _set_desired(uow, device, cfg, uid)
     uow.emit(device.household_id, "config", {"device_id": device.id, "rev": cfg.rev})
     await uow.commit()
     return device
-
-
-def actuator_limits(body: dict | None) -> list:
-    """What the hub snapshot needs from a config; used to detect changes."""
-    body = body or {}
-    return [body.get("wake_interval_s"), body.get("limits")] + [
-        (s.get("slot"), s.get("max_run_s"), s.get("min_pause_s"))
-        for s in body.get("slots", []) if s.get("module") == "pump_relay"]
 
 
 def config_view(d: Device) -> dict:

@@ -1,4 +1,4 @@
-"""Identifiers: ULIDs, device IDs, hub IDs and hub user codes."""
+"""Identifiers: ULIDs, device IDs, gateway IDs and enrollment user codes."""
 
 import secrets
 
@@ -22,13 +22,13 @@ def new_device_id() -> str:
     return "mc-" + _random_base32(16)
 
 
-def new_hub_id() -> str:
-    """`hub-` + 16 lowercase Crockford base32 chars, hub.md §2."""
-    return "hub-" + _random_base32(16)
+def new_gateway_id() -> str:
+    """`gw-` + 16 lowercase Crockford base32 chars, gateway_api.md §2."""
+    return "gw-" + _random_base32(16)
 
 
 def new_user_code() -> str:
-    """8 uppercase Crockford chars shown as `XXXX-XXXX` (hub.md §3.1)."""
+    """8 uppercase Crockford chars shown as `XXXX-XXXX` (gateway_api.md §3.1)."""
     code = _random_base32(8).upper()
     return f"{code[:4]}-{code[4:]}"
 

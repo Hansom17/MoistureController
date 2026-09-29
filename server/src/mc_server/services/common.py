@@ -4,7 +4,7 @@ from datetime import UTC, datetime
 from sqlalchemy import select
 
 from ..context import Uow
-from ..db.models import AuditLog, Device, Hub, Plant
+from ..db.models import AuditLog, Device, Plant
 from ..errors import not_found
 
 
@@ -34,10 +34,6 @@ async def get_plant(uow: Uow, household_id: str, plant_id: str) -> Plant:
     if plant is None:
         raise not_found("plant")
     return plant
-
-
-async def get_hub(uow: Uow, household_id: str) -> Hub | None:
-    return await uow.s.scalar(select(Hub).where(Hub.household_id == household_id))
 
 
 def audit(uow: Uow, household_id: str | None, actor: str | None, action: str,

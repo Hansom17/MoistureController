@@ -93,8 +93,7 @@ class FakeDevice:
 @pytest.fixture
 async def app(tmp_path):
     settings = Settings(database_url=f"sqlite+aiosqlite:///{tmp_path}/test.db",
-                        broker_files_dir=tmp_path / "broker", auth_mode="dev",
-                        broker_public_host="mqtt.example.com")
+                        auth_mode="dev", broker_public_host="mqtt.example.com")
     application = create_app(settings, background=False)
     async with application.router.lifespan_context(application):
         yield application

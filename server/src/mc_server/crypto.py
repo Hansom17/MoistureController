@@ -1,4 +1,4 @@
-"""AES-256-GCM encryption of PSKs at rest (Server_Specs §4)."""
+"""AES-256-GCM encryption of PSKs at rest (Api_Specs §4)."""
 
 import base64
 import os

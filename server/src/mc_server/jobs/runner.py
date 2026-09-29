@@ -1,4 +1,4 @@
-"""Periodic jobs: expiry, late/offline, hub alerts, cleanup (Server_Specs §3)."""
+"""Periodic jobs: expiry, late/offline, cleanup."""
 
 import asyncio
 import logging
@@ -7,24 +7,21 @@ from datetime import timedelta
 from sqlalchemy import delete, select
 
 from ..context import AppContext, Uow
-from ..db.models import Device, Hub, HubEnrollment, Outbox
+from ..db.models import Device, Outbox
 from ..db.types import utcnow
-from ..services import alerts, commands, hubs
+from ..services import alerts, commands
 
 log = logging.getLogger(__name__)
 
 
 async def device_status(uow: Uow) -> None:
-    """late after 1 missed interval, offline after 3 (§8.3); paused while hub offline."""
+    """late after 1 missed interval, offline after 3 (Api_Specs §8.3)."""
     now = utcnow()
-    offline_hubs = set((await uow.s.scalars(select(Hub.household_id).where(
-        Hub.bridge_connected.is_(False)))).all())
     devices = await uow.s.scalars(select(Device).where(
         Device.deleted_at.is_(None), Device.next_expected_at.is_not(None),
         Device.status.in_(("online", "sleeping", "service", "late"))))
     for d in devices:
-        if d.gateway == "hub" and d.household_id in offline_hubs:
-            continue
+        # v2: skip households whose gateway is offline (Api_Specs §8.3).
         interval = timedelta(seconds=d.wake_interval_s)
         overdue = now - d.next_expected_at
         if overdue > 3 * interval:
@@ -40,8 +37,6 @@ async def device_status(uow: Uow) -> None:
 
 async def cleanup(uow: Uow) -> None:
     now = utcnow()
-    await uow.s.execute(delete(HubEnrollment).where(
-        HubEnrollment.created_at < now - timedelta(hours=24)))
     await uow.s.execute(delete(Outbox).where(
         Outbox.sent_at.is_not(None), Outbox.sent_at < now - timedelta(days=7)))
     # Devices never paired within 24 h are removed with their keys (§8.1).
@@ -51,12 +46,10 @@ async def cleanup(uow: Uow) -> None:
     for d in stale:
         d.deleted_at, d.psk_enc, d.gateway = now, None, "none"
         uow.emit(d.household_id, "device", {"id": d.id, "deleted": True})
-    if stale:
-        uow.broker_files_changed()
     await uow.commit()
 
 
-JOBS = (commands.expire_overdue, device_status, hubs.raise_offline_alerts, cleanup)
+JOBS = (commands.expire_overdue, device_status, cleanup)
 
 
 async def run_once(ctx: AppContext) -> None:

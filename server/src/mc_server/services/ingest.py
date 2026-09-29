@@ -1,4 +1,8 @@
-"""MQTT ingest pipeline (Server_Specs §10.2)."""
+"""Ingest of device messages (mqtt.md payloads).
+
+v1 entry point is an MQTT topic + payload; in v2 the same logic is fed by the
+gateway WebSocket's normalized device messages (Api_Specs §9.5).
+"""
 
 import json
 import logging
@@ -29,8 +33,8 @@ from ..db.models import (
     ReadingRow,
 )
 from ..db.types import utcnow
-from . import alerts, commands, hubs, rules
-from .common import get_hub, to_dt
+from . import alerts, commands
+from .common import to_dt
 
 log = logging.getLogger(__name__)
 
@@ -44,9 +48,6 @@ async def handle(uow: Uow, topic: str, payload: bytes, retained: bool = False) -
     t = topics.parse(topic)
     if t is None:
         log.debug("foreign topic %s", topic)
-        return
-    if t.kind == "hub":
-        await hubs.handle_report(uow, t.id, t.suffix, payload)
         return
     if t.suffix not in topics.DEVICE_UP:
         return  # our own cmd / config/desired echoing back
@@ -131,12 +132,7 @@ async def _timestamp(uow: Uow, device: Device, ts: int | None):
     if ts is None:
         return now, "server"
     at = to_dt(ts)
-    past = TS_PAST
-    hub = await get_hub(uow, device.household_id)
-    if hub is not None:
-        past += timedelta(seconds=hub.last_outage_s or 0)
-        if not hub.bridge_connected and hub.bridge_changed_at:
-            past += now - hub.bridge_changed_at
+    past = TS_PAST  # v2: + the gateway's offline duration (Api_Specs §9.5)
     if now - past <= at <= now + TS_FUTURE:
         return at, "device"
     return now, "server"
@@ -151,7 +147,6 @@ async def _telemetry(uow: Uow, device: Device, msg: Telemetry) -> None:
     plants = {(p.sensor_slot): p for p in await uow.s.scalars(select(Plant).where(
         Plant.household_id == hid, Plant.sensor_device_id == device.id,
         Plant.archived_at.is_(None)))}
-    has_hub = await get_hub(uow, hid) is not None
     streak = dict(device.sensor_error_streak or {})
     touched: list[str] = []
 
@@ -172,10 +167,7 @@ async def _telemetry(uow: Uow, device: Device, msg: Telemetry) -> None:
             if not any(v >= SENSOR_ERROR_CYCLES for v in streak.values()):
                 await alerts.resolve_alert(uow, hid, "sensor_error", device.id)
         if plant is not None and r.type == "soil_moisture":
-            touched.append(plant.id)
-            if not has_hub:  # hub households: the hub decides (§10.2)
-                await rules.run_for_reading(uow, household, plant, r.value, r.error, {
-                    "device": device.id, "slot": r.slot, "seq": msg.seq, "value": r.value})
+            touched.append(plant.id)  # rules run on the gateway (D36)
     device.sensor_error_streak = streak
 
     h = msg.health
@@ -222,11 +214,8 @@ async def _event(uow: Uow, device: Device, msg: Event) -> None:
 
 
 async def _config_state(uow: Uow, device: Device, msg: ConfigState) -> None:
-    from .devices import actuator_limits
-
     hid = device.household_id
     body = msg.model_dump(exclude_none=True)
-    before = actuator_limits(device.reported_config)
     device.reported_rev = msg.rev
     device.reported_config = body
     device.wake_interval_s = msg.wake_interval_s
@@ -242,6 +231,4 @@ async def _config_state(uow: Uow, device: Device, msg: ConfigState) -> None:
     elif device.reported_rev == device.desired_rev:
         device.rejected_rev, device.config_error = None, None
         await alerts.resolve_alert(uow, hid, "config_rejected", device.id)
-    if actuator_limits(body) != before:
-        await hubs.republish_snapshot(uow, hid)
     uow.emit(hid, "config", {"device_id": device.id, "rev": msg.rev})

@@ -1,4 +1,5 @@
-# Cloud stack: backend + Mosquitto + PostgreSQL (Server_Specs §13).
+# Central stack: backend (v1 code, becomes api/) + PostgreSQL (Api_Specs §13).
+# No MQTT broker here anymore — devices connect to their gateway (PROJECT D33).
 # Runs unchanged on the Raspberry Pi (phase 1), a cloud VM (phase 2) and a
 # developer machine. Everything site-specific lives in .env + secrets/.
 #
@@ -27,29 +28,6 @@ services:
       interval: 5s
       retries: 20
 
-  mosquitto:
-    <<: *restart
-    build: ../broker
-    image: mc-broker:local
-    environment:
-      MC_BROKER_ROLE: cloud
-      MC_WATCH_DIR: /broker-files
-      MC_BROKER_USER: mc-backend
-      MC_BROKER_PASSWORD_FILE: /run/secrets/mqtt_backend_password
-    secrets: [mqtt_backend_password]
-    # The backend creates broker-files with the right owner and writes psk/acl
-    # before Mosquitto can start; the backend's MQTT client retries meanwhile.
-    depends_on:
-      backend: {condition: service_started}
-    volumes:
-      - ../broker/cloud/mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
-      - mosquitto-data:/mosquitto/data
-      - broker-files:/broker-files:ro
-    ports:
-      - "${MC_MQTT_BIND:-0.0.0.0:8883}:8883"   # TLS-PSK only; 1883 stays internal
-    read_only: true
-    tmpfs: [/tmp]   # mosquitto_passwd writes a temp file
-
   backend:
     <<: *restart
     build:
@@ -62,12 +40,7 @@ services:
       MC_AUTH_MODE: ${MC_AUTH_MODE:-firebase}
       MC_DATABASE_URL: postgresql+asyncpg://mc:{password}@postgres:5432/mc
       MC_DATABASE_PASSWORD_FILE: /run/secrets/postgres_password
-      MC_MQTT_HOST: mosquitto
-      MC_MQTT_PORT: "1883"
-      MC_MQTT_USERNAME: mc-backend
-      MC_MQTT_PASSWORD_FILE: /run/secrets/mqtt_backend_password
-      MC_BROKER_FILES_DIR: /broker-files
-      MC_BROKER_PUBLIC_HOST: ${MC_BROKER_PUBLIC_HOST:?set in .env}
+      MC_BROKER_PUBLIC_HOST: ${MC_BROKER_PUBLIC_HOST:-localhost}   # pairing-bundle host until gateways key devices
       MC_BROKER_PUBLIC_PORT: ${MC_BROKER_PUBLIC_PORT:-8883}
       MC_KEY_ENCRYPTION_KEY_FILE: /run/secrets/key_encryption_key
       MC_FIREBASE_CREDENTIALS: ${MC_FIREBASE_CREDENTIALS:-}
@@ -76,10 +49,8 @@ services:
       MC_APP_URL: ${MC_APP_URL:-http://localhost:8420}
       MC_CORS_ORIGINS: ${MC_CORS_ORIGINS:-}
       MC_MIN_APP_VERSION: ${MC_MIN_APP_VERSION:-}
-      MC_LATEST_HUB_VERSION: ${MC_LATEST_HUB_VERSION:-0.1.0}
-    secrets: [postgres_password, mqtt_backend_password, key_encryption_key]
+    secrets: [postgres_password, key_encryption_key]
     volumes:
-      - broker-files:/broker-files
       - ${MC_FIREBASE_CREDENTIALS_DIR:-./secrets/firebase}:/run/firebase:ro
     ports:
       - "${MC_API_BIND:-127.0.0.1:8000}:8000"
@@ -104,11 +75,8 @@ services:
 
 secrets:
   postgres_password: {file: ./secrets/postgres_password}
-  mqtt_backend_password: {file: ./secrets/mqtt_backend_password}
   key_encryption_key: {file: ./secrets/key_encryption_key}
 
 volumes:
   postgres-data:
-  mosquitto-data:
-  broker-files:
   caddy-data:

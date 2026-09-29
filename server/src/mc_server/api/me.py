@@ -1,14 +1,13 @@
 from fastapi import APIRouter, Response
-from sqlalchemy import select
 
 from mc_core import pins
 
 from ..auth.deps import CurrentUser, UowDep
-from ..db.models import Hub, PushToken, User
+from ..db.models import PushToken, User
 from ..errors import not_found
 from ..realtime.bus import TICKET_TTL_S
 from ..services import households
-from .schemas import HouseholdOut, HubSummary, MeOut, PushTokenIn, TicketOut
+from .schemas import HouseholdOut, MeOut, PushTokenIn, TicketOut
 
 router = APIRouter(tags=["me"])
 
@@ -30,13 +29,8 @@ async def delete_me(user: CurrentUser, uow: UowDep):
 async def my_households(user: CurrentUser, uow: UowDep):
     out = []
     for h, role in await households.list_for_user(uow, user.uid):
-        hub = await uow.s.scalar(select(Hub).where(Hub.household_id == h.id))
-        out.append(HouseholdOut(
-            id=h.id, name=h.name, timezone=h.timezone, battery_low_mv=h.battery_low_mv,
-            role=role,
-            hub=None if hub is None else HubSummary(
-                online=hub.bridge_connected,
-                offline_since=None if hub.bridge_connected else hub.bridge_changed_at)))
+        out.append(HouseholdOut(id=h.id, name=h.name, timezone=h.timezone,
+                                battery_low_mv=h.battery_low_mv, role=role))
     return out
 
 

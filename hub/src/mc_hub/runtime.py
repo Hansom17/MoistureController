@@ -1,11 +1,13 @@
-"""The running agent: enrollment, then the local MQTT connection (Hub_Specs §3)."""
+"""The running service: enrollment, then the local MQTT connection (Gateway_Specs §3).
+
+The WebSocket uplink to the API server is not implemented yet; until then up
+messages accumulate in the outbox (`mc-hub outbox`).
+"""
 
 import asyncio
 import logging
 
 import aiomqtt
-
-from mc_core.contract import topics
 
 from .agent import Agent
 from .config import HubConfig
@@ -23,25 +25,20 @@ def connect(cfg: HubConfig, client_id: str) -> aiomqtt.Client:
 
 async def run(cfg: HubConfig) -> None:
     cfg.data_dir.mkdir(parents=True, exist_ok=True)
-    # The broker waits for these; empty psk = no device can connect yet.
-    (cfg.broker_dir / "conf.d").mkdir(parents=True, exist_ok=True)
+    # The broker waits for the psk file; empty = no device can connect yet.
+    cfg.broker_dir.mkdir(parents=True, exist_ok=True)
     if not (cfg.broker_dir / "psk").exists():
         (cfg.broker_dir / "psk").write_text("")
         (cfg.broker_dir / "psk").chmod(0o640)
     store = Store(cfg.db_path)
     agent = Agent(cfg, store)
 
-    if not agent.hub_id:
+    if not agent.gateway_id:
         log.info("not enrolled yet")
         creds = await enroll(cfg)
-        agent.enrolled(creds.hub_id, creds.mqtt.host, creds.mqtt.port, creds.mqtt.psk)
-        log.info("enrolled as %s for household '%s'; the broker restarts with the bridge",
-                 creds.hub_id, creds.household_name)
-    else:
-        # Keep the bridge config in line with the stored device list.
-        import json
-
-        agent.write_bridge(json.loads(store.get("devices", "[]")))
+        agent.enrolled(creds.gateway_id, creds.credential)
+        log.info("enrolled as %s for household '%s'", creds.gateway_id, creds.household_name)
+    log.warning("uplink to the API server not implemented yet: up messages stay in the outbox")
 
     backoff = 1
     while True:
@@ -54,15 +51,14 @@ async def run(cfg: HubConfig) -> None:
 
                 agent.set_publisher(publish)
                 await client.subscribe("mc/v1/+/#", qos=1)
-                await client.subscribe(topics.hub(agent.hub_id, "#"), qos=1)
                 log.info("connected to the local broker")
-                await agent.publish_state()
+                agent.publish_state()
 
                 async def periodic():
                     while True:
                         await asyncio.sleep(cfg.state_interval_s)
                         agent.housekeeping()
-                        await agent.publish_state()
+                        agent.publish_state()
 
                 ticker = asyncio.create_task(periodic())
                 try:

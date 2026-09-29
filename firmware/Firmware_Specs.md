@@ -65,17 +65,17 @@ Auto-detect capability depends entirely on the bus, not on wanting it to exist:
 
 - Module slot table lives in **Zephyr settings** (NVS partition) — persists across reboots and sleep cycles.
 - Two ways to change it:
-  1. **Remote, via MQTT** — the server publishes the full desired config on `config/desired` (with a revision number); the device validates it, applies it atomically, persists it and reports back on `config/state`. See [`contracts/mqtt.md`](../contracts/mqtt.md) §6. This is the normal "on the fly" path once the device is deployed.
+  1. **Remote, via MQTT** — the gateway publishes (on behalf of the API server) the full desired config on `config/desired` (with a revision number); the device validates it, applies it atomically, persists it and reports back on `config/state`. See [`contracts/mqtt.md`](../contracts/mqtt.md) §6. This is the normal "on the fly" path once the device is deployed.
   2. **Local maintenance mode** — holding the BOOT button (GPIO0, already wired) for 3 s keeps the device awake and connected (skips the sleep cycle) so it can be reconfigured interactively over USB console or MQTT without racing the sleep timer, **and opens the BLE pairing window for 5 min**. Holding it for 10 s is a factory reset. Needed because during normal operation the wake window is short and easy to miss.
 
 ### Provisioning and pairing
 
-WiFi credentials, the gateway address (hub on the LAN or cloud broker), the TLS-PSK key and the cloud-assigned device ID arrive over BLE using the PoP-authenticated, encrypted protocol in [`contracts/ble.md`](../contracts/ble.md). Firmware requirements from it:
+WiFi credentials, the gateway's broker address on the LAN, the TLS-PSK key and the device ID assigned by the API server arrive over BLE using the PoP-authenticated, encrypted protocol in [`contracts/ble.md`](../contracts/ble.md). Firmware requirements from it:
 
 - A **factory NVS partition** holding the 16-byte PoP, written at flash time by `tools/make_label.py` (which also prints the QR label) and never erased by factory reset.
 - BLE advertising only while unprovisioned or in maintenance mode; closes after 5 failed handshakes.
 - X25519, HKDF-SHA256, HMAC-SHA256 and AES-128-GCM via PSA Crypto / Mbed TLS.
-- **MQTT over TLS-PSK** ([`contracts/mqtt.md`](../contracts/mqtt.md) §2): Zephyr TLS sockets with `TLS_CREDENTIAL_PSK` + `TLS_CREDENTIAL_PSK_ID`, Mbed TLS with `MBEDTLS_KEY_EXCHANGE_PSK_ENABLED` and the `TLS_PSK_WITH_AES_128_GCM_SHA256` suite only (keeps code size and RAM small). Same code path whether the gateway is a hub or the cloud broker.
+- **MQTT over TLS-PSK** ([`contracts/mqtt.md`](../contracts/mqtt.md) §2): Zephyr TLS sockets with `TLS_CREDENTIAL_PSK` + `TLS_CREDENTIAL_PSK_ID`, Mbed TLS with `MBEDTLS_KEY_EXCHANGE_PSK_ENABLED` and the `TLS_PSK_WITH_AES_128_GCM_SHA256` suite only (keeps code size and RAM small).
 - Early check needed: **BLE + WiFi coexistence** on the ESP32 under Zephyr (the `test` step runs WiFi while the BLE connection is up), and flash/RAM budget of the BLE stack.
 
 ## Connectivity: WiFi + MQTT
@@ -128,5 +128,5 @@ There's no single right number; it's a battery-life vs. responsiveness tradeoff 
 ## Open decisions (yours to make, not architectural)
 
 - Exact wake interval default and whether it should adapt (e.g. shorter during active watering schedules, longer otherwise).
-- MQTT broker: self-hosted vs. cloud, TLS or not, auth scheme — affects connect-time power cost and code in phase 4.
+- ~~MQTT broker: self-hosted vs. cloud, TLS or not, auth scheme~~ — decided: the household's gateway broker on the LAN, TLS-PSK (PROJECT D29, D33).
 - Full list of sensor types beyond moisture (affects how many driver files phase 1 needs, not the architecture itself).

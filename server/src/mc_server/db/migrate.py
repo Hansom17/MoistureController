@@ -1,4 +1,4 @@
-"""Alembic upgrade at startup (Server_Specs §13.2: migrations on start)."""
+"""Alembic upgrade at startup (Api_Specs §13.2: migrations on start)."""
 
 from pathlib import Path
 

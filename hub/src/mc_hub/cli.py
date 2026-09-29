@@ -1,4 +1,7 @@
-"""`mc-hub` — run the agent, or inspect it from a shell on the hub (Hub_Specs §7)."""
+"""`mc-hub` — run the gateway service, or inspect it from a shell (Gateway_Specs §8).
+
+The command becomes `mc-gateway` when this code moves to gateway/.
+"""
 
 import argparse
 import asyncio
@@ -34,14 +37,15 @@ def cmd_run(cfg: HubConfig, args) -> None:
 
 def cmd_status(cfg: HubConfig, args) -> None:
     store = Store(cfg.db_path)
-    hub_id = store.get("hub_id")
-    if not hub_id:
-        print("not enrolled — the enrollment code is in the agent log "
-              "(docker compose logs agent)")
+    gateway_id = store.get("gateway_id")
+    if not gateway_id:
+        print("not enrolled — the enrollment code is in the log (docker compose logs agent)")
         return
     snap = store.snapshot() or {}
-    print(f"hub           {hub_id}")
-    print(f"bridge        {'connected' if store.get('bridge_connected') == '1' else 'DOWN'}")
+    depth, oldest = store.outbox_depth()
+    print(f"gateway       {gateway_id}")
+    print(f"outbox        {depth} messages{f', oldest {_ago(oldest)}' if oldest else ''}"
+          " (uplink not implemented yet)")
     print(f"snapshot rev  {store.get('snapshot_rev', '—')}   keys rev {store.get('keys_rev', '—')}")
     print(f"LAN address   {cfg.lan_host}:{cfg.lan_port}")
     print(f"time zone     {snap.get('timezone', '—')}")
@@ -97,9 +101,14 @@ def cmd_logs(cfg: HubConfig, args) -> None:
               f"{c['seconds'] or ''}s  {c['source']:<5} {c['status']}")
 
 
+def cmd_outbox(cfg: HubConfig, args) -> None:
+    for msg in Store(cfg.db_path).outbox_peek(args.peek):
+        print(json.dumps(msg, separators=(",", ":"))[:200])
+
+
 def cmd_reset(cfg: HubConfig, args) -> None:
     if not args.yes:
-        raise SystemExit("this forgets the enrollment and all keys; remove the hub in the app "
+        raise SystemExit("this forgets the enrollment and all keys; remove the gateway in the app "
                          "too, then run `mc-hub reset --yes` and restart the containers")
     Agent(cfg, Store(cfg.db_path)).reset()
     print("reset done — restart the agent to enroll again")
@@ -110,7 +119,7 @@ def main() -> None:
     logging.getLogger("httpx").setLevel(logging.WARNING)  # one line per poll otherwise
     p = argparse.ArgumentParser(prog="mc-hub")
     sub = p.add_subparsers(dest="cmd")
-    sub.add_parser("run", help="run the agent (container default)").set_defaults(func=cmd_run)
+    sub.add_parser("run", help="run the service (container default)").set_defaults(func=cmd_run)
     sub.add_parser("status").set_defaults(func=cmd_status)
     sub.add_parser("plants").set_defaults(func=cmd_plants)
     w = sub.add_parser("water", help="water a plant locally (works without internet)")
@@ -118,6 +127,9 @@ def main() -> None:
     w.add_argument("seconds", type=int)
     w.set_defaults(func=cmd_water)
     sub.add_parser("logs").set_defaults(func=cmd_logs)
+    o = sub.add_parser("outbox", help="show buffered up messages")
+    o.add_argument("--peek", type=int, default=20)
+    o.set_defaults(func=cmd_outbox)
     r = sub.add_parser("reset")
     r.add_argument("--yes", action="store_true")
     r.set_defaults(func=cmd_reset)

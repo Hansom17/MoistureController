@@ -1,4 +1,4 @@
-"""Households, members, invites (Server_Specs §5.2, §6.1)."""
+"""Households, members, invites (Api_Specs §5.2, §6.1)."""
 
 import hashlib
 import secrets
@@ -11,7 +11,6 @@ from ..context import Uow
 from ..db.models import ROLES, Household, Invite, Membership, User
 from ..db.types import utcnow
 from ..errors import Problem, not_found
-from . import hubs
 from .common import audit
 
 INVITE_MAX_H = 24 * 14
@@ -64,8 +63,6 @@ async def update(uow: Uow, household: Household, uid: str, *, name: str | None,
         household.timezone = timezone
     if battery_low_mv is not None:
         household.battery_low_mv = battery_low_mv
-    if timezone is not None or battery_low_mv is not None:
-        await hubs.republish_snapshot(uow, household.id)
     audit(uow, household.id, uid, "household.update")
     uow.emit(household.id, "household", {})
     await uow.commit()
@@ -76,14 +73,9 @@ async def delete_household(uow: Uow, household: Household, uid: str) -> None:
     from mc_core.contract import topics
 
     from ..db.models import Device
-    from .common import get_hub
-
-    if await get_hub(uow, household.id) is not None:
-        await hubs.remove(uow, household.id, uid)
     for d in await uow.s.scalars(select(Device).where(Device.household_id == household.id)):
         for suffix in ("status", "config/desired", "config/state"):
             uow.publish(topics.device(d.id, suffix), None, retain=True)
-    uow.broker_files_changed()
     audit(uow, None, uid, "household.delete", {"household_id": household.id})
     uow.emit(household.id, "household", {"deleted": True})
     await uow.s.delete(household)

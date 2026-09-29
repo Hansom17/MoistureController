@@ -1,4 +1,4 @@
-"""Alerts: one open alert per (kind, subject) (Server_Specs §11.2)."""
+"""Alerts: one open alert per (kind, subject) (Api_Specs §11.2)."""
 
 from sqlalchemy import select
 
@@ -16,8 +16,6 @@ TITLES = {
     "config_rejected": "{name}: configuration rejected",
     "safety_stop": "{name}: pump stopped by safety limit",
     "rule_limit_reached": "{name}: daily watering limit reached",
-    "hub_offline": "Hub offline",
-    "hub_sync_failed": "Hub could not apply the latest settings",
 }
 
 # Alerts that close only when a user acknowledges them.

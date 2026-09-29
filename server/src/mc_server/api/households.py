@@ -12,13 +12,11 @@ from ..auth.deps import (
 )
 from ..db.models import AuditLog, Membership, User
 from ..services import households
-from ..services.common import get_hub
 from .schemas import (
     AuditOut,
     HouseholdCreate,
     HouseholdOut,
     HouseholdPatch,
-    HubSummary,
     InviteCreate,
     InviteCreated,
     InviteOut,
@@ -32,13 +30,8 @@ router = APIRouter(tags=["households"])
 
 
 async def _out(uow, household, role: str) -> HouseholdOut:
-    hub = await get_hub(uow, household.id)
-    return HouseholdOut(
-        id=household.id, name=household.name, timezone=household.timezone,
-        battery_low_mv=household.battery_low_mv, role=role,
-        hub=None if hub is None else HubSummary(
-            online=hub.bridge_connected,
-            offline_since=None if hub.bridge_connected else hub.bridge_changed_at))
+    return HouseholdOut(id=household.id, name=household.name, timezone=household.timezone,
+                        battery_low_mv=household.battery_low_mv, role=role)
 
 
 @router.post("/households", response_model=HouseholdOut, status_code=201)

@@ -8,11 +8,8 @@ RUN pip install --no-cache-dir --prefix=/install ./core "./server[firebase]"
 
 FROM python:3.13-slim
 COPY --from=build /install /usr/local
-# gid 1883 = mcbroker: the broker can read the generated psk/acl files (0640).
-# /broker-files is created here so the shared volume gets this owner.
-RUN groupadd -g 1883 mcbroker && useradd -u 10001 -g mcbroker -M -s /usr/sbin/nologin mc \
-    && mkdir /broker-files && chown 10001:1883 /broker-files && chmod 2750 /broker-files
-USER 10001:1883
+RUN useradd -u 10001 -M -s /usr/sbin/nologin mc
+USER 10001
 WORKDIR /app
 ENV PYTHONUNBUFFERED=1 PYTHONDONTWRITEBYTECODE=1
 EXPOSE 8000

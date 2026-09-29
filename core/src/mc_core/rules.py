@@ -1,4 +1,4 @@
-"""Rules engine shared by the backend and the hub (Server_Specs §11.1).
+"""Rules engine: evaluated on the gateway (Gateway_Specs §5.3, D36).
 
 Pure functions: callers gather the context (last rule command, count today,
 pending commands) from their own storage and act on the decision.

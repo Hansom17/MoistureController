@@ -1,4 +1,5 @@
-"""Local SQLite state (Hub_Specs §5.4). Not a history store: 7 days max."""
+"""Local SQLite state (Gateway_Specs §4). Not a history store: the outbox is
+kept until the API acknowledges it, everything else 7 days at most."""
 
 import json
 import sqlite3
@@ -17,6 +18,8 @@ CREATE TABLE IF NOT EXISTS commands (
     id TEXT PRIMARY KEY, device TEXT, slot INTEGER, action TEXT, seconds INTEGER,
     source TEXT, rule_id TEXT, plant_id TEXT, status TEXT, created_at INTEGER,
     exp INTEGER, finished_at INTEGER);
+CREATE TABLE IF NOT EXISTS outbox (
+    seq INTEGER PRIMARY KEY, type TEXT, body TEXT, created_at INTEGER);
 CREATE TABLE IF NOT EXISTS rule_decisions (
     id TEXT PRIMARY KEY, rule_id TEXT, plant_id TEXT, ts INTEGER, value REAL,
     decision TEXT, skip_reason TEXT, command_id TEXT);
@@ -117,6 +120,34 @@ class Store:
         return self.db.execute("SELECT * FROM commands ORDER BY created_at DESC LIMIT ?",
                                (limit,)).fetchall()
 
+    # --- outbox (gateway_api.md §4.2) ------------------------------------------------
+
+    def outbox_append(self, body: dict) -> int:
+        """Stores an up message with the next `seq`; returns it (never reused)."""
+        self.db.execute("BEGIN IMMEDIATE")
+        try:
+            seq = self.get_int("next_seq") + 1
+            self.set("next_seq", seq)
+            self.db.execute("INSERT INTO outbox VALUES (?, ?, ?, ?)",
+                            (seq, body["t"], json.dumps({**body, "seq": seq}), int(time.time())))
+            self.db.execute("COMMIT")
+        except Exception:
+            self.db.execute("ROLLBACK")
+            raise
+        return seq
+
+    def outbox_ack(self, seq: int) -> None:
+        """The API stored everything ≤ seq."""
+        self.db.execute("DELETE FROM outbox WHERE seq <= ?", (seq,))
+
+    def outbox_peek(self, limit: int = 100) -> list[dict]:
+        rows = self.db.execute("SELECT body FROM outbox ORDER BY seq LIMIT ?", (limit,))
+        return [json.loads(r["body"]) for r in rows]
+
+    def outbox_depth(self) -> tuple[int, int | None]:
+        row = self.db.execute("SELECT COUNT(*) AS n, MIN(created_at) AS oldest FROM outbox").fetchone()
+        return row["n"], row["oldest"]
+
     # --- decisions ------------------------------------------------------------------------
 
     def add_decision(self, id_: str, rule_id: str, plant_id: str, ts: int, value: float | None,
@@ -137,6 +168,7 @@ class Store:
         self.db.execute("DELETE FROM rule_decisions WHERE ts < ?", (cutoff,))
 
     def reset(self) -> None:
-        """Forget enrollment, keys and snapshot (Hub_Specs §3 "Removed", `mc-hub reset`)."""
+        """Forget enrollment, keys and snapshot (Gateway_Specs §3 "Removed", `mc-hub reset`)."""
+        # The outbox stays: unsent data may still be inspected (Gateway_Specs §3).
         for table in ("meta", "snapshot", "readings_recent", "commands", "rule_decisions"):
             self.db.execute(f"DELETE FROM {table}")  # noqa: S608 — fixed names

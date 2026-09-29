@@ -1,14 +1,15 @@
 """Application context and unit of work.
 
 `AppContext` holds the long-lived objects (DB engine, key box, SSE bus, …).
-`Uow` wraps one DB session: services add rows, queue MQTT publishes via the
-outbox and record live events; `commit()` makes it all happen atomically and
-only then notifies SSE subscribers and the outbox sender (§3, §10.1).
+`Uow` wraps one DB session: services add rows, queue messages for devices in
+the outbox (v1; becomes the per-gateway downlink, Api_Specs §9.3) and record
+live events; `commit()` makes it all happen atomically and only then notifies
+SSE subscribers.
 """
 
 import asyncio
 import json
-from collections.abc import AsyncIterator, Callable
+from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from dataclasses import dataclass, field
 
@@ -30,10 +31,6 @@ class AppContext:
     bus: EventBus
     push: PushSender
     outbox_wakeup: asyncio.Event = field(default_factory=asyncio.Event)
-    broker_files_changed: Callable[[], None] = lambda: None
-    # Acks for hub-created commands that arrived before their `up/cmd`
-    # (§7.2): (device_id, command_id) → (ack dict, received unix time).
-    orphan_acks: dict = field(default_factory=dict)
 
     @asynccontextmanager
     async def uow(self) -> AsyncIterator["Uow"]:
@@ -48,7 +45,6 @@ class Uow:
         self._events: list[tuple[str, str, dict]] = []
         self._pushes: list[tuple[str, str, dict]] = []
         self._outbox = False
-        self._broker_files = False
 
     # Recorded now, delivered after commit.
 
@@ -64,15 +60,12 @@ class Uow:
     def notify(self, household_id: str, title: str, data: dict) -> None:
         self._pushes.append((household_id, title, data))
 
-    def broker_files_changed(self) -> None:
-        self._broker_files = True
-
     async def rollback(self) -> None:
         """Discard DB changes and everything recorded for after-commit."""
         await self.s.rollback()
         self._events.clear()
         self._pushes.clear()
-        self._outbox = self._broker_files = False
+        self._outbox = False
 
     async def commit(self) -> None:
         await self.s.commit()
@@ -80,11 +73,9 @@ class Uow:
             self.ctx.bus.publish(household_id, kind, data)
         if self._outbox:
             self.ctx.outbox_wakeup.set()
-        if self._broker_files:
-            self.ctx.broker_files_changed()
         pushes, self._pushes = self._pushes, []
         for household_id, title, data in pushes:
             asyncio.get_running_loop().create_task(
                 self.ctx.push.send_to_household(self.ctx, household_id, title, data))
         self._events.clear()
-        self._outbox = self._broker_files = False
+        self._outbox = False

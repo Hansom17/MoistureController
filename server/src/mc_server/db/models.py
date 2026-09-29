@@ -1,4 +1,4 @@
-"""Database schema (Server_Specs §4). Every household table has `household_id`."""
+"""Database schema (Api_Specs §4). Every household table has `household_id`."""
 
 from datetime import datetime
 
@@ -82,41 +82,6 @@ class Invite(Base):
     used_by: Mapped[str | None] = mapped_column(String(128))
     used_at: Mapped[datetime | None]
     revoked_at: Mapped[datetime | None]
-
-
-class Hub(Base):
-    __tablename__ = "hubs"
-    id: Mapped[str] = mapped_column(String(24), primary_key=True)
-    household_id: Mapped[str] = mapped_column(
-        ForeignKey("households.id", ondelete="CASCADE"), unique=True)
-    psk_enc: Mapped[str] = mapped_column(Text)
-    status: Mapped[str] = mapped_column(String(16), default="enrolling")
-    bridge_connected: Mapped[bool] = mapped_column(Boolean, default=False)
-    bridge_changed_at: Mapped[datetime | None]
-    last_outage_s: Mapped[int] = mapped_column(Integer, default=0)
-    last_state: Mapped[dict | None]
-    last_state_at: Mapped[datetime | None]
-    lan_host_override: Mapped[str | None] = mapped_column(String(255))
-    snapshot_rev_applied: Mapped[int] = mapped_column(Integer, default=0)
-    keys_rev_applied: Mapped[int] = mapped_column(Integer, default=0)
-    created_at: Mapped[datetime] = _created()
-
-
-class HubEnrollment(Base):
-    __tablename__ = "hub_enrollments"
-    id: Mapped[str] = _id()
-    secret_sha256: Mapped[str] = mapped_column(String(64))
-    user_code_hash: Mapped[str] = mapped_column(String(64), index=True)
-    expires_at: Mapped[datetime]
-    claimed_household_id: Mapped[str | None] = mapped_column(String(26))
-    claimed_by: Mapped[str | None] = mapped_column(String(128))
-    hub_id: Mapped[str | None] = mapped_column(String(24))
-    consumed_at: Mapped[datetime | None]
-    last_poll_at: Mapped[datetime | None]
-    ip: Mapped[str | None] = mapped_column(String(64))
-    agent_version: Mapped[str | None] = mapped_column(String(32))
-    arch: Mapped[str | None] = mapped_column(String(16))
-    created_at: Mapped[datetime] = _created()
 
 
 class Device(Base):

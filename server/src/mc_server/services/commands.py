@@ -1,4 +1,4 @@
-"""Command service: creation, cancel, acks, expiry (Server_Specs §7)."""
+"""Command service: creation, cancel, acks, expiry (Api_Specs §7)."""
 
 import logging
 from datetime import timedelta
@@ -8,20 +8,18 @@ from sqlalchemy import select
 from mc_core.commands import CommandRejected, check_pump_run, expiry
 from mc_core.contract import topics
 from mc_core.contract.device import CmdAck
-from mc_core.contract.hub import HubCmd
 
 from ..context import Uow
 from ..db.models import CommandRow, Device, Household, Plant
 from ..db.types import utcnow
 from ..errors import Problem, not_found
 from . import alerts
-from .common import get_hub, now_ts, to_dt, to_ts
+from .common import now_ts, to_dt, to_ts
 from .devices import actuator
 
 log = logging.getLogger(__name__)
 
 OPEN = ("queued", "delivered", "cancelling")
-ORPHAN_ACK_TTL_S = 600
 
 
 # --- views ---------------------------------------------------------------------
@@ -100,7 +98,7 @@ async def _send(uow: Uow, cmd: CommandRow) -> None:
 async def create_pump_run(uow: Uow, household_id: str, plant: Plant, seconds: int, *,
                           source: str, created_by: str | None,
                           rule_id: str | None = None) -> tuple[CommandRow, list[str]]:
-    """Returns the queued command and warnings (e.g. `hub_offline`)."""
+    """Returns the queued command and warnings (v2: `gateway_offline`)."""
     if plant.pump_device_id is None or plant.pump_slot is None:
         raise CommandRejected("slot_not_actuator", "plant has no pump")
     device = await uow.s.get(Device, plant.pump_device_id)
@@ -115,11 +113,7 @@ async def create_pump_run(uow: Uow, household_id: str, plant: Plant, seconds: in
     cmd = _insert(uow, device, "pump.run", {"slot": plant.pump_slot, "seconds": seconds},
                   source=source, created_by=created_by, plant_id=plant.id, rule_id=rule_id)
     await _send(uow, cmd)
-    warnings = []
-    hub = await get_hub(uow, household_id)
-    if hub is not None and not hub.bridge_connected:
-        warnings.append("hub_offline")
-    return cmd, warnings
+    return cmd, []
 
 
 DEVICE_ACTIONS = {
@@ -180,11 +174,7 @@ async def handle_ack(uow: Uow, device: Device, ack: CmdAck) -> None:
     cmd = await uow.s.scalar(select(CommandRow).where(
         CommandRow.id == ack.id, CommandRow.device_id == device.id))
     if cmd is None:
-        if await get_hub(uow, device.household_id) is not None:
-            # Hub-created command whose up/cmd hasn't arrived yet.
-            uow.ctx.orphan_acks[(device.id, ack.id)] = (ack.model_dump(), now_ts())
-        else:
-            log.info("ack for unknown command %s from %s", ack.id, device.id)
+        log.info("ack for unknown command %s from %s", ack.id, device.id)
         return
     await _apply_ack(uow, device, cmd, ack)
 
@@ -216,58 +206,18 @@ async def _apply_ack(uow: Uow, device: Device, cmd: CommandRow, ack: CmdAck) -> 
                  {"id": cmd.id, "plant_id": cmd.plant_id, "status": cmd.status})
 
 
-# --- hub-created commands (§9.3) ---------------------------------------------------
-
-
-async def record_hub_command(uow: Uow, household_id: str, msg: HubCmd) -> None:
-    if await uow.s.get(CommandRow, msg.id) is not None:
-        return  # duplicate after reconnect
-    device = await uow.s.get(Device, msg.device)
-    if device is None or device.household_id != household_id:
-        log.warning("hub command for foreign device %s", msg.device)
-        return
-    plant_id = None
-    if msg.action == "pump.run":
-        plant_id = await uow.s.scalar(select(Plant.id).where(
-            Plant.household_id == household_id, Plant.pump_device_id == device.id,
-            Plant.pump_slot == msg.args.get("slot"), Plant.archived_at.is_(None)))
-    cmd = _insert(uow, device, msg.action, msg.args, source=msg.source, created_by=msg.rule_id,
-                  plant_id=plant_id, rule_id=msg.rule_id, command_id=msg.id, origin="hub",
-                  exp=msg.exp, created_at=msg.created_at)
-    await uow.s.flush()
-    uow.emit(household_id, "command", {"id": cmd.id, "plant_id": plant_id, "status": "queued"})
-    orphan = uow.ctx.orphan_acks.pop((device.id, msg.id), None)
-    if orphan is not None:
-        await _apply_ack(uow, device, cmd, CmdAck.model_validate(orphan[0]))
-
-
 # --- expiry job (§7.2) ---------------------------------------------------------------
 
 
 async def expire_overdue(uow: Uow) -> None:
     now = utcnow()
-    cutoff = now_ts() - ORPHAN_ACK_TTL_S
-    for key, (_, received) in list(uow.ctx.orphan_acks.items()):
-        if received < cutoff:
-            log.warning("dropping ack for unknown hub command %s", key)
-            uow.ctx.orphan_acks.pop(key, None)
-
     rows = (await uow.s.execute(
         select(CommandRow, Device, Household.id)
         .join(Device, Device.id == CommandRow.device_id)
         .join(Household, Household.id == CommandRow.household_id)
         .where(CommandRow.status.in_(OPEN)))).all()
-    paused: dict[str, bool] = {}
+    # v2: pause while the household's gateway is offline (Api_Specs §7.2).
     for cmd, device, hid in rows:
-        if hid not in paused:
-            hub = await get_hub(uow, hid)
-            # Paused while the hub is offline, plus one grace interval after.
-            paused[hid] = hub is not None and (
-                not hub.bridge_connected or (hub.bridge_changed_at is not None and
-                                             now - hub.bridge_changed_at <
-                                             timedelta(seconds=2 * device.wake_interval_s)))
-        if paused[hid]:
-            continue
         grace = timedelta(seconds=2 * device.wake_interval_s)
         if cmd.status in ("queued", "cancelling") and now > cmd.exp + grace:
             cmd.status, cmd.reason, cmd.finished_at = "expired", "no_ack", now

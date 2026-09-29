@@ -1,4 +1,4 @@
-"""Push notifications to all members of a household (Server_Specs §11.2)."""
+"""Push notifications to all members of a household (Api_Specs §11)."""
 
 import logging
 from typing import TYPE_CHECKING

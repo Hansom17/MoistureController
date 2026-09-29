@@ -1,4 +1,4 @@
-"""Tenant isolation, roles, sensitive actions, invites (Server_Specs §5, §14)."""
+"""Tenant isolation, roles, sensitive actions, invites (Api_Specs §5, §14)."""
 
 import pytest
 

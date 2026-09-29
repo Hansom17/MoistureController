@@ -1,4 +1,6 @@
-# Home hub: Mosquitto (LAN broker + bridge) and the agent (Hub_Specs §2).
+# Gateway stack (v1 hub code, becomes gateway/): Mosquitto (LAN broker) and the
+# gateway service (Gateway_Specs §2). The uplink to the API is not implemented
+# yet; up messages stay in the outbox (`mc-hub outbox`).
 #
 #   ./scripts/make-secrets.sh && docker compose up -d
 #   docker compose logs -f agent      # shows the enrollment code
@@ -20,12 +22,11 @@ services:
       dockerfile: hub/Dockerfile
     image: mc-hub-agent:local
     environment:
-      MC_CLOUD_API_URL: ${MC_CLOUD_API_URL:?set in .env}
+      MC_API_URL: ${MC_API_URL:?set in .env}
       MC_MQTT_HOST: mosquitto
       MC_MQTT_PASSWORD_FILE: /run/secrets/mqtt_agent_password
       MC_LAN_HOST: ${MC_LAN_HOST:?set in .env — the hub's fixed LAN IP or hostname}
       MC_LAN_PORT: ${MC_LAN_PORT:-8883}
-      MC_CLOUD_MQTT_HOST_OVERRIDE: ${MC_CLOUD_MQTT_HOST_OVERRIDE:-}
     secrets: [mqtt_agent_password]
     volumes: [hub-data:/data]
     read_only: true
@@ -39,7 +40,6 @@ services:
     depends_on:
       agent: {condition: service_started}
     environment:
-      MC_BROKER_ROLE: hub
       MC_WATCH_DIR: /data/broker
       MC_BROKER_USER: mc-agent
       MC_BROKER_PASSWORD_FILE: /run/secrets/mqtt_agent_password

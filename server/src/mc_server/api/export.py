@@ -1,4 +1,4 @@
-"""Owner data export as ZIP (Server_Specs §12). No keys are ever exported."""
+"""Owner data export as ZIP (Api_Specs §12). No keys are ever exported."""
 
 import gzip
 import hashlib

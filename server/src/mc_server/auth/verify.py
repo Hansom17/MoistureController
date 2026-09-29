@@ -1,4 +1,4 @@
-"""ID token verification (Server_Specs §5.1)."""
+"""ID token verification (Api_Specs §5.1)."""
 
 import asyncio
 import time

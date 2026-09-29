@@ -1,4 +1,4 @@
-"""Plants, readings, rules (Server_Specs §6.1)."""
+"""Plants, readings, rules (Api_Specs §6.1)."""
 
 from datetime import datetime, timedelta
 
@@ -8,7 +8,6 @@ from ..context import Uow
 from ..db.models import Device, Plant, ReadingRow, Rule, RuleExecution
 from ..db.types import utcnow
 from ..errors import Problem, not_found
-from . import hubs
 from .devices import actuator
 
 TREND_WINDOW = timedelta(hours=3)
@@ -33,7 +32,6 @@ async def create(uow: Uow, household_id: str, data: dict, uid: str) -> Plant:
     plant = Plant(household_id=household_id, **data)
     uow.s.add(plant)
     await uow.s.flush()
-    await hubs.republish_snapshot(uow, household_id)
     uow.emit(household_id, "plant", {"id": plant.id})
     await uow.commit()
     return plant
@@ -48,7 +46,6 @@ async def update(uow: Uow, plant: Plant, data: dict) -> Plant:
                       merged["pump_slot"], "pump")
     for k, v in data.items():
         setattr(plant, k, v)
-    await hubs.republish_snapshot(uow, plant.household_id)
     uow.emit(plant.household_id, "plant", {"id": plant.id})
     await uow.commit()
     return plant
@@ -58,7 +55,6 @@ async def archive(uow: Uow, plant: Plant) -> None:
     plant.archived_at = utcnow()
     for r in await uow.s.scalars(select(Rule).where(Rule.plant_id == plant.id)):
         r.enabled = False
-    await hubs.republish_snapshot(uow, plant.household_id)
     uow.emit(plant.household_id, "plant", {"id": plant.id, "archived": True})
     await uow.commit()
 
@@ -160,7 +156,6 @@ async def create_rule(uow: Uow, plant: Plant, data: dict, uid: str) -> Rule:
     rule = Rule(household_id=plant.household_id, plant_id=plant.id, created_by=uid, **data)
     uow.s.add(rule)
     await uow.s.flush()
-    await hubs.republish_snapshot(uow, plant.household_id)
     uow.emit(plant.household_id, "rule", {"plant_id": plant.id})
     await uow.commit()
     return rule
@@ -170,7 +165,6 @@ async def update_rule(uow: Uow, rule: Rule, data: dict) -> Rule:
     _validate_rule(data)
     for k, v in data.items():
         setattr(rule, k, v)
-    await hubs.republish_snapshot(uow, rule.household_id)
     uow.emit(rule.household_id, "rule", {"plant_id": rule.plant_id})
     await uow.commit()
     return rule
@@ -179,7 +173,6 @@ async def update_rule(uow: Uow, rule: Rule, data: dict) -> Rule:
 async def delete_rule(uow: Uow, rule: Rule) -> None:
     hid, pid = rule.household_id, rule.plant_id
     await uow.s.delete(rule)
-    await hubs.republish_snapshot(uow, hid)
     uow.emit(hid, "rule", {"plant_id": pid})
     await uow.commit()
 

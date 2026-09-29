@@ -15,10 +15,6 @@ async def test_device_pairing_bundle_and_initial_config(setup, ctx):
     assert len(bundle["mqtt"]["psk"]) == 64
     desired = await outbox(ctx, "config/desired")
     assert desired[0].retain and json.loads(desired[0].payload)["rev"] == 1
-    # The broker PSK file is regenerated from the DB.
-    app_files = ctx.settings.broker_files_dir
-    await ctx.broker_files_changed.__self__.regenerate()
-    assert f"{bundle['device_id']}:{bundle['mqtt']['psk']}" in (app_files / "psk").read_text()
 
 
 async def test_telemetry_reaches_plant_and_device(setup, owner):
@@ -94,24 +90,6 @@ async def test_failed_command_opens_alert(setup, owner):
     assert [a["kind"] for a in alerts] == ["command_failed"]
     acked = await owner.post(f"/households/{h}/alerts/{alerts[0]['id']}/ack", expect=200)
     assert acked["resolved_at"] is not None
-
-
-async def test_cloud_rule_waters_below_threshold(setup, owner, ctx):
-    h, plant = setup["h"], setup["plant"]
-    rule = await owner.post(f"/households/{h}/plants/{plant['id']}/rules",
-                            {"threshold": 30, "water_s": 8, "cooldown_s": 0,
-                             "max_per_day": 2}, expect=201)
-    await setup["device"].wake(moisture=22.0)
-    commands = await owner.get(f"/households/{h}/commands?plant_id={plant['id']}")
-    assert len(commands) == 1 and commands[0]["source"] == "rule"
-    assert commands[0]["args"] == {"slot": 2, "seconds": 8}
-    execs = await owner.get(f"/households/{h}/plants/{plant['id']}/rules/{rule['id']}/executions")
-    assert execs[0]["decision"] == "water" and execs[0]["origin"] == "cloud"
-
-    # Next dry reading: a command is still pending → skip.
-    await setup["device"].wake(moisture=21.0)
-    execs = await owner.get(f"/households/{h}/plants/{plant['id']}/rules/{rule['id']}/executions")
-    assert execs[0]["skip_reason"] == "pending_command"
 
 
 async def test_config_validation_and_conflict(setup, owner):

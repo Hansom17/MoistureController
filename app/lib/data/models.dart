@@ -39,7 +39,7 @@ class HubStatus {
   final String? version;
 }
 
-/// Everything the hub screen shows (Server_Specs §6.1, `GET …/hub`).
+/// Everything the hub screen shows (Api_Specs §6.1, `GET …/hub`).
 class HubInfo {
   const HubInfo({
     required this.id,

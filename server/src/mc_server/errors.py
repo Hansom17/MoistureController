@@ -1,4 +1,4 @@
-"""RFC 9457 problem responses with stable `type`s (Server_Specs §6)."""
+"""RFC 9457 problem responses with stable `type`s (Api_Specs §6)."""
 
 from fastapi import Request
 from fastapi.responses import JSONResponse

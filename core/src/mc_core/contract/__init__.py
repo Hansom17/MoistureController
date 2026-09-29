@@ -1,3 +1,3 @@
-from . import device, hub, topics
+from . import device, gateway, topics
 
-__all__ = ["device", "hub", "topics"]
+__all__ = ["device", "gateway", "topics"]

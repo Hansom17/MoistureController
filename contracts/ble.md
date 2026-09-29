@@ -1,8 +1,8 @@
 # BLE Pairing Contract — App ↔ Device
 
-**Version:** v1 (draft) · **Status:** proposal, not yet implemented · **Last change:** 2026-09-26
+**Version:** v1 (draft) · **Status:** proposal, not yet implemented · **Last change:** 2026-09-29 (D33: bundle from the API server, device connects to the gateway)
 
-How the Flutter app hands WiFi and broker credentials to a plant device over Bluetooth Low Energy, and how this is protected against a neighbour taking over or eavesdropping on the device. Firmware and app both implement this document.
+How the Flutter app hands WiFi and gateway broker credentials to an ESP32 plant device over Bluetooth Low Energy, and how this is protected against a neighbour taking over or eavesdropping on the device. Firmware and app both implement this document.
 
 Context: [`PROJECT.md`](../PROJECT.md) §3.8, [`contracts/mqtt.md`](mqtt.md) §2.
 
@@ -12,11 +12,11 @@ Context: [`PROJECT.md`](../PROJECT.md) §3.8, [`contracts/mqtt.md`](mqtt.md) §2
 
 | Threat | Protection |
 |---|---|
-| Someone in BLE range pairs the device before the owner, or re-pairs it later and moves it to their server | Pairing needs the device's **proof-of-possession code (PoP)** from its label, *and* the device only listens for pairing on first boot or after a **button press** (§3). |
+| Someone in BLE range pairs the device before the owner, or re-pairs it later and moves it to their own household | Pairing needs the device's **proof-of-possession code (PoP)** from its label, *and* the device only listens for pairing on first boot or after a **button press** (§3). |
 | Someone sniffs the WiFi password or the device's MQTT key over the air | All payloads are encrypted with a session key derived from an ECDH exchange **authenticated by the PoP** (§4). BLE link-layer pairing is not relied on. |
 | Man-in-the-middle between app and device | The MITM does not know the PoP, so it cannot compute a matching session key; the key confirmation fails on both sides. |
 | Guessing the PoP online | 128-bit PoP, and the device closes the pairing window after 5 failed handshakes. |
-| Squatting a device ID | Device IDs are random and assigned by the cloud (mqtt.md §2), not derived from the MAC. |
+| Squatting a device ID | Device IDs are random and assigned by the API server (mqtt.md §2), not derived from the MAC. |
 
 Out of scope: an attacker with physical access **and** the label. Physical access is treated as ownership.
 
@@ -27,7 +27,7 @@ Out of scope: an attacker with physical access **and** the label. Physical acces
 - 16 random bytes, generated **when the device is flashed** by `firmware/tools/make_label.py`, written to a dedicated NVS "factory" partition, never changed by a factory reset.
 - Printed on a label on the device as a QR code: `MCPOP1:<ble-name>:<pop-base32>` (e.g. `MCPOP1:MC-3F9A:K7Q2…`), plus the base32 text for manual entry.
 - Recoverable only via the USB console (`mc pop show`) — i.e. again with physical access.
-- Never sent over BLE, never sent to the server.
+- Never sent over BLE, never sent to the gateway or the API server.
 
 ---
 
@@ -80,12 +80,12 @@ GATT: one custom service, one write characteristic (app → device) and one noti
 | `info` | `{hw_mac, fw, provisioned, device_id?}` | What is this device. |
 | `wifi_scan` | `{networks: [{ssid, rssi, secure}]}` | Optional, helps the user pick the network. |
 | `set_wifi` `{ssid, password}` | `{ok}` | Stored in RAM only until `commit`. |
-| `set_mqtt` `{device_id, host, port, psk}` | `{ok}` | Pairing bundle from the cloud (Server_Specs §8.1): gateway address (hub on the LAN or cloud broker) and the 32-byte TLS-PSK key (hex). RAM only until `commit`. |
-| `test` | `{wifi: ok/err, mqtt: ok/err, detail}` | Device joins WiFi and connects to the gateway with the new settings (TLS-PSK), publishes `status online`, disconnects. |
+| `set_mqtt` `{device_id, host, port, psk}` | `{ok}` | Pairing bundle from the API server (Api_Specs §8.1): the gateway's broker address on the LAN and the 32-byte TLS-PSK key (hex), which the API has already installed on the gateway. RAM only until `commit`. |
+| `test` | `{wifi: ok/err, mqtt: ok/err, detail}` | Device joins WiFi and connects to the gateway's broker with the new settings (TLS-PSK), publishes `status online`, disconnects. |
 | `commit` | `{ok}` | Persist everything to NVS, close BLE, reboot into normal operation. |
 | `abort` | `{ok}` | Discard, stay in the previous state. |
 
-`device_id` and `psk` sent in `set_mqtt` replace any previous ones — this is how a device moves to a new gateway (hub added or removed) or a new household.
+`device_id` and `psk` sent in `set_mqtt` replace any previous ones — this is how a device moves to a new gateway address, a replaced gateway or another household.
 
 ---
 
@@ -94,12 +94,12 @@ GATT: one custom service, one write characteristic (app → device) and one noti
 ```mermaid
 flowchart TD
     A[User taps 'add device'] --> B[Scan QR label → PoP + BLE name]
-    B --> C["Cloud: POST /households/{h}/devices {name}<br/>→ device_id + gateway address + PSK"]
+    B --> C["API: POST /households/{h}/devices {name}<br/>(gateway must be online)<br/>→ device_id + gateway address + PSK"]
     C --> D[BLE connect to MC-xxxx, secure session with PoP]
-    D -->|confirm fails| X[Show 'wrong device or code'<br/>delete device in the cloud]
+    D -->|confirm fails| X[Show 'wrong device or code'<br/>delete the device via the API]
     D -->|ok| E[set_wifi, set_mqtt]
     E --> F[test]
-    F -->|error| G[Show error, let user fix WiFi<br/>or abort → delete device in the cloud]
+    F -->|error| G[Show error, let user fix WiFi<br/>or abort → delete the device via the API]
     G --> E
     F -->|ok| H[commit]
     H --> I([Device appears online in the household])

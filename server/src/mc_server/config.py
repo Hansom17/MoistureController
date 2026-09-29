@@ -1,4 +1,4 @@
-"""Settings from environment variables (Server_Specs §13.1)."""
+"""Settings from environment variables (Api_Specs §13.1)."""
 
 import os
 import secrets
@@ -20,17 +20,10 @@ def _env(name: str, default: str | None = None) -> str | None:
 class Settings:
     database_url: str = "sqlite+aiosqlite:///./mc-dev.db"
 
-    # Internal MQTT listener; empty host = MQTT disabled (tests, API-only dev).
-    mqtt_host: str | None = None
-    mqtt_port: int = 1883
-    mqtt_username: str = "mc-backend"
-    mqtt_password: str | None = None
-
     broker_public_host: str = "mqtt.localhost"
     broker_public_port: int = 8883
-    broker_files_dir: Path | None = None
 
-    # 32 bytes hex; encrypts device and hub PSKs in the database.
+    # 32 bytes hex; encrypts device PSKs in the database.
     key_encryption_key: str = field(default_factory=lambda: secrets.token_hex(32))
 
     # "firebase" in every real deployment. "dev" accepts `Bearer dev:<uid>`
@@ -44,7 +37,6 @@ class Settings:
     cors_origins: list[str] = field(default_factory=list)
     max_households_per_user: int = 10
     min_app_version: str | None = None
-    latest_hub_version: str = "0.1.0"
     docs_enabled: bool = True
     jobs_interval_s: float = 30.0
 
@@ -57,14 +49,8 @@ class Settings:
             from urllib.parse import quote
 
             s.database_url = s.database_url.replace("{password}", quote(db_password, safe=""))
-        s.mqtt_host = _env("MC_MQTT_HOST") or None
-        s.mqtt_port = int(_env("MC_MQTT_PORT", str(s.mqtt_port)))
-        s.mqtt_username = _env("MC_MQTT_USERNAME", s.mqtt_username)
-        s.mqtt_password = _env("MC_MQTT_PASSWORD")
         s.broker_public_host = _env("MC_BROKER_PUBLIC_HOST", s.broker_public_host)
         s.broker_public_port = int(_env("MC_BROKER_PUBLIC_PORT", str(s.broker_public_port)))
-        files = _env("MC_BROKER_FILES_DIR")
-        s.broker_files_dir = Path(files) if files else None
         s.auth_mode = _env("MC_AUTH_MODE", "firebase")
         key = _env("MC_KEY_ENCRYPTION_KEY")
         if key:
@@ -85,6 +71,5 @@ class Settings:
         s.max_households_per_user = int(
             _env("MC_MAX_HOUSEHOLDS_PER_USER", str(s.max_households_per_user)))
         s.min_app_version = _env("MC_MIN_APP_VERSION")
-        s.latest_hub_version = _env("MC_LATEST_HUB_VERSION", s.latest_hub_version)
         s.docs_enabled = _env("MC_DOCS", "1" if s.auth_mode == "dev" else "0") == "1"
         return s

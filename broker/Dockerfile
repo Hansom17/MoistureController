@@ -1,5 +1,4 @@
-# Same image for the cloud broker and the hub broker; the mounted
-# mosquitto.conf decides the role (Broker_Specs §5).
+# Mosquitto for the gateway stack (Broker_Specs §4).
 FROM eclipse-mosquitto:2.0.20
 RUN apk add --no-cache inotify-tools
 COPY entrypoint.sh /usr/local/bin/mc-broker-entrypoint

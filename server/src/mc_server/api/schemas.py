@@ -22,18 +22,12 @@ class MeOut(Out):
     email_verified: bool
 
 
-class HubSummary(Out):
-    online: bool
-    offline_since: datetime | None
-
-
 class HouseholdOut(Out):
     id: str
     name: str
     timezone: str
     battery_low_mv: int
     role: RoleName
-    hub: HubSummary | None = None
 
 
 class TicketOut(Out):
@@ -315,7 +309,7 @@ class RuleExecutionOut(Out):
     origin: Literal["cloud", "hub"]
 
 
-# --- alerts, hub ---------------------------------------------------------------------------------
+# --- alerts ---------------------------------------------------------------------------------
 
 
 class AlertOut(Out):
@@ -330,31 +324,3 @@ class AlertOut(Out):
     acked_by: str | None
     acked_at: datetime | None
     detail: dict | None
-
-
-class HubOut(BaseModel):
-    id: str
-    status: str
-    online: bool
-    offline_since: datetime | None
-    agent_version: str | None
-    latest_agent_version: str | None
-    arch: str | None
-    in_sync: bool
-    snapshot_rev: int
-    snapshot_rev_applied: int
-    keys_rev: int
-    keys_rev_applied: int
-    queue_depth: int | None
-    time_synced: bool | None
-    lan_host: str | None
-    lan_host_override: str | None
-    last_state_at: datetime | None
-
-
-class HubClaim(BaseModel):
-    user_code: str = Field(min_length=8, max_length=12)
-
-
-class HubPatch(BaseModel):
-    lan_host_override: str | None = Field(None, max_length=255)

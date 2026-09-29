@@ -8,7 +8,7 @@ import '../api_problem.dart';
 import '../models.dart';
 import 'moisture_repository.dart';
 
-/// Talks to the cloud backend (`/api/v1`, Server_Specs §6).
+/// Talks to the cloud backend (`/api/v1`, Api_Specs §6).
 ///
 /// Hand-written until the Dart client is generated from contracts/api.yaml
 /// (App_Specs §2); it maps the API's JSON onto the app's models.
