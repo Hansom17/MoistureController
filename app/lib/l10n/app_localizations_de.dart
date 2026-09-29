@@ -452,4 +452,129 @@ class AppLocalizationsDe extends AppLocalizations {
   String alertOther(String subject, String kind) {
     return '$subject: $kind';
   }
+
+  @override
+  String get hubTitle => 'Hub';
+
+  @override
+  String get hubNoneTitle => 'Gießen auch ohne Internet';
+
+  @override
+  String get hubNoneBody =>
+      'Ein Hub ist ein kleiner Rechner zu Hause, etwa ein Raspberry Pi, der deine Gießregeln lokal ausführt. Starte die Hub-Software und gib den angezeigten Code ein.';
+
+  @override
+  String get hubAdd => 'Hub hinzufügen';
+
+  @override
+  String get hubCodeLabel => 'Code vom Hub';
+
+  @override
+  String get hubCodeInvalid => 'Gib den 8-stelligen Code ein, etwa K7QM-2XPA.';
+
+  @override
+  String get hubClaimNote =>
+      'Nach dem Hinzufügen musst du jedes Gerät dieses Haushalts neu mit dem Hub koppeln.';
+
+  @override
+  String get hubAdded => 'Hub hinzugefügt. Warte auf die Verbindung.';
+
+  @override
+  String get hubEnrolling => 'Warte auf die Verbindung des Hubs';
+
+  @override
+  String hubOfflineSince(String time) {
+    return 'Offline seit $time';
+  }
+
+  @override
+  String get hubInSync => 'Einstellungen aktuell';
+
+  @override
+  String get hubSyncing => 'Einstellungen werden übertragen';
+
+  @override
+  String get hubAgentVersion => 'Agent-Version';
+
+  @override
+  String hubUpdateAvailable(String version) {
+    return 'Update verfügbar: $version';
+  }
+
+  @override
+  String get hubUpdateHint =>
+      'Auf dem Hub ausführen: docker compose pull && docker compose up -d';
+
+  @override
+  String get hubQueue => 'Wartende Nachrichten an die Cloud';
+
+  @override
+  String get hubClock => 'Uhrzeit';
+
+  @override
+  String get hubClockOk => 'Synchron';
+
+  @override
+  String get hubClockBad => 'Nicht synchron: kein automatisches Gießen';
+
+  @override
+  String get hubLastReport => 'Letzte Meldung';
+
+  @override
+  String get hubLanAddress => 'LAN-Adresse';
+
+  @override
+  String get hubLanHint =>
+      'Geräte verbinden sich mit dieser Adresse. Überschreibe sie, wenn der Hub mehrere Netzwerkschnittstellen hat.';
+
+  @override
+  String get hubLanReported => 'Vom Hub gemeldet';
+
+  @override
+  String get hubLanOverridden => 'Manuell festgelegt';
+
+  @override
+  String get hubLanUnknown => 'Noch nicht gemeldet';
+
+  @override
+  String get hubLanReset => 'Gemeldete Adresse verwenden';
+
+  @override
+  String get edit => 'Bearbeiten';
+
+  @override
+  String get hubRepairTitle => 'Neu zu koppelnde Geräte';
+
+  @override
+  String get hubRepairBody =>
+      'Diese Geräte nutzen noch die alte Verbindung. Kopple jedes mit der Handy-App neu, in der Nähe des Geräts.';
+
+  @override
+  String get deviceNeedsRepair => 'Neu koppeln';
+
+  @override
+  String get hubRemove => 'Hub entfernen';
+
+  @override
+  String get hubRemoveTitle => 'Hub entfernen?';
+
+  @override
+  String get hubRemoveBody =>
+      'Alle Geräte dieses Haushalts melden sich erst wieder, wenn du sie neu mit der Cloud koppelst. Der Verlauf bleibt erhalten.';
+
+  @override
+  String get hubRemoved => 'Hub entfernt';
+
+  @override
+  String get hubNone => 'Kein Hub';
+
+  @override
+  String get errorInvalidCode =>
+      'Der Code ist ungültig oder abgelaufen. Der Hub zeigt einen neuen an.';
+
+  @override
+  String get errorHubExists => 'Dieser Haushalt hat bereits einen Hub.';
+
+  @override
+  String get errorReauth => 'Melde dich erneut an, um das zu tun.';
 }

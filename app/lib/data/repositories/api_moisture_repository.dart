@@ -285,6 +285,7 @@ class ApiMoistureRepository implements MoistureRepository {
       configError: error == null
           ? null
           : (error['detail'] ?? error['code']) as String?,
+      gateway: Gateway.values.byName(d['gateway'] as String),
       slots: [
         for (final s in slots.cast<Map>())
           Slot(
@@ -340,6 +341,57 @@ class ApiMoistureRepository implements MoistureRepository {
   @override
   Future<void> acknowledgeAlert(String householdId, String alertId) =>
       _send('POST', '/households/$householdId/alerts/$alertId/ack');
+
+  // --- hub (App_Specs §12) -------------------------------------------------------------
+
+  HubInfo _hub(Map h) => HubInfo(
+    id: h['id'] as String,
+    status: h['status'] as String,
+    online: h['online'] as bool,
+    inSync: h['in_sync'] as bool,
+    offlineSince: _dt(h['offline_since']),
+    agentVersion: h['agent_version'] as String?,
+    latestAgentVersion: h['latest_agent_version'] as String?,
+    arch: h['arch'] as String?,
+    queueDepth: h['queue_depth'] as int?,
+    timeSynced: h['time_synced'] as bool?,
+    lanHost: h['lan_host'] as String?,
+    lanHostOverride: h['lan_host_override'] as String?,
+    lastStateAt: _dt(h['last_state_at']),
+  );
+
+  @override
+  Future<HubInfo?> hub(String householdId) async {
+    try {
+      return _hub(await _get('/households/$householdId/hub') as Map);
+    } on ApiProblem catch (e) {
+      if (e.status == 404) return null;
+      rethrow;
+    }
+  }
+
+  @override
+  Future<HubInfo> claimHub(String householdId, String userCode) async => _hub(
+    await _send('POST', '/households/$householdId/hub', {
+          'user_code': userCode.trim(),
+        })
+        as Map,
+  );
+
+  @override
+  Future<HubInfo> setHubLanHost(
+    String householdId,
+    String? lanHostOverride,
+  ) async => _hub(
+    await _send('PATCH', '/households/$householdId/hub', {
+          'lan_host_override': lanHostOverride,
+        })
+        as Map,
+  );
+
+  @override
+  Future<void> removeHub(String householdId) =>
+      _send('DELETE', '/households/$householdId/hub');
 
   // --- live updates (SSE, App_Specs §6.2) --------------------------------------------
 

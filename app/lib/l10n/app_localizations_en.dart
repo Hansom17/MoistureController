@@ -449,4 +449,129 @@ class AppLocalizationsEn extends AppLocalizations {
   String alertOther(String subject, String kind) {
     return '$subject: $kind';
   }
+
+  @override
+  String get hubTitle => 'Hub';
+
+  @override
+  String get hubNoneTitle => 'Keep watering without internet';
+
+  @override
+  String get hubNoneBody =>
+      'A hub is a small computer at home, like a Raspberry Pi, that runs your watering rules locally. Start the hub software, then enter the code it shows.';
+
+  @override
+  String get hubAdd => 'Add hub';
+
+  @override
+  String get hubCodeLabel => 'Code shown by the hub';
+
+  @override
+  String get hubCodeInvalid => 'Enter the 8-character code, like K7QM-2XPA.';
+
+  @override
+  String get hubClaimNote =>
+      'After adding a hub, re-pair every device of this household to it.';
+
+  @override
+  String get hubAdded => 'Hub added. Waiting for it to connect.';
+
+  @override
+  String get hubEnrolling => 'Waiting for the hub to connect';
+
+  @override
+  String hubOfflineSince(String time) {
+    return 'Offline since $time';
+  }
+
+  @override
+  String get hubInSync => 'Settings in sync';
+
+  @override
+  String get hubSyncing => 'Syncing settings';
+
+  @override
+  String get hubAgentVersion => 'Agent version';
+
+  @override
+  String hubUpdateAvailable(String version) {
+    return 'Update available: $version';
+  }
+
+  @override
+  String get hubUpdateHint =>
+      'On the hub, run: docker compose pull && docker compose up -d';
+
+  @override
+  String get hubQueue => 'Messages waiting for the cloud';
+
+  @override
+  String get hubClock => 'Clock';
+
+  @override
+  String get hubClockOk => 'Synced';
+
+  @override
+  String get hubClockBad => 'Not synced: no automatic watering';
+
+  @override
+  String get hubLastReport => 'Last report';
+
+  @override
+  String get hubLanAddress => 'LAN address';
+
+  @override
+  String get hubLanHint =>
+      'Devices connect to this address. Override it if the hub has several network interfaces.';
+
+  @override
+  String get hubLanReported => 'Reported by the hub';
+
+  @override
+  String get hubLanOverridden => 'Set manually';
+
+  @override
+  String get hubLanUnknown => 'Not reported yet';
+
+  @override
+  String get hubLanReset => 'Use reported address';
+
+  @override
+  String get edit => 'Edit';
+
+  @override
+  String get hubRepairTitle => 'Devices to re-pair';
+
+  @override
+  String get hubRepairBody =>
+      'These devices still use the old connection. Re-pair each one with the phone app, close to the device.';
+
+  @override
+  String get deviceNeedsRepair => 'Needs re-pairing';
+
+  @override
+  String get hubRemove => 'Remove hub';
+
+  @override
+  String get hubRemoveTitle => 'Remove the hub?';
+
+  @override
+  String get hubRemoveBody =>
+      'All devices of this household stop reporting until you re-pair them to the cloud. History is kept.';
+
+  @override
+  String get hubRemoved => 'Hub removed';
+
+  @override
+  String get hubNone => 'No hub';
+
+  @override
+  String get errorInvalidCode =>
+      'That code isn\'t valid or has expired. The hub shows a new one.';
+
+  @override
+  String get errorHubExists => 'This household already has a hub.';
+
+  @override
+  String get errorReauth => 'Sign in again to do this.';
 }

@@ -15,6 +15,9 @@ class ApiProblem implements Exception {
   static const hubOffline = 'hub_offline';
   static const noGateway = 'no_gateway';
   static const tooLate = 'too_late';
+  static const invalidCode = 'invalid_code';
+  static const hubExists = 'hub_exists';
+  static const reauthRequired = 'reauth_required';
 
   @override
   String toString() => 'ApiProblem($type, $status, $detail)';

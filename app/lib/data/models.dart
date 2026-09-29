@@ -39,6 +39,61 @@ class HubStatus {
   final String? version;
 }
 
+/// Everything the hub screen shows (Server_Specs §6.1, `GET …/hub`).
+class HubInfo {
+  const HubInfo({
+    required this.id,
+    required this.status,
+    required this.online,
+    required this.inSync,
+    this.offlineSince,
+    this.agentVersion,
+    this.latestAgentVersion,
+    this.arch,
+    this.queueDepth,
+    this.timeSynced,
+    this.lanHost,
+    this.lanHostOverride,
+    this.lastStateAt,
+  });
+
+  final String id;
+
+  /// enrolling · connecting · online · offline
+  final String status;
+  final bool online;
+  final bool inSync;
+  final DateTime? offlineSince;
+  final String? agentVersion;
+  final String? latestAgentVersion;
+  final String? arch;
+  final int? queueDepth;
+  final bool? timeSynced;
+
+  /// What devices store at pairing: override or the hub's reported address.
+  final String? lanHost;
+  final String? lanHostOverride;
+  final DateTime? lastStateAt;
+
+  bool get enrolling => status == 'enrolling' || status == 'connecting';
+
+  bool get updateAvailable {
+    final a = agentVersion, b = latestAgentVersion;
+    if (a == null || b == null) return false;
+    List<int> parts(String v) =>
+        v.split('.').map((p) => int.tryParse(p) ?? 0).toList();
+    final x = parts(a), y = parts(b);
+    for (var i = 0; i < 3; i++) {
+      final xi = i < x.length ? x[i] : 0, yi = i < y.length ? y[i] : 0;
+      if (xi != yi) return yi > xi;
+    }
+    return false;
+  }
+}
+
+/// How a device reaches the backend; `none` = must be re-paired (§8.1).
+enum Gateway { cloud, hub, none }
+
 /// Device connectivity as shown in the UI (App_Specs §7).
 enum DeviceState { online, sleeping, late, offline }
 
@@ -60,6 +115,7 @@ class Device {
     required this.configRev,
     required this.slots,
     this.configError,
+    this.gateway = Gateway.cloud,
   });
 
   final String id;
@@ -76,6 +132,9 @@ class Device {
   final int configRev;
   final String? configError;
   final List<Slot> slots;
+  final Gateway gateway;
+
+  bool get needsRepair => gateway == Gateway.none;
 
   Device copyWith({
     DeviceState? state,
@@ -97,6 +156,7 @@ class Device {
     configRev: configRev,
     configError: configError,
     slots: slots,
+    gateway: gateway,
   );
 }
 

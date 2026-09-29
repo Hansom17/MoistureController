@@ -38,6 +38,9 @@ String describeError(AppLocalizations l, Object error) {
       ApiProblem.hubOffline => l.errorHubOffline,
       ApiProblem.tooLate => l.errorTooLate,
       ApiProblem.busy => l.errorBusy,
+      ApiProblem.invalidCode => l.errorInvalidCode,
+      ApiProblem.hubExists => l.errorHubExists,
+      ApiProblem.reauthRequired => l.errorReauth,
       _ => error.detail ?? l.errorGeneric,
     };
   }

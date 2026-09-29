@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../app/theme/tokens.dart';
 import '../../core/format.dart';
@@ -84,6 +85,23 @@ class SettingsScreen extends ConsumerWidget {
                     contentPadding: EdgeInsets.zero,
                     title: Text(l.yourRole),
                     trailing: Text(roleLabel(l, household.role)),
+                  ),
+                  ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    leading: const Icon(Icons.router_outlined),
+                    title: Text(l.hubTitle),
+                    subtitle: Text(switch (household.hub) {
+                      null => l.hubNone,
+                      final hub when hub.online => l.deviceOnline,
+                      final hub =>
+                        hub.offlineSince == null
+                            ? l.deviceOffline
+                            : l.hubOfflineSince(
+                                formatTime(context, hub.offlineSince!),
+                              ),
+                    }),
+                    trailing: const Icon(Icons.chevron_right),
+                    onTap: () => context.go('/settings/hub'),
                   ),
                 ],
               ),

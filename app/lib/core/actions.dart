@@ -61,4 +61,35 @@ class HouseholdActions {
     await _ref.read(repositoryProvider).acknowledgeAlert(householdId, alertId);
     _ref.invalidate(alertsProvider(householdId));
   }
+
+  // --- hub (App_Specs §12) ----------------------------------------------------------
+
+  Future<HubInfo> claimHub(String householdId, String userCode) async {
+    final hub = await _ref
+        .read(repositoryProvider)
+        .claimHub(householdId, userCode);
+    _hubChanged(householdId);
+    return hub;
+  }
+
+  Future<void> setHubLanHost(
+    String householdId,
+    String? lanHostOverride,
+  ) async {
+    await _ref
+        .read(repositoryProvider)
+        .setHubLanHost(householdId, lanHostOverride);
+    _ref.invalidate(hubProvider(householdId));
+  }
+
+  Future<void> removeHub(String householdId) async {
+    await _ref.read(repositoryProvider).removeHub(householdId);
+    _hubChanged(householdId);
+  }
+
+  void _hubChanged(String householdId) {
+    _ref.invalidate(hubProvider(householdId));
+    _ref.invalidate(householdsProvider);
+    _ref.invalidate(devicesProvider(householdId));
+  }
 }

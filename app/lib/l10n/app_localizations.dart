@@ -853,6 +853,234 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'{subject}: {kind}'**
   String alertOther(String subject, String kind);
+
+  /// No description provided for @hubTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Hub'**
+  String get hubTitle;
+
+  /// No description provided for @hubNoneTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Keep watering without internet'**
+  String get hubNoneTitle;
+
+  /// No description provided for @hubNoneBody.
+  ///
+  /// In en, this message translates to:
+  /// **'A hub is a small computer at home, like a Raspberry Pi, that runs your watering rules locally. Start the hub software, then enter the code it shows.'**
+  String get hubNoneBody;
+
+  /// No description provided for @hubAdd.
+  ///
+  /// In en, this message translates to:
+  /// **'Add hub'**
+  String get hubAdd;
+
+  /// No description provided for @hubCodeLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Code shown by the hub'**
+  String get hubCodeLabel;
+
+  /// No description provided for @hubCodeInvalid.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter the 8-character code, like K7QM-2XPA.'**
+  String get hubCodeInvalid;
+
+  /// No description provided for @hubClaimNote.
+  ///
+  /// In en, this message translates to:
+  /// **'After adding a hub, re-pair every device of this household to it.'**
+  String get hubClaimNote;
+
+  /// No description provided for @hubAdded.
+  ///
+  /// In en, this message translates to:
+  /// **'Hub added. Waiting for it to connect.'**
+  String get hubAdded;
+
+  /// No description provided for @hubEnrolling.
+  ///
+  /// In en, this message translates to:
+  /// **'Waiting for the hub to connect'**
+  String get hubEnrolling;
+
+  /// No description provided for @hubOfflineSince.
+  ///
+  /// In en, this message translates to:
+  /// **'Offline since {time}'**
+  String hubOfflineSince(String time);
+
+  /// No description provided for @hubInSync.
+  ///
+  /// In en, this message translates to:
+  /// **'Settings in sync'**
+  String get hubInSync;
+
+  /// No description provided for @hubSyncing.
+  ///
+  /// In en, this message translates to:
+  /// **'Syncing settings'**
+  String get hubSyncing;
+
+  /// No description provided for @hubAgentVersion.
+  ///
+  /// In en, this message translates to:
+  /// **'Agent version'**
+  String get hubAgentVersion;
+
+  /// No description provided for @hubUpdateAvailable.
+  ///
+  /// In en, this message translates to:
+  /// **'Update available: {version}'**
+  String hubUpdateAvailable(String version);
+
+  /// No description provided for @hubUpdateHint.
+  ///
+  /// In en, this message translates to:
+  /// **'On the hub, run: docker compose pull && docker compose up -d'**
+  String get hubUpdateHint;
+
+  /// No description provided for @hubQueue.
+  ///
+  /// In en, this message translates to:
+  /// **'Messages waiting for the cloud'**
+  String get hubQueue;
+
+  /// No description provided for @hubClock.
+  ///
+  /// In en, this message translates to:
+  /// **'Clock'**
+  String get hubClock;
+
+  /// No description provided for @hubClockOk.
+  ///
+  /// In en, this message translates to:
+  /// **'Synced'**
+  String get hubClockOk;
+
+  /// No description provided for @hubClockBad.
+  ///
+  /// In en, this message translates to:
+  /// **'Not synced: no automatic watering'**
+  String get hubClockBad;
+
+  /// No description provided for @hubLastReport.
+  ///
+  /// In en, this message translates to:
+  /// **'Last report'**
+  String get hubLastReport;
+
+  /// No description provided for @hubLanAddress.
+  ///
+  /// In en, this message translates to:
+  /// **'LAN address'**
+  String get hubLanAddress;
+
+  /// No description provided for @hubLanHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Devices connect to this address. Override it if the hub has several network interfaces.'**
+  String get hubLanHint;
+
+  /// No description provided for @hubLanReported.
+  ///
+  /// In en, this message translates to:
+  /// **'Reported by the hub'**
+  String get hubLanReported;
+
+  /// No description provided for @hubLanOverridden.
+  ///
+  /// In en, this message translates to:
+  /// **'Set manually'**
+  String get hubLanOverridden;
+
+  /// No description provided for @hubLanUnknown.
+  ///
+  /// In en, this message translates to:
+  /// **'Not reported yet'**
+  String get hubLanUnknown;
+
+  /// No description provided for @hubLanReset.
+  ///
+  /// In en, this message translates to:
+  /// **'Use reported address'**
+  String get hubLanReset;
+
+  /// No description provided for @edit.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit'**
+  String get edit;
+
+  /// No description provided for @hubRepairTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Devices to re-pair'**
+  String get hubRepairTitle;
+
+  /// No description provided for @hubRepairBody.
+  ///
+  /// In en, this message translates to:
+  /// **'These devices still use the old connection. Re-pair each one with the phone app, close to the device.'**
+  String get hubRepairBody;
+
+  /// No description provided for @deviceNeedsRepair.
+  ///
+  /// In en, this message translates to:
+  /// **'Needs re-pairing'**
+  String get deviceNeedsRepair;
+
+  /// No description provided for @hubRemove.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove hub'**
+  String get hubRemove;
+
+  /// No description provided for @hubRemoveTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove the hub?'**
+  String get hubRemoveTitle;
+
+  /// No description provided for @hubRemoveBody.
+  ///
+  /// In en, this message translates to:
+  /// **'All devices of this household stop reporting until you re-pair them to the cloud. History is kept.'**
+  String get hubRemoveBody;
+
+  /// No description provided for @hubRemoved.
+  ///
+  /// In en, this message translates to:
+  /// **'Hub removed'**
+  String get hubRemoved;
+
+  /// No description provided for @hubNone.
+  ///
+  /// In en, this message translates to:
+  /// **'No hub'**
+  String get hubNone;
+
+  /// No description provided for @errorInvalidCode.
+  ///
+  /// In en, this message translates to:
+  /// **'That code isn\'t valid or has expired. The hub shows a new one.'**
+  String get errorInvalidCode;
+
+  /// No description provided for @errorHubExists.
+  ///
+  /// In en, this message translates to:
+  /// **'This household already has a hub.'**
+  String get errorHubExists;
+
+  /// No description provided for @errorReauth.
+  ///
+  /// In en, this message translates to:
+  /// **'Sign in again to do this.'**
+  String get errorReauth;
 }
 
 class _AppLocalizationsDelegate

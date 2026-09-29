@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../app/theme/app_colors.dart';
 import '../../app/theme/tokens.dart';
 import '../../core/actions.dart';
 import '../../core/format.dart';
@@ -83,6 +84,12 @@ class _DeviceBody extends ConsumerWidget {
           runSpacing: Spacing.xs,
           children: [
             StatusChip.device(context, device, withLastSeen: true),
+            if (device.needsRepair)
+              StatusChip(
+                kind: StatusKind.warning,
+                icon: Icons.link_off,
+                label: context.l10n.deviceNeedsRepair,
+              ),
             configSyncChip(context, device),
           ],
         ),

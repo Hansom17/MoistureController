@@ -33,6 +33,7 @@ class FakeMoistureRepository implements MoistureRepository {
   final _commands = <String, List<Command>>{};
   final _rules = <String, List<Rule>>{};
   final _alerts = <String, List<Alert>>{};
+  final _hubs = <String, HubInfo?>{};
   final _curves = <String, _Curve>{};
   final _streams = <String, StreamController<LiveEvent>>{};
   final _timers = <Timer>[];
@@ -199,6 +200,128 @@ class FakeMoistureRepository implements MoistureRepository {
         _emit(householdId, LiveEvent(LiveEventKind.alert, entityId: alertId));
       });
 
+  // --- hub ------------------------------------------------------------------------
+
+  @override
+  Future<HubInfo?> hub(String householdId) => _delay(() => _hubs[householdId]);
+
+  @override
+  Future<HubInfo> claimHub(String householdId, String userCode) => _delay(() {
+    _requireRole(householdId, Role.admin);
+    final code = userCode.replaceAll(RegExp(r'[\s-]'), '');
+    if (!RegExp(r'^[0-9A-Za-z]{8}$').hasMatch(code)) {
+      throw const ApiProblem(ApiProblem.invalidCode, status: 422);
+    }
+    if (_hubs[householdId] != null) {
+      throw const ApiProblem(ApiProblem.hubExists, status: 409);
+    }
+    // Gateway change: every device must be re-paired to the hub.
+    _devices[householdId] = [
+      for (final d in _devices[householdId]!) _withGateway(d, Gateway.none),
+    ];
+    _setHub(householdId, _hubInfo('enrolling', online: false, inSync: false));
+    // Simulate the hub polling, connecting its bridge and syncing.
+    _timers.add(
+      Timer(const Duration(seconds: 3), () {
+        _setHub(householdId, _hubInfo('online', online: true, inSync: false));
+      }),
+    );
+    _timers.add(
+      Timer(const Duration(seconds: 5), () {
+        _setHub(householdId, _hubInfo('online', online: true, inSync: true));
+      }),
+    );
+    _emit(householdId, const LiveEvent(LiveEventKind.device));
+    return _hubs[householdId]!;
+  });
+
+  @override
+  Future<HubInfo> setHubLanHost(String householdId, String? lanHostOverride) =>
+      _delay(() {
+        _requireRole(householdId, Role.admin);
+        final h = _hubs[householdId]!;
+        _setHub(
+          householdId,
+          HubInfo(
+            id: h.id,
+            status: h.status,
+            online: h.online,
+            inSync: h.inSync,
+            offlineSince: h.offlineSince,
+            agentVersion: h.agentVersion,
+            latestAgentVersion: h.latestAgentVersion,
+            queueDepth: h.queueDepth,
+            timeSynced: h.timeSynced,
+            lanHost: lanHostOverride ?? '192.168.1.20',
+            lanHostOverride: lanHostOverride,
+            lastStateAt: h.lastStateAt,
+          ),
+        );
+        return _hubs[householdId]!;
+      });
+
+  @override
+  Future<void> removeHub(String householdId) => _delay(() {
+    _requireRole(householdId, Role.admin);
+    _devices[householdId] = [
+      for (final d in _devices[householdId]!) _withGateway(d, Gateway.none),
+    ];
+    _setHub(householdId, null);
+    _emit(householdId, const LiveEvent(LiveEventKind.device));
+  });
+
+  HubInfo _hubInfo(
+    String status, {
+    required bool online,
+    required bool inSync,
+  }) => HubInfo(
+    id: 'hub-4k9m2x7q1v8w3h5t',
+    status: status,
+    online: online,
+    inSync: inSync,
+    offlineSince: online ? null : _clock(),
+    agentVersion: online ? '0.1.0' : null,
+    latestAgentVersion: '0.1.0',
+    arch: 'arm64',
+    queueDepth: 0,
+    timeSynced: online ? true : null,
+    lanHost: online ? '192.168.1.20' : null,
+    lastStateAt: online ? _clock() : null,
+  );
+
+  void _setHub(String householdId, HubInfo? hub) {
+    _hubs[householdId] = hub;
+    final h = _households[householdId]!;
+    _households[householdId] = Household(
+      id: h.id,
+      name: h.name,
+      timezone: h.timezone,
+      role: h.role,
+      hub: hub == null
+          ? null
+          : HubStatus(online: hub.online, offlineSince: hub.offlineSince),
+    );
+    _emit(householdId, const LiveEvent(LiveEventKind.hub));
+  }
+
+  Device _withGateway(Device d, Gateway g) => Device(
+    id: d.id,
+    name: d.name,
+    board: d.board,
+    firmware: d.firmware,
+    batteryPercent: d.batteryPercent,
+    rssi: d.rssi,
+    state: d.state,
+    lastSeen: d.lastSeen,
+    nextExpectedAt: d.nextExpectedAt,
+    wakeIntervalS: d.wakeIntervalS,
+    configSync: d.configSync,
+    configRev: d.configRev,
+    configError: d.configError,
+    slots: d.slots,
+    gateway: g,
+  );
+
   @override
   Stream<LiveEvent> events(String householdId) => _stream(householdId).stream;
 
@@ -340,11 +463,40 @@ class FakeMoistureRepository implements MoistureRepository {
       configSync: sync,
       configRev: 7,
       configError: configError,
+      gateway: Gateway.hub,
       slots: const [
         Slot(index: 0, module: 'capacitive_moisture', pin: 34),
         Slot(index: 1, module: 'capacitive_moisture', pin: 35),
         Slot(index: 2, module: 'pump', pin: 26, maxRunS: 30),
       ],
+    );
+
+    _hubs['h1'] = HubInfo(
+      id: 'hub-4k9m2x7q1v8w3h5t',
+      status: 'online',
+      online: true,
+      inSync: true,
+      agentVersion: '0.1.0',
+      latestAgentVersion: '0.2.0',
+      arch: 'arm64',
+      queueDepth: 0,
+      timeSynced: true,
+      lanHost: '192.168.1.20',
+      lastStateAt: ago(const Duration(minutes: 4)),
+    );
+    _hubs['h2'] = HubInfo(
+      id: 'hub-7c2m9x1q4v8w3h5z',
+      status: 'offline',
+      online: false,
+      inSync: true,
+      offlineSince: ago(const Duration(hours: 3)),
+      agentVersion: '0.1.0',
+      latestAgentVersion: '0.2.0',
+      arch: 'amd64',
+      queueDepth: 212,
+      timeSynced: true,
+      lanHost: '192.168.178.40',
+      lastStateAt: ago(const Duration(hours: 3)),
     );
 
     _devices['h1'] = [

@@ -38,6 +38,11 @@ final devicesProvider = FutureProvider.family<List<Device>, String>(
   (ref, householdId) => ref.watch(repositoryProvider).devices(householdId),
 );
 
+/// The household's hub; null when it has none (App_Specs §12).
+final hubProvider = FutureProvider.family<HubInfo?, String>(
+  (ref, householdId) => ref.watch(repositoryProvider).hub(householdId),
+);
+
 final alertsProvider = FutureProvider.family<List<Alert>, String>(
   (ref, householdId) => ref.watch(repositoryProvider).alerts(householdId),
 );

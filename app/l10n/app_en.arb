@@ -354,5 +354,57 @@
         "type": "String"
       }
     }
-  }
+  },
+  "hubTitle": "Hub",
+  "hubNoneTitle": "Keep watering without internet",
+  "hubNoneBody": "A hub is a small computer at home, like a Raspberry Pi, that runs your watering rules locally. Start the hub software, then enter the code it shows.",
+  "hubAdd": "Add hub",
+  "hubCodeLabel": "Code shown by the hub",
+  "hubCodeInvalid": "Enter the 8-character code, like K7QM-2XPA.",
+  "hubClaimNote": "After adding a hub, re-pair every device of this household to it.",
+  "hubAdded": "Hub added. Waiting for it to connect.",
+  "hubEnrolling": "Waiting for the hub to connect",
+  "hubOfflineSince": "Offline since {time}",
+  "@hubOfflineSince": {
+    "placeholders": {
+      "time": {
+        "type": "String"
+      }
+    }
+  },
+  "hubInSync": "Settings in sync",
+  "hubSyncing": "Syncing settings",
+  "hubAgentVersion": "Agent version",
+  "hubUpdateAvailable": "Update available: {version}",
+  "@hubUpdateAvailable": {
+    "placeholders": {
+      "version": {
+        "type": "String"
+      }
+    }
+  },
+  "hubUpdateHint": "On the hub, run: docker compose pull && docker compose up -d",
+  "hubQueue": "Messages waiting for the cloud",
+  "hubClock": "Clock",
+  "hubClockOk": "Synced",
+  "hubClockBad": "Not synced: no automatic watering",
+  "hubLastReport": "Last report",
+  "hubLanAddress": "LAN address",
+  "hubLanHint": "Devices connect to this address. Override it if the hub has several network interfaces.",
+  "hubLanReported": "Reported by the hub",
+  "hubLanOverridden": "Set manually",
+  "hubLanUnknown": "Not reported yet",
+  "hubLanReset": "Use reported address",
+  "edit": "Edit",
+  "hubRepairTitle": "Devices to re-pair",
+  "hubRepairBody": "These devices still use the old connection. Re-pair each one with the phone app, close to the device.",
+  "deviceNeedsRepair": "Needs re-pairing",
+  "hubRemove": "Remove hub",
+  "hubRemoveTitle": "Remove the hub?",
+  "hubRemoveBody": "All devices of this household stop reporting until you re-pair them to the cloud. History is kept.",
+  "hubRemoved": "Hub removed",
+  "hubNone": "No hub",
+  "errorInvalidCode": "That code isn't valid or has expired. The hub shows a new one.",
+  "errorHubExists": "This household already has a hub.",
+  "errorReauth": "Sign in again to do this."
 }

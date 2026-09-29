@@ -103,6 +103,12 @@ class _DeviceTile extends StatelessWidget {
                 runSpacing: Spacing.xs,
                 children: [
                   StatusChip.device(context, device, withLastSeen: true),
+                  if (device.needsRepair)
+                    StatusChip(
+                      kind: StatusKind.warning,
+                      icon: Icons.link_off,
+                      label: context.l10n.deviceNeedsRepair,
+                    ),
                   configSyncChip(context, device),
                 ],
               ),
