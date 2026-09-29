@@ -8,7 +8,7 @@ import '../api_problem.dart';
 import '../models.dart';
 import 'moisture_repository.dart';
 
-/// Talks to the cloud backend (`/api/v1`, Api_Specs §6).
+/// Talks to the API server (`/api/v1`, Api_Specs §6).
 ///
 /// Hand-written until the Dart client is generated from contracts/api.yaml
 /// (App_Specs §2); it maps the API's JSON onto the app's models.
@@ -88,11 +88,11 @@ class ApiMoistureRepository implements MoistureRepository {
           name: h['name'] as String,
           timezone: h['timezone'] as String,
           role: Role.values.byName(h['role'] as String),
-          hub: h['hub'] == null
+          gateway: h['gateway'] == null
               ? null
-              : HubStatus(
-                  online: h['hub']['online'] as bool,
-                  offlineSince: _dt(h['hub']['offline_since']),
+              : GatewayStatus(
+                  online: h['gateway']['online'] as bool,
+                  offlineSince: _dt(h['gateway']['offline_since']),
                 ),
         ),
     ];
@@ -157,11 +157,11 @@ class ApiMoistureRepository implements MoistureRepository {
       _ => CommandState.cancelled,
     };
     final createdAt = _dt(c['created_at'])!;
-    final origin = c['source'] == 'manual'
-        ? CommandOrigin.user
-        : c['origin'] == 'hub'
-        ? CommandOrigin.hubRule
-        : CommandOrigin.cloudRule;
+    final origin = switch (c['source']) {
+      'rule' => CommandOrigin.rule,
+      'local' => CommandOrigin.local,
+      _ => CommandOrigin.user,
+    };
     return Command(
       id: c['id'] as String,
       plantId: (c['plant_id'] ?? '') as String,
@@ -285,7 +285,7 @@ class ApiMoistureRepository implements MoistureRepository {
       configError: error == null
           ? null
           : (error['detail'] ?? error['code']) as String?,
-      gateway: Gateway.values.byName(d['gateway'] as String),
+      gateway: GatewayLink.values.byName(d['gateway'] as String),
       slots: [
         for (final s in slots.cast<Map>())
           Slot(
@@ -342,28 +342,32 @@ class ApiMoistureRepository implements MoistureRepository {
   Future<void> acknowledgeAlert(String householdId, String alertId) =>
       _send('POST', '/households/$householdId/alerts/$alertId/ack');
 
-  // --- hub (App_Specs §12) -------------------------------------------------------------
+  // --- gateway (App_Specs §12) -------------------------------------------------------------
 
-  HubInfo _hub(Map h) => HubInfo(
+  GatewayInfo _gateway(Map h) => GatewayInfo(
     id: h['id'] as String,
     status: h['status'] as String,
     online: h['online'] as bool,
     inSync: h['in_sync'] as bool,
     offlineSince: _dt(h['offline_since']),
-    agentVersion: h['agent_version'] as String?,
-    latestAgentVersion: h['latest_agent_version'] as String?,
+    version: h['version'] as String?,
+    latestVersion: h['latest_version'] as String?,
     arch: h['arch'] as String?,
-    queueDepth: h['queue_depth'] as int?,
+    adapters: [
+      for (final a in (h['adapters'] as List? ?? const [])) a as String,
+    ],
+    outboxDepth: h['outbox_depth'] as int?,
     timeSynced: h['time_synced'] as bool?,
     lanHost: h['lan_host'] as String?,
+    lanPort: (h['lan_port'] as int?) ?? 8883,
     lanHostOverride: h['lan_host_override'] as String?,
     lastStateAt: _dt(h['last_state_at']),
   );
 
   @override
-  Future<HubInfo?> hub(String householdId) async {
+  Future<GatewayInfo?> gateway(String householdId) async {
     try {
-      return _hub(await _get('/households/$householdId/hub') as Map);
+      return _gateway(await _get('/households/$householdId/gateway') as Map);
     } on ApiProblem catch (e) {
       if (e.status == 404) return null;
       rethrow;
@@ -371,27 +375,28 @@ class ApiMoistureRepository implements MoistureRepository {
   }
 
   @override
-  Future<HubInfo> claimHub(String householdId, String userCode) async => _hub(
-    await _send('POST', '/households/$householdId/hub', {
-          'user_code': userCode.trim(),
-        })
-        as Map,
-  );
+  Future<GatewayInfo> claimGateway(String householdId, String userCode) async =>
+      _gateway(
+        await _send('POST', '/households/$householdId/gateway', {
+              'user_code': userCode.trim(),
+            })
+            as Map,
+      );
 
   @override
-  Future<HubInfo> setHubLanHost(
+  Future<GatewayInfo> setGatewayLanHost(
     String householdId,
     String? lanHostOverride,
-  ) async => _hub(
-    await _send('PATCH', '/households/$householdId/hub', {
+  ) async => _gateway(
+    await _send('PATCH', '/households/$householdId/gateway', {
           'lan_host_override': lanHostOverride,
         })
         as Map,
   );
 
   @override
-  Future<void> removeHub(String householdId) =>
-      _send('DELETE', '/households/$householdId/hub');
+  Future<void> removeGateway(String householdId) =>
+      _send('DELETE', '/households/$householdId/gateway');
 
   // --- live updates (SSE, App_Specs §6.2) --------------------------------------------
 
@@ -402,7 +407,7 @@ class ApiMoistureRepository implements MoistureRepository {
     'device': LiveEventKind.device,
     'config': LiveEventKind.config,
     'alert': LiveEventKind.alert,
-    'hub': LiveEventKind.hub,
+    'gateway': LiveEventKind.gateway,
     'household': LiveEventKind.household,
     'rule': LiveEventKind.rule,
     'rule_execution': LiveEventKind.rule,

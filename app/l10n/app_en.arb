@@ -10,8 +10,8 @@
   "roleMember": "Member",
   "roleAdmin": "Admin",
   "roleOwner": "Owner",
-  "hubOfflineBanner": "Hub offline since {time}. Watering is delivered when it's back.",
-  "@hubOfflineBanner": {
+  "gatewayOfflineBanner": "Gateway offline since {time}. Watering is delivered when it's back.",
+  "@gatewayOfflineBanner": {
     "placeholders": {
       "time": {
         "type": "String"
@@ -26,7 +26,7 @@
   "errorGeneric": "Something went wrong.",
   "errorForbidden": "Your role no longer allows this.",
   "errorSafetyLimit": "That's longer than this pump's limit.",
-  "errorHubOffline": "The hub is offline.",
+  "errorGatewayOffline": "The gateway is offline.",
   "errorTooLate": "The device already picked this up.",
   "errorBusy": "The device is busy. Try again shortly.",
   "moistureSemantics": "Moisture {percent} percent",
@@ -145,7 +145,7 @@
     }
   },
   "waterQueued": "Watering queued",
-  "waterQueuedHubOffline": "Queued. It's delivered when the hub is back online.",
+  "waterQueuedGatewayOffline": "Queued. It's delivered when the gateway is back online.",
   "cancel": "Cancel",
   "cancelCommand": "Cancel watering",
   "cancelCommandHint": "Best effort — it may already have run.",
@@ -179,8 +179,8 @@
   "commandExpired": "Expired",
   "commandCancelled": "Cancelled",
   "originUser": "Manual",
-  "originCloudRule": "Rule (cloud)",
-  "originHubRule": "Rule (hub)",
+  "originRule": "Rule",
+  "originLocal": "On the gateway",
   "historyTitle": "Moisture history",
   "range24h": "24 h",
   "range7d": "7 d",
@@ -355,56 +355,58 @@
       }
     }
   },
-  "hubTitle": "Hub",
-  "hubNoneTitle": "Keep watering without internet",
-  "hubNoneBody": "A hub is a small computer at home, like a Raspberry Pi, that runs your watering rules locally. Start the hub software, then enter the code it shows.",
-  "hubAdd": "Add hub",
-  "hubCodeLabel": "Code shown by the hub",
-  "hubCodeInvalid": "Enter the 8-character code, like K7QM-2XPA.",
-  "hubClaimNote": "After adding a hub, re-pair every device of this household to it.",
-  "hubAdded": "Hub added. Waiting for it to connect.",
-  "hubEnrolling": "Waiting for the hub to connect",
-  "hubOfflineSince": "Offline since {time}",
-  "@hubOfflineSince": {
+  "gatewayTitle": "Gateway",
+  "gatewayNoneTitle": "Connect your plants",
+  "gatewayNoneBody": "Plant devices talk to a gateway: a small computer at home, like a Raspberry Pi, that also runs your watering rules when the internet is down. Start the gateway software, then enter the code it shows.",
+  "gatewayAdd": "Add gateway",
+  "gatewayCodeLabel": "Code shown by the gateway",
+  "gatewayCodeInvalid": "Enter the 8-character code, like K7QM-2XPA.",
+  "gatewayClaimNote": "Devices paired before have to be re-paired to the new gateway.",
+  "gatewayAdded": "Gateway added. Waiting for it to connect.",
+  "gatewayEnrolling": "Waiting for the gateway to connect",
+  "gatewayOfflineSince": "Offline since {time}",
+  "@gatewayOfflineSince": {
     "placeholders": {
       "time": {
         "type": "String"
       }
     }
   },
-  "hubInSync": "Settings in sync",
-  "hubSyncing": "Syncing settings",
-  "hubAgentVersion": "Agent version",
-  "hubUpdateAvailable": "Update available: {version}",
-  "@hubUpdateAvailable": {
+  "gatewayInSync": "Settings in sync",
+  "gatewaySyncing": "Syncing settings",
+  "gatewayVersion": "Version",
+  "gatewayAdapters": "Device types",
+  "gatewayUpdateAvailable": "Update available: {version}",
+  "@gatewayUpdateAvailable": {
     "placeholders": {
       "version": {
         "type": "String"
       }
     }
   },
-  "hubUpdateHint": "On the hub, run: docker compose pull && docker compose up -d",
-  "hubQueue": "Messages waiting for the cloud",
-  "hubClock": "Clock",
-  "hubClockOk": "Synced",
-  "hubClockBad": "Not synced: no automatic watering",
-  "hubLastReport": "Last report",
-  "hubLanAddress": "LAN address",
-  "hubLanHint": "Devices connect to this address. Override it if the hub has several network interfaces.",
-  "hubLanReported": "Reported by the hub",
-  "hubLanOverridden": "Set manually",
-  "hubLanUnknown": "Not reported yet",
-  "hubLanReset": "Use reported address",
+  "gatewayUpdateHint": "On the gateway, run: docker compose pull && docker compose up -d",
+  "gatewayOutbox": "Messages not uploaded yet",
+  "gatewayClock": "Clock",
+  "gatewayClockOk": "Synced",
+  "gatewayClockBad": "Not synced: no automatic watering",
+  "gatewayLastReport": "Last report",
+  "gatewayLanAddress": "LAN address",
+  "gatewayLanHint": "Devices connect to this address. Override it if the gateway has several network interfaces.",
+  "gatewayLanReported": "Reported by the gateway",
+  "gatewayLanOverridden": "Set manually",
+  "gatewayLanUnknown": "Not reported yet",
+  "gatewayLanReset": "Use reported address",
   "edit": "Edit",
-  "hubRepairTitle": "Devices to re-pair",
-  "hubRepairBody": "These devices still use the old connection. Re-pair each one with the phone app, close to the device.",
+  "gatewayRepairTitle": "Devices to re-pair",
+  "gatewayRepairBody": "These devices aren't paired to this gateway. Re-pair each one with the phone app, close to the device.",
   "deviceNeedsRepair": "Needs re-pairing",
-  "hubRemove": "Remove hub",
-  "hubRemoveTitle": "Remove the hub?",
-  "hubRemoveBody": "All devices of this household stop reporting until you re-pair them to the cloud. History is kept.",
-  "hubRemoved": "Hub removed",
-  "hubNone": "No hub",
-  "errorInvalidCode": "That code isn't valid or has expired. The hub shows a new one.",
-  "errorHubExists": "This household already has a hub.",
+  "gatewayRemove": "Remove gateway",
+  "gatewayRemoveTitle": "Remove the gateway?",
+  "gatewayRemoveBody": "Its devices stop reporting until you add a gateway again and re-pair them. Automatic watering stops too. History is kept.",
+  "gatewayRemoved": "Gateway removed",
+  "gatewayNone": "No gateway",
+  "errorInvalidCode": "That code isn't valid or has expired. The gateway shows a new one.",
+  "errorGatewayExists": "This household already has a gateway.",
+  "errorNoGateway": "Add a gateway to this household first (Settings → Gateway).",
   "errorReauth": "Sign in again to do this."
 }

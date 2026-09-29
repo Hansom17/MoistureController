@@ -41,9 +41,11 @@ void main() {
     expect(find.text('Roses'), findsNothing);
   });
 
-  testWidgets('hub-offline banner is shown for that household', (tester) async {
+  testWidgets('gateway-offline banner is shown for that household', (
+    tester,
+  ) async {
     await pumpApp(tester, household: 'h2');
-    expect(find.textContaining('Hub offline since'), findsOneWidget);
+    expect(find.textContaining('Gateway offline since'), findsOneWidget);
     expect(find.text('Roses'), findsOneWidget);
   });
 

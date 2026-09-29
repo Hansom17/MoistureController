@@ -35,11 +35,12 @@ String describeError(AppLocalizations l, Object error) {
     return switch (error.type) {
       ApiProblem.forbidden => l.errorForbidden,
       ApiProblem.safetyLimit => l.errorSafetyLimit,
-      ApiProblem.hubOffline => l.errorHubOffline,
+      ApiProblem.gatewayOffline => l.errorGatewayOffline,
       ApiProblem.tooLate => l.errorTooLate,
       ApiProblem.busy => l.errorBusy,
       ApiProblem.invalidCode => l.errorInvalidCode,
-      ApiProblem.hubExists => l.errorHubExists,
+      ApiProblem.gatewayExists => l.errorGatewayExists,
+      ApiProblem.noGateway => l.errorNoGateway,
       ApiProblem.reauthRequired => l.errorReauth,
       _ => error.detail ?? l.errorGeneric,
     };

@@ -158,11 +158,11 @@ abstract class AppLocalizations {
   /// **'Owner'**
   String get roleOwner;
 
-  /// No description provided for @hubOfflineBanner.
+  /// No description provided for @gatewayOfflineBanner.
   ///
   /// In en, this message translates to:
-  /// **'Hub offline since {time}. Watering is delivered when it\'s back.'**
-  String hubOfflineBanner(String time);
+  /// **'Gateway offline since {time}. Watering is delivered when it\'s back.'**
+  String gatewayOfflineBanner(String time);
 
   /// No description provided for @noPlantsTitle.
   ///
@@ -212,11 +212,11 @@ abstract class AppLocalizations {
   /// **'That\'s longer than this pump\'s limit.'**
   String get errorSafetyLimit;
 
-  /// No description provided for @errorHubOffline.
+  /// No description provided for @errorGatewayOffline.
   ///
   /// In en, this message translates to:
-  /// **'The hub is offline.'**
-  String get errorHubOffline;
+  /// **'The gateway is offline.'**
+  String get errorGatewayOffline;
 
   /// No description provided for @errorTooLate.
   ///
@@ -380,11 +380,11 @@ abstract class AppLocalizations {
   /// **'Watering queued'**
   String get waterQueued;
 
-  /// No description provided for @waterQueuedHubOffline.
+  /// No description provided for @waterQueuedGatewayOffline.
   ///
   /// In en, this message translates to:
-  /// **'Queued. It\'s delivered when the hub is back online.'**
-  String get waterQueuedHubOffline;
+  /// **'Queued. It\'s delivered when the gateway is back online.'**
+  String get waterQueuedGatewayOffline;
 
   /// No description provided for @cancel.
   ///
@@ -458,17 +458,17 @@ abstract class AppLocalizations {
   /// **'Manual'**
   String get originUser;
 
-  /// No description provided for @originCloudRule.
+  /// No description provided for @originRule.
   ///
   /// In en, this message translates to:
-  /// **'Rule (cloud)'**
-  String get originCloudRule;
+  /// **'Rule'**
+  String get originRule;
 
-  /// No description provided for @originHubRule.
+  /// No description provided for @originLocal.
   ///
   /// In en, this message translates to:
-  /// **'Rule (hub)'**
-  String get originHubRule;
+  /// **'On the gateway'**
+  String get originLocal;
 
   /// No description provided for @historyTitle.
   ///
@@ -854,161 +854,167 @@ abstract class AppLocalizations {
   /// **'{subject}: {kind}'**
   String alertOther(String subject, String kind);
 
-  /// No description provided for @hubTitle.
+  /// No description provided for @gatewayTitle.
   ///
   /// In en, this message translates to:
-  /// **'Hub'**
-  String get hubTitle;
+  /// **'Gateway'**
+  String get gatewayTitle;
 
-  /// No description provided for @hubNoneTitle.
+  /// No description provided for @gatewayNoneTitle.
   ///
   /// In en, this message translates to:
-  /// **'Keep watering without internet'**
-  String get hubNoneTitle;
+  /// **'Connect your plants'**
+  String get gatewayNoneTitle;
 
-  /// No description provided for @hubNoneBody.
+  /// No description provided for @gatewayNoneBody.
   ///
   /// In en, this message translates to:
-  /// **'A hub is a small computer at home, like a Raspberry Pi, that runs your watering rules locally. Start the hub software, then enter the code it shows.'**
-  String get hubNoneBody;
+  /// **'Plant devices talk to a gateway: a small computer at home, like a Raspberry Pi, that also runs your watering rules when the internet is down. Start the gateway software, then enter the code it shows.'**
+  String get gatewayNoneBody;
 
-  /// No description provided for @hubAdd.
+  /// No description provided for @gatewayAdd.
   ///
   /// In en, this message translates to:
-  /// **'Add hub'**
-  String get hubAdd;
+  /// **'Add gateway'**
+  String get gatewayAdd;
 
-  /// No description provided for @hubCodeLabel.
+  /// No description provided for @gatewayCodeLabel.
   ///
   /// In en, this message translates to:
-  /// **'Code shown by the hub'**
-  String get hubCodeLabel;
+  /// **'Code shown by the gateway'**
+  String get gatewayCodeLabel;
 
-  /// No description provided for @hubCodeInvalid.
+  /// No description provided for @gatewayCodeInvalid.
   ///
   /// In en, this message translates to:
   /// **'Enter the 8-character code, like K7QM-2XPA.'**
-  String get hubCodeInvalid;
+  String get gatewayCodeInvalid;
 
-  /// No description provided for @hubClaimNote.
+  /// No description provided for @gatewayClaimNote.
   ///
   /// In en, this message translates to:
-  /// **'After adding a hub, re-pair every device of this household to it.'**
-  String get hubClaimNote;
+  /// **'Devices paired before have to be re-paired to the new gateway.'**
+  String get gatewayClaimNote;
 
-  /// No description provided for @hubAdded.
+  /// No description provided for @gatewayAdded.
   ///
   /// In en, this message translates to:
-  /// **'Hub added. Waiting for it to connect.'**
-  String get hubAdded;
+  /// **'Gateway added. Waiting for it to connect.'**
+  String get gatewayAdded;
 
-  /// No description provided for @hubEnrolling.
+  /// No description provided for @gatewayEnrolling.
   ///
   /// In en, this message translates to:
-  /// **'Waiting for the hub to connect'**
-  String get hubEnrolling;
+  /// **'Waiting for the gateway to connect'**
+  String get gatewayEnrolling;
 
-  /// No description provided for @hubOfflineSince.
+  /// No description provided for @gatewayOfflineSince.
   ///
   /// In en, this message translates to:
   /// **'Offline since {time}'**
-  String hubOfflineSince(String time);
+  String gatewayOfflineSince(String time);
 
-  /// No description provided for @hubInSync.
+  /// No description provided for @gatewayInSync.
   ///
   /// In en, this message translates to:
   /// **'Settings in sync'**
-  String get hubInSync;
+  String get gatewayInSync;
 
-  /// No description provided for @hubSyncing.
+  /// No description provided for @gatewaySyncing.
   ///
   /// In en, this message translates to:
   /// **'Syncing settings'**
-  String get hubSyncing;
+  String get gatewaySyncing;
 
-  /// No description provided for @hubAgentVersion.
+  /// No description provided for @gatewayVersion.
   ///
   /// In en, this message translates to:
-  /// **'Agent version'**
-  String get hubAgentVersion;
+  /// **'Version'**
+  String get gatewayVersion;
 
-  /// No description provided for @hubUpdateAvailable.
+  /// No description provided for @gatewayAdapters.
+  ///
+  /// In en, this message translates to:
+  /// **'Device types'**
+  String get gatewayAdapters;
+
+  /// No description provided for @gatewayUpdateAvailable.
   ///
   /// In en, this message translates to:
   /// **'Update available: {version}'**
-  String hubUpdateAvailable(String version);
+  String gatewayUpdateAvailable(String version);
 
-  /// No description provided for @hubUpdateHint.
+  /// No description provided for @gatewayUpdateHint.
   ///
   /// In en, this message translates to:
-  /// **'On the hub, run: docker compose pull && docker compose up -d'**
-  String get hubUpdateHint;
+  /// **'On the gateway, run: docker compose pull && docker compose up -d'**
+  String get gatewayUpdateHint;
 
-  /// No description provided for @hubQueue.
+  /// No description provided for @gatewayOutbox.
   ///
   /// In en, this message translates to:
-  /// **'Messages waiting for the cloud'**
-  String get hubQueue;
+  /// **'Messages not uploaded yet'**
+  String get gatewayOutbox;
 
-  /// No description provided for @hubClock.
+  /// No description provided for @gatewayClock.
   ///
   /// In en, this message translates to:
   /// **'Clock'**
-  String get hubClock;
+  String get gatewayClock;
 
-  /// No description provided for @hubClockOk.
+  /// No description provided for @gatewayClockOk.
   ///
   /// In en, this message translates to:
   /// **'Synced'**
-  String get hubClockOk;
+  String get gatewayClockOk;
 
-  /// No description provided for @hubClockBad.
+  /// No description provided for @gatewayClockBad.
   ///
   /// In en, this message translates to:
   /// **'Not synced: no automatic watering'**
-  String get hubClockBad;
+  String get gatewayClockBad;
 
-  /// No description provided for @hubLastReport.
+  /// No description provided for @gatewayLastReport.
   ///
   /// In en, this message translates to:
   /// **'Last report'**
-  String get hubLastReport;
+  String get gatewayLastReport;
 
-  /// No description provided for @hubLanAddress.
+  /// No description provided for @gatewayLanAddress.
   ///
   /// In en, this message translates to:
   /// **'LAN address'**
-  String get hubLanAddress;
+  String get gatewayLanAddress;
 
-  /// No description provided for @hubLanHint.
+  /// No description provided for @gatewayLanHint.
   ///
   /// In en, this message translates to:
-  /// **'Devices connect to this address. Override it if the hub has several network interfaces.'**
-  String get hubLanHint;
+  /// **'Devices connect to this address. Override it if the gateway has several network interfaces.'**
+  String get gatewayLanHint;
 
-  /// No description provided for @hubLanReported.
+  /// No description provided for @gatewayLanReported.
   ///
   /// In en, this message translates to:
-  /// **'Reported by the hub'**
-  String get hubLanReported;
+  /// **'Reported by the gateway'**
+  String get gatewayLanReported;
 
-  /// No description provided for @hubLanOverridden.
+  /// No description provided for @gatewayLanOverridden.
   ///
   /// In en, this message translates to:
   /// **'Set manually'**
-  String get hubLanOverridden;
+  String get gatewayLanOverridden;
 
-  /// No description provided for @hubLanUnknown.
+  /// No description provided for @gatewayLanUnknown.
   ///
   /// In en, this message translates to:
   /// **'Not reported yet'**
-  String get hubLanUnknown;
+  String get gatewayLanUnknown;
 
-  /// No description provided for @hubLanReset.
+  /// No description provided for @gatewayLanReset.
   ///
   /// In en, this message translates to:
   /// **'Use reported address'**
-  String get hubLanReset;
+  String get gatewayLanReset;
 
   /// No description provided for @edit.
   ///
@@ -1016,17 +1022,17 @@ abstract class AppLocalizations {
   /// **'Edit'**
   String get edit;
 
-  /// No description provided for @hubRepairTitle.
+  /// No description provided for @gatewayRepairTitle.
   ///
   /// In en, this message translates to:
   /// **'Devices to re-pair'**
-  String get hubRepairTitle;
+  String get gatewayRepairTitle;
 
-  /// No description provided for @hubRepairBody.
+  /// No description provided for @gatewayRepairBody.
   ///
   /// In en, this message translates to:
-  /// **'These devices still use the old connection. Re-pair each one with the phone app, close to the device.'**
-  String get hubRepairBody;
+  /// **'These devices aren\'t paired to this gateway. Re-pair each one with the phone app, close to the device.'**
+  String get gatewayRepairBody;
 
   /// No description provided for @deviceNeedsRepair.
   ///
@@ -1034,47 +1040,53 @@ abstract class AppLocalizations {
   /// **'Needs re-pairing'**
   String get deviceNeedsRepair;
 
-  /// No description provided for @hubRemove.
+  /// No description provided for @gatewayRemove.
   ///
   /// In en, this message translates to:
-  /// **'Remove hub'**
-  String get hubRemove;
+  /// **'Remove gateway'**
+  String get gatewayRemove;
 
-  /// No description provided for @hubRemoveTitle.
+  /// No description provided for @gatewayRemoveTitle.
   ///
   /// In en, this message translates to:
-  /// **'Remove the hub?'**
-  String get hubRemoveTitle;
+  /// **'Remove the gateway?'**
+  String get gatewayRemoveTitle;
 
-  /// No description provided for @hubRemoveBody.
+  /// No description provided for @gatewayRemoveBody.
   ///
   /// In en, this message translates to:
-  /// **'All devices of this household stop reporting until you re-pair them to the cloud. History is kept.'**
-  String get hubRemoveBody;
+  /// **'Its devices stop reporting until you add a gateway again and re-pair them. Automatic watering stops too. History is kept.'**
+  String get gatewayRemoveBody;
 
-  /// No description provided for @hubRemoved.
+  /// No description provided for @gatewayRemoved.
   ///
   /// In en, this message translates to:
-  /// **'Hub removed'**
-  String get hubRemoved;
+  /// **'Gateway removed'**
+  String get gatewayRemoved;
 
-  /// No description provided for @hubNone.
+  /// No description provided for @gatewayNone.
   ///
   /// In en, this message translates to:
-  /// **'No hub'**
-  String get hubNone;
+  /// **'No gateway'**
+  String get gatewayNone;
 
   /// No description provided for @errorInvalidCode.
   ///
   /// In en, this message translates to:
-  /// **'That code isn\'t valid or has expired. The hub shows a new one.'**
+  /// **'That code isn\'t valid or has expired. The gateway shows a new one.'**
   String get errorInvalidCode;
 
-  /// No description provided for @errorHubExists.
+  /// No description provided for @errorGatewayExists.
   ///
   /// In en, this message translates to:
-  /// **'This household already has a hub.'**
-  String get errorHubExists;
+  /// **'This household already has a gateway.'**
+  String get errorGatewayExists;
+
+  /// No description provided for @errorNoGateway.
+  ///
+  /// In en, this message translates to:
+  /// **'Add a gateway to this household first (Settings → Gateway).'**
+  String get errorNoGateway;
 
   /// No description provided for @errorReauth.
   ///

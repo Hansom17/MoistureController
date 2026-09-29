@@ -10,19 +10,19 @@ import '../features/dashboard/dashboard_screen.dart';
 import '../features/devices/device_detail_screen.dart';
 import '../features/devices/devices_screen.dart';
 import '../features/plants/plant_detail_screen.dart';
-import '../features/hub/hub_screen.dart';
+import '../features/gateway/gateway_screen.dart';
 import '../features/settings/settings_screen.dart';
 import 'theme/tokens.dart';
 
-/// Deep links `/hub#u=<code>` and `/join#c=<code>` (App_Specs §13) carry the
+/// Deep links `/gateway#u=<code>` and `/join#c=<code>` (App_Specs §13) carry the
 /// code in the URL fragment, which the router never sees; map them here.
 String initialLocation(Uri url) {
   final path = url.path.endsWith('/') && url.path.length > 1
       ? url.path.substring(0, url.path.length - 1)
       : url.path;
-  if (path.endsWith('/hub') && url.fragment.startsWith('u=')) {
+  if (path.endsWith('/gateway') && url.fragment.startsWith('u=')) {
     return Uri(
-      path: '/settings/hub',
+      path: '/settings/gateway',
       queryParameters: {'code': url.fragment.substring(2)},
     ).toString();
   }
@@ -80,8 +80,8 @@ final routerProvider = Provider<GoRouter>((ref) {
                 builder: (_, _) => const SettingsScreen(),
                 routes: [
                   GoRoute(
-                    path: 'hub',
-                    builder: (_, state) => HubScreen(
+                    path: 'gateway',
+                    builder: (_, state) => GatewayScreen(
                       initialCode: state.uri.queryParameters['code'],
                     ),
                   ),

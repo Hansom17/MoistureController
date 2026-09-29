@@ -11,7 +11,7 @@ class Household {
     required this.name,
     required this.timezone,
     required this.role,
-    this.hub,
+    this.gateway,
   });
 
   final String id;
@@ -19,66 +19,74 @@ class Household {
   final String timezone;
   final Role role;
 
-  /// Null when the household has no hub.
-  final HubStatus? hub;
+  /// Null when the household has no gateway.
+  final GatewayStatus? gateway;
 
-  Household copyWith({Role? role, HubStatus? hub}) => Household(
+  Household copyWith({Role? role, GatewayStatus? gateway}) => Household(
     id: id,
     name: name,
     timezone: timezone,
     role: role ?? this.role,
-    hub: hub ?? this.hub,
+    gateway: gateway ?? this.gateway,
   );
 }
 
-class HubStatus {
-  const HubStatus({required this.online, this.offlineSince, this.version});
+class GatewayStatus {
+  const GatewayStatus({required this.online, this.offlineSince, this.version});
 
   final bool online;
   final DateTime? offlineSince;
   final String? version;
 }
 
-/// Everything the hub screen shows (Api_Specs §6.1, `GET …/hub`).
-class HubInfo {
-  const HubInfo({
+/// Everything the gateway screen shows (Api_Specs §6.1, `GET …/gateway`).
+class GatewayInfo {
+  const GatewayInfo({
     required this.id,
     required this.status,
     required this.online,
     required this.inSync,
     this.offlineSince,
-    this.agentVersion,
-    this.latestAgentVersion,
+    this.version,
+    this.latestVersion,
     this.arch,
-    this.queueDepth,
+    this.adapters = const [],
+    this.outboxDepth,
     this.timeSynced,
     this.lanHost,
+    this.lanPort = 8883,
     this.lanHostOverride,
     this.lastStateAt,
   });
 
   final String id;
 
-  /// enrolling · connecting · online · offline
+  /// enrolling (claimed, not connected yet) · online · offline
   final String status;
   final bool online;
   final bool inSync;
   final DateTime? offlineSince;
-  final String? agentVersion;
-  final String? latestAgentVersion;
+  final String? version;
+  final String? latestVersion;
   final String? arch;
-  final int? queueDepth;
+
+  /// Device technologies it speaks, e.g. `esp32-mqtt`.
+  final List<String> adapters;
+
+  /// Up messages buffered on the gateway, not yet stored by the API.
+  final int? outboxDepth;
   final bool? timeSynced;
 
-  /// What devices store at pairing: override or the hub's reported address.
+  /// What devices store at pairing: override or the gateway's reported address.
   final String? lanHost;
+  final int lanPort;
   final String? lanHostOverride;
   final DateTime? lastStateAt;
 
-  bool get enrolling => status == 'enrolling' || status == 'connecting';
+  bool get enrolling => status == 'enrolling';
 
   bool get updateAvailable {
-    final a = agentVersion, b = latestAgentVersion;
+    final a = version, b = latestVersion;
     if (a == null || b == null) return false;
     List<int> parts(String v) =>
         v.split('.').map((p) => int.tryParse(p) ?? 0).toList();
@@ -91,8 +99,9 @@ class HubInfo {
   }
 }
 
-/// How a device reaches the backend; `none` = must be re-paired (§8.1).
-enum Gateway { cloud, hub, none }
+/// Whether a device's key is on the household's gateway; `none` = it must be
+/// re-paired, e.g. after the gateway was replaced (Api_Specs §8.1).
+enum GatewayLink { gateway, none }
 
 /// Device connectivity as shown in the UI (App_Specs §7).
 enum DeviceState { online, sleeping, late, offline }
@@ -115,7 +124,7 @@ class Device {
     required this.configRev,
     required this.slots,
     this.configError,
-    this.gateway = Gateway.cloud,
+    this.gateway = GatewayLink.gateway,
   });
 
   final String id;
@@ -132,9 +141,9 @@ class Device {
   final int configRev;
   final String? configError;
   final List<Slot> slots;
-  final Gateway gateway;
+  final GatewayLink gateway;
 
-  bool get needsRepair => gateway == Gateway.none;
+  bool get needsRepair => gateway == GatewayLink.none;
 
   Device copyWith({
     DeviceState? state,
@@ -308,7 +317,8 @@ class Command {
   );
 }
 
-enum CommandOrigin { user, cloudRule, hubRule }
+/// Who started a command: the app, a rule on the gateway, or the gateway's CLI.
+enum CommandOrigin { user, rule, local }
 
 class Rule {
   const Rule({
@@ -391,7 +401,7 @@ enum LiveEventKind {
   device,
   config,
   alert,
-  hub,
+  gateway,
   household,
   rule,
   resync,

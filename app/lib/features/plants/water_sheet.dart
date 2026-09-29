@@ -28,8 +28,12 @@ Future<void> showWaterSheet(
         .read(householdActionsProvider)
         .waterNow(household.id, plant.id, seconds);
     if (!context.mounted) return;
-    final hubOffline = household.hub != null && !household.hub!.online;
-    showSnackBar(context, hubOffline ? l.waterQueuedHubOffline : l.waterQueued);
+    final gatewayOffline =
+        household.gateway != null && !household.gateway!.online;
+    showSnackBar(
+      context,
+      gatewayOffline ? l.waterQueuedGatewayOffline : l.waterQueued,
+    );
   } catch (e) {
     if (context.mounted) showErrorSnackBar(context, e);
   }

@@ -12,11 +12,11 @@ class ApiProblem implements Exception {
   static const safetyLimit = 'safety_limit';
   static const householdFrozen = 'household_frozen';
   static const busy = 'busy';
-  static const hubOffline = 'hub_offline';
+  static const gatewayOffline = 'gateway_offline';
   static const noGateway = 'no_gateway';
   static const tooLate = 'too_late';
   static const invalidCode = 'invalid_code';
-  static const hubExists = 'hub_exists';
+  static const gatewayExists = 'gateway_exists';
   static const reauthRequired = 'reauth_required';
 
   @override

@@ -12,7 +12,7 @@ const _kinds = [
   'device',
   'config',
   'alert',
-  'hub',
+  'gateway',
   'household',
   'resync',
   'plant',

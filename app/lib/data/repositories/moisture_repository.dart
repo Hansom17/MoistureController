@@ -1,10 +1,10 @@
 import '../models.dart';
 
-/// Everything the app reads from or writes to the cloud backend.
+/// Everything the app reads from or writes to the API server.
 ///
 /// Screens never use this directly — only through providers (App_Specs §3).
 /// Implementations: [FakeMoistureRepository] (no backend) and
-/// [ApiMoistureRepository] (the cloud backend's REST + SSE API).
+/// [ApiMoistureRepository] (the API server's REST + SSE API).
 abstract interface class MoistureRepository {
   Future<List<Household>> households();
 
@@ -33,13 +33,16 @@ abstract interface class MoistureRepository {
   Future<List<Alert>> alerts(String householdId);
   Future<void> acknowledgeAlert(String householdId, String alertId);
 
-  /// The household's hub, or null if it has none.
-  Future<HubInfo?> hub(String householdId);
+  /// The household's gateway, or null if it has none.
+  Future<GatewayInfo?> gateway(String householdId);
 
-  /// Claims an enrolling hub by the code it shows (gateway_api.md §3.2).
-  Future<HubInfo> claimHub(String householdId, String userCode);
-  Future<HubInfo> setHubLanHost(String householdId, String? lanHostOverride);
-  Future<void> removeHub(String householdId);
+  /// Claims an enrolling gateway by the code it shows (gateway_api.md §3.2).
+  Future<GatewayInfo> claimGateway(String householdId, String userCode);
+  Future<GatewayInfo> setGatewayLanHost(
+    String householdId,
+    String? lanHostOverride,
+  );
+  Future<void> removeGateway(String householdId);
 
   /// Live updates for one household (SSE stream on the real backend).
   Stream<LiveEvent> events(String householdId);

@@ -22,7 +22,7 @@ class DevicesScreen extends StatelessWidget {
       builder: (context, household) => Consumer(
         builder: (context, ref, _) {
           final devices = ref.watch(devicesProvider(household.id));
-          final banner = hubOfflineMessage(context, household);
+          final banner = gatewayOfflineMessage(context, household);
           return Scaffold(
             appBar: AppBar(title: Text(l.navDevices)),
             body: Column(

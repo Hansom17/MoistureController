@@ -245,7 +245,7 @@ Implements the app side of [contracts/gateway_api.md §3](../contracts/gateway_a
 - Sensitive action → re-authentication first, then `POST /households/{h}/gateway {user_code}`.
 - The screen then follows the gateway via SSE: *enrolling → online → in sync*.
 - Removing or replacing the gateway: confirmation dialog explaining that all devices need re-pairing afterwards; devices then show "needs re-pairing" with the re-pair wizard.
-- The existing hub screen (commit `ab2ed39`) becomes this screen: rename, `/hub` → `/gateway`, show adapters and outbox depth.
+- Implemented in `lib/features/gateway/gateway_screen.dart` (route `/settings/gateway`, deep link `/gateway#u=<code>`), including adapters and outbox depth.
 
 ---
 

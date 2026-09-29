@@ -614,5 +614,5 @@ The code written until 2026-09-29 targets the v1 architecture; most of it moves.
 | `hub/src/mc_hub/` (agent: enrollment, snapshot/keys, local rules, SQLite store, CLI) | **`gateway/`**. *Done in place (still under `hub/`):* Enrollment and CLI stay; the MQTT bridge is replaced by the WebSocket uplink + outbox; device traffic is forwarded up by the gateway itself (no bridge). |
 | `broker/` | Gateway broker config only; cloud config and cloud ACL generation removed; no bridge. |
 | `core/` | Unchanged; contract tests switch from `hub.md` to `gateway_api.md`. |
-| `app/` | Mostly unchanged: API base URL stays central; the "Hub" screen becomes the "Gateway" screen; "no hub" households disappear. |
+| `app/` | *Done:* API base URL stays central; the "Hub" screen became the "Gateway" screen; "no hub" households are gone (adding a device needs a gateway). |
 | `scripts/dev-start.sh` | *Done:* starts the central stack + one gateway (claimed by `seed-dev`) + simulator + app. |

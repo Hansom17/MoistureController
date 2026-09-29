@@ -35,8 +35,8 @@ class CommandStateTile extends StatelessWidget {
     };
     final origin = switch (c.origin) {
       CommandOrigin.user => l.originUser,
-      CommandOrigin.cloudRule => l.originCloudRule,
-      CommandOrigin.hubRule => l.originHubRule,
+      CommandOrigin.rule => l.originRule,
+      CommandOrigin.local => l.originLocal,
     };
     return ListTile(
       contentPadding: EdgeInsets.zero,

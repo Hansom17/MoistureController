@@ -38,9 +38,9 @@ final devicesProvider = FutureProvider.family<List<Device>, String>(
   (ref, householdId) => ref.watch(repositoryProvider).devices(householdId),
 );
 
-/// The household's hub; null when it has none (App_Specs §12).
-final hubProvider = FutureProvider.family<HubInfo?, String>(
-  (ref, householdId) => ref.watch(repositoryProvider).hub(householdId),
+/// The household's gateway; null when it has none (App_Specs §12).
+final gatewayProvider = FutureProvider.family<GatewayInfo?, String>(
+  (ref, householdId) => ref.watch(repositoryProvider).gateway(householdId),
 );
 
 final alertsProvider = FutureProvider.family<List<Alert>, String>(

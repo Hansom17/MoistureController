@@ -39,8 +39,8 @@ class AppLocalizationsEn extends AppLocalizations {
   String get roleOwner => 'Owner';
 
   @override
-  String hubOfflineBanner(String time) {
-    return 'Hub offline since $time. Watering is delivered when it\'s back.';
+  String gatewayOfflineBanner(String time) {
+    return 'Gateway offline since $time. Watering is delivered when it\'s back.';
   }
 
   @override
@@ -68,7 +68,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get errorSafetyLimit => 'That\'s longer than this pump\'s limit.';
 
   @override
-  String get errorHubOffline => 'The hub is offline.';
+  String get errorGatewayOffline => 'The gateway is offline.';
 
   @override
   String get errorTooLate => 'The device already picked this up.';
@@ -179,8 +179,8 @@ class AppLocalizationsEn extends AppLocalizations {
   String get waterQueued => 'Watering queued';
 
   @override
-  String get waterQueuedHubOffline =>
-      'Queued. It\'s delivered when the hub is back online.';
+  String get waterQueuedGatewayOffline =>
+      'Queued. It\'s delivered when the gateway is back online.';
 
   @override
   String get cancel => 'Cancel';
@@ -225,10 +225,10 @@ class AppLocalizationsEn extends AppLocalizations {
   String get originUser => 'Manual';
 
   @override
-  String get originCloudRule => 'Rule (cloud)';
+  String get originRule => 'Rule';
 
   @override
-  String get originHubRule => 'Rule (hub)';
+  String get originLocal => 'On the gateway';
 
   @override
   String get historyTitle => 'Moisture history';
@@ -451,126 +451,134 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String get hubTitle => 'Hub';
+  String get gatewayTitle => 'Gateway';
 
   @override
-  String get hubNoneTitle => 'Keep watering without internet';
+  String get gatewayNoneTitle => 'Connect your plants';
 
   @override
-  String get hubNoneBody =>
-      'A hub is a small computer at home, like a Raspberry Pi, that runs your watering rules locally. Start the hub software, then enter the code it shows.';
+  String get gatewayNoneBody =>
+      'Plant devices talk to a gateway: a small computer at home, like a Raspberry Pi, that also runs your watering rules when the internet is down. Start the gateway software, then enter the code it shows.';
 
   @override
-  String get hubAdd => 'Add hub';
+  String get gatewayAdd => 'Add gateway';
 
   @override
-  String get hubCodeLabel => 'Code shown by the hub';
+  String get gatewayCodeLabel => 'Code shown by the gateway';
 
   @override
-  String get hubCodeInvalid => 'Enter the 8-character code, like K7QM-2XPA.';
+  String get gatewayCodeInvalid =>
+      'Enter the 8-character code, like K7QM-2XPA.';
 
   @override
-  String get hubClaimNote =>
-      'After adding a hub, re-pair every device of this household to it.';
+  String get gatewayClaimNote =>
+      'Devices paired before have to be re-paired to the new gateway.';
 
   @override
-  String get hubAdded => 'Hub added. Waiting for it to connect.';
+  String get gatewayAdded => 'Gateway added. Waiting for it to connect.';
 
   @override
-  String get hubEnrolling => 'Waiting for the hub to connect';
+  String get gatewayEnrolling => 'Waiting for the gateway to connect';
 
   @override
-  String hubOfflineSince(String time) {
+  String gatewayOfflineSince(String time) {
     return 'Offline since $time';
   }
 
   @override
-  String get hubInSync => 'Settings in sync';
+  String get gatewayInSync => 'Settings in sync';
 
   @override
-  String get hubSyncing => 'Syncing settings';
+  String get gatewaySyncing => 'Syncing settings';
 
   @override
-  String get hubAgentVersion => 'Agent version';
+  String get gatewayVersion => 'Version';
 
   @override
-  String hubUpdateAvailable(String version) {
+  String get gatewayAdapters => 'Device types';
+
+  @override
+  String gatewayUpdateAvailable(String version) {
     return 'Update available: $version';
   }
 
   @override
-  String get hubUpdateHint =>
-      'On the hub, run: docker compose pull && docker compose up -d';
+  String get gatewayUpdateHint =>
+      'On the gateway, run: docker compose pull && docker compose up -d';
 
   @override
-  String get hubQueue => 'Messages waiting for the cloud';
+  String get gatewayOutbox => 'Messages not uploaded yet';
 
   @override
-  String get hubClock => 'Clock';
+  String get gatewayClock => 'Clock';
 
   @override
-  String get hubClockOk => 'Synced';
+  String get gatewayClockOk => 'Synced';
 
   @override
-  String get hubClockBad => 'Not synced: no automatic watering';
+  String get gatewayClockBad => 'Not synced: no automatic watering';
 
   @override
-  String get hubLastReport => 'Last report';
+  String get gatewayLastReport => 'Last report';
 
   @override
-  String get hubLanAddress => 'LAN address';
+  String get gatewayLanAddress => 'LAN address';
 
   @override
-  String get hubLanHint =>
-      'Devices connect to this address. Override it if the hub has several network interfaces.';
+  String get gatewayLanHint =>
+      'Devices connect to this address. Override it if the gateway has several network interfaces.';
 
   @override
-  String get hubLanReported => 'Reported by the hub';
+  String get gatewayLanReported => 'Reported by the gateway';
 
   @override
-  String get hubLanOverridden => 'Set manually';
+  String get gatewayLanOverridden => 'Set manually';
 
   @override
-  String get hubLanUnknown => 'Not reported yet';
+  String get gatewayLanUnknown => 'Not reported yet';
 
   @override
-  String get hubLanReset => 'Use reported address';
+  String get gatewayLanReset => 'Use reported address';
 
   @override
   String get edit => 'Edit';
 
   @override
-  String get hubRepairTitle => 'Devices to re-pair';
+  String get gatewayRepairTitle => 'Devices to re-pair';
 
   @override
-  String get hubRepairBody =>
-      'These devices still use the old connection. Re-pair each one with the phone app, close to the device.';
+  String get gatewayRepairBody =>
+      'These devices aren\'t paired to this gateway. Re-pair each one with the phone app, close to the device.';
 
   @override
   String get deviceNeedsRepair => 'Needs re-pairing';
 
   @override
-  String get hubRemove => 'Remove hub';
+  String get gatewayRemove => 'Remove gateway';
 
   @override
-  String get hubRemoveTitle => 'Remove the hub?';
+  String get gatewayRemoveTitle => 'Remove the gateway?';
 
   @override
-  String get hubRemoveBody =>
-      'All devices of this household stop reporting until you re-pair them to the cloud. History is kept.';
+  String get gatewayRemoveBody =>
+      'Its devices stop reporting until you add a gateway again and re-pair them. Automatic watering stops too. History is kept.';
 
   @override
-  String get hubRemoved => 'Hub removed';
+  String get gatewayRemoved => 'Gateway removed';
 
   @override
-  String get hubNone => 'No hub';
+  String get gatewayNone => 'No gateway';
 
   @override
   String get errorInvalidCode =>
-      'That code isn\'t valid or has expired. The hub shows a new one.';
+      'That code isn\'t valid or has expired. The gateway shows a new one.';
 
   @override
-  String get errorHubExists => 'This household already has a hub.';
+  String get errorGatewayExists => 'This household already has a gateway.';
+
+  @override
+  String get errorNoGateway =>
+      'Add a gateway to this household first (Settings → Gateway).';
 
   @override
   String get errorReauth => 'Sign in again to do this.';

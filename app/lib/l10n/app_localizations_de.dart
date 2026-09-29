@@ -39,8 +39,8 @@ class AppLocalizationsDe extends AppLocalizations {
   String get roleOwner => 'Eigentümer';
 
   @override
-  String hubOfflineBanner(String time) {
-    return 'Hub offline seit $time. Gießen wird ausgeführt, sobald er wieder da ist.';
+  String gatewayOfflineBanner(String time) {
+    return 'Gateway offline seit $time. Gießen wird ausgeführt, sobald es wieder da ist.';
   }
 
   @override
@@ -68,7 +68,7 @@ class AppLocalizationsDe extends AppLocalizations {
   String get errorSafetyLimit => 'Das ist länger als das Limit dieser Pumpe.';
 
   @override
-  String get errorHubOffline => 'Der Hub ist offline.';
+  String get errorGatewayOffline => 'Das Gateway ist offline.';
 
   @override
   String get errorTooLate => 'Das Gerät hat das bereits übernommen.';
@@ -180,8 +180,8 @@ class AppLocalizationsDe extends AppLocalizations {
   String get waterQueued => 'Gießen eingeplant';
 
   @override
-  String get waterQueuedHubOffline =>
-      'Eingeplant. Wird ausgeführt, sobald der Hub wieder online ist.';
+  String get waterQueuedGatewayOffline =>
+      'Eingeplant. Wird ausgeführt, sobald das Gateway wieder online ist.';
 
   @override
   String get cancel => 'Abbrechen';
@@ -227,10 +227,10 @@ class AppLocalizationsDe extends AppLocalizations {
   String get originUser => 'Manuell';
 
   @override
-  String get originCloudRule => 'Regel (Cloud)';
+  String get originRule => 'Regel';
 
   @override
-  String get originHubRule => 'Regel (Hub)';
+  String get originLocal => 'Am Gateway';
 
   @override
   String get historyTitle => 'Feuchtigkeitsverlauf';
@@ -454,126 +454,134 @@ class AppLocalizationsDe extends AppLocalizations {
   }
 
   @override
-  String get hubTitle => 'Hub';
+  String get gatewayTitle => 'Gateway';
 
   @override
-  String get hubNoneTitle => 'Gießen auch ohne Internet';
+  String get gatewayNoneTitle => 'Pflanzen verbinden';
 
   @override
-  String get hubNoneBody =>
-      'Ein Hub ist ein kleiner Rechner zu Hause, etwa ein Raspberry Pi, der deine Gießregeln lokal ausführt. Starte die Hub-Software und gib den angezeigten Code ein.';
+  String get gatewayNoneBody =>
+      'Pflanzengeräte sprechen mit einem Gateway: einem kleinen Rechner zu Hause, etwa einem Raspberry Pi, der deine Gießregeln auch ohne Internet ausführt. Starte die Gateway-Software und gib den angezeigten Code ein.';
 
   @override
-  String get hubAdd => 'Hub hinzufügen';
+  String get gatewayAdd => 'Gateway hinzufügen';
 
   @override
-  String get hubCodeLabel => 'Code vom Hub';
+  String get gatewayCodeLabel => 'Code vom Gateway';
 
   @override
-  String get hubCodeInvalid => 'Gib den 8-stelligen Code ein, etwa K7QM-2XPA.';
+  String get gatewayCodeInvalid =>
+      'Gib den 8-stelligen Code ein, etwa K7QM-2XPA.';
 
   @override
-  String get hubClaimNote =>
-      'Nach dem Hinzufügen musst du jedes Gerät dieses Haushalts neu mit dem Hub koppeln.';
+  String get gatewayClaimNote =>
+      'Bisher gekoppelte Geräte musst du neu mit dem neuen Gateway koppeln.';
 
   @override
-  String get hubAdded => 'Hub hinzugefügt. Warte auf die Verbindung.';
+  String get gatewayAdded => 'Gateway hinzugefügt. Warte auf die Verbindung.';
 
   @override
-  String get hubEnrolling => 'Warte auf die Verbindung des Hubs';
+  String get gatewayEnrolling => 'Warte auf die Verbindung des Gateways';
 
   @override
-  String hubOfflineSince(String time) {
+  String gatewayOfflineSince(String time) {
     return 'Offline seit $time';
   }
 
   @override
-  String get hubInSync => 'Einstellungen aktuell';
+  String get gatewayInSync => 'Einstellungen aktuell';
 
   @override
-  String get hubSyncing => 'Einstellungen werden übertragen';
+  String get gatewaySyncing => 'Einstellungen werden übertragen';
 
   @override
-  String get hubAgentVersion => 'Agent-Version';
+  String get gatewayVersion => 'Version';
 
   @override
-  String hubUpdateAvailable(String version) {
+  String get gatewayAdapters => 'Gerätetypen';
+
+  @override
+  String gatewayUpdateAvailable(String version) {
     return 'Update verfügbar: $version';
   }
 
   @override
-  String get hubUpdateHint =>
-      'Auf dem Hub ausführen: docker compose pull && docker compose up -d';
+  String get gatewayUpdateHint =>
+      'Auf dem Gateway ausführen: docker compose pull && docker compose up -d';
 
   @override
-  String get hubQueue => 'Wartende Nachrichten an die Cloud';
+  String get gatewayOutbox => 'Noch nicht hochgeladene Nachrichten';
 
   @override
-  String get hubClock => 'Uhrzeit';
+  String get gatewayClock => 'Uhrzeit';
 
   @override
-  String get hubClockOk => 'Synchron';
+  String get gatewayClockOk => 'Synchron';
 
   @override
-  String get hubClockBad => 'Nicht synchron: kein automatisches Gießen';
+  String get gatewayClockBad => 'Nicht synchron: kein automatisches Gießen';
 
   @override
-  String get hubLastReport => 'Letzte Meldung';
+  String get gatewayLastReport => 'Letzte Meldung';
 
   @override
-  String get hubLanAddress => 'LAN-Adresse';
+  String get gatewayLanAddress => 'LAN-Adresse';
 
   @override
-  String get hubLanHint =>
-      'Geräte verbinden sich mit dieser Adresse. Überschreibe sie, wenn der Hub mehrere Netzwerkschnittstellen hat.';
+  String get gatewayLanHint =>
+      'Geräte verbinden sich mit dieser Adresse. Überschreibe sie, wenn das Gateway mehrere Netzwerkschnittstellen hat.';
 
   @override
-  String get hubLanReported => 'Vom Hub gemeldet';
+  String get gatewayLanReported => 'Vom Gateway gemeldet';
 
   @override
-  String get hubLanOverridden => 'Manuell festgelegt';
+  String get gatewayLanOverridden => 'Manuell festgelegt';
 
   @override
-  String get hubLanUnknown => 'Noch nicht gemeldet';
+  String get gatewayLanUnknown => 'Noch nicht gemeldet';
 
   @override
-  String get hubLanReset => 'Gemeldete Adresse verwenden';
+  String get gatewayLanReset => 'Gemeldete Adresse verwenden';
 
   @override
   String get edit => 'Bearbeiten';
 
   @override
-  String get hubRepairTitle => 'Neu zu koppelnde Geräte';
+  String get gatewayRepairTitle => 'Neu zu koppelnde Geräte';
 
   @override
-  String get hubRepairBody =>
-      'Diese Geräte nutzen noch die alte Verbindung. Kopple jedes mit der Handy-App neu, in der Nähe des Geräts.';
+  String get gatewayRepairBody =>
+      'Diese Geräte sind nicht mit diesem Gateway gekoppelt. Kopple jedes mit der Handy-App neu, in der Nähe des Geräts.';
 
   @override
   String get deviceNeedsRepair => 'Neu koppeln';
 
   @override
-  String get hubRemove => 'Hub entfernen';
+  String get gatewayRemove => 'Gateway entfernen';
 
   @override
-  String get hubRemoveTitle => 'Hub entfernen?';
+  String get gatewayRemoveTitle => 'Gateway entfernen?';
 
   @override
-  String get hubRemoveBody =>
-      'Alle Geräte dieses Haushalts melden sich erst wieder, wenn du sie neu mit der Cloud koppelst. Der Verlauf bleibt erhalten.';
+  String get gatewayRemoveBody =>
+      'Seine Geräte melden sich erst wieder, wenn du ein Gateway hinzufügst und sie neu koppelst. Auch automatisches Gießen stoppt. Der Verlauf bleibt erhalten.';
 
   @override
-  String get hubRemoved => 'Hub entfernt';
+  String get gatewayRemoved => 'Gateway entfernt';
 
   @override
-  String get hubNone => 'Kein Hub';
+  String get gatewayNone => 'Kein Gateway';
 
   @override
   String get errorInvalidCode =>
-      'Der Code ist ungültig oder abgelaufen. Der Hub zeigt einen neuen an.';
+      'Der Code ist ungültig oder abgelaufen. Das Gateway zeigt einen neuen an.';
 
   @override
-  String get errorHubExists => 'Dieser Haushalt hat bereits einen Hub.';
+  String get errorGatewayExists => 'Dieser Haushalt hat bereits ein Gateway.';
+
+  @override
+  String get errorNoGateway =>
+      'Füge diesem Haushalt zuerst ein Gateway hinzu (Einstellungen → Gateway).';
 
   @override
   String get errorReauth => 'Melde dich erneut an, um das zu tun.';

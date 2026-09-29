@@ -33,7 +33,7 @@ class FakeMoistureRepository implements MoistureRepository {
   final _commands = <String, List<Command>>{};
   final _rules = <String, List<Rule>>{};
   final _alerts = <String, List<Alert>>{};
-  final _hubs = <String, HubInfo?>{};
+  final _gateways = <String, GatewayInfo?>{};
   final _curves = <String, _Curve>{};
   final _streams = <String, StreamController<LiveEvent>>{};
   final _timers = <Timer>[];
@@ -200,111 +200,131 @@ class FakeMoistureRepository implements MoistureRepository {
         _emit(householdId, LiveEvent(LiveEventKind.alert, entityId: alertId));
       });
 
-  // --- hub ------------------------------------------------------------------------
+  // --- gateway ------------------------------------------------------------------------
 
   @override
-  Future<HubInfo?> hub(String householdId) => _delay(() => _hubs[householdId]);
+  Future<GatewayInfo?> gateway(String householdId) =>
+      _delay(() => _gateways[householdId]);
 
   @override
-  Future<HubInfo> claimHub(String householdId, String userCode) => _delay(() {
-    _requireRole(householdId, Role.admin);
-    final code = userCode.replaceAll(RegExp(r'[\s-]'), '');
-    if (!RegExp(r'^[0-9A-Za-z]{8}$').hasMatch(code)) {
-      throw const ApiProblem(ApiProblem.invalidCode, status: 422);
-    }
-    if (_hubs[householdId] != null) {
-      throw const ApiProblem(ApiProblem.hubExists, status: 409);
-    }
-    // Gateway change: every device must be re-paired to the hub.
-    _devices[householdId] = [
-      for (final d in _devices[householdId]!) _withGateway(d, Gateway.none),
-    ];
-    _setHub(householdId, _hubInfo('enrolling', online: false, inSync: false));
-    // Simulate the hub polling, connecting its bridge and syncing.
-    _timers.add(
-      Timer(const Duration(seconds: 3), () {
-        _setHub(householdId, _hubInfo('online', online: true, inSync: false));
-      }),
-    );
-    _timers.add(
-      Timer(const Duration(seconds: 5), () {
-        _setHub(householdId, _hubInfo('online', online: true, inSync: true));
-      }),
-    );
-    _emit(householdId, const LiveEvent(LiveEventKind.device));
-    return _hubs[householdId]!;
-  });
-
-  @override
-  Future<HubInfo> setHubLanHost(String householdId, String? lanHostOverride) =>
+  Future<GatewayInfo> claimGateway(String householdId, String userCode) =>
       _delay(() {
         _requireRole(householdId, Role.admin);
-        final h = _hubs[householdId]!;
-        _setHub(
+        final code = userCode.replaceAll(RegExp(r'[\s-]'), '');
+        if (!RegExp(r'^[0-9A-Za-z]{8}$').hasMatch(code)) {
+          throw const ApiProblem(ApiProblem.invalidCode, status: 422);
+        }
+        if (_gateways[householdId] != null) {
+          throw const ApiProblem(ApiProblem.gatewayExists, status: 409);
+        }
+        // A new gateway: every device must be re-paired to it.
+        _devices[householdId] = [
+          for (final d in _devices[householdId]!)
+            _withGateway(d, GatewayLink.none),
+        ];
+        _setGateway(
           householdId,
-          HubInfo(
-            id: h.id,
-            status: h.status,
-            online: h.online,
-            inSync: h.inSync,
-            offlineSince: h.offlineSince,
-            agentVersion: h.agentVersion,
-            latestAgentVersion: h.latestAgentVersion,
-            queueDepth: h.queueDepth,
-            timeSynced: h.timeSynced,
-            lanHost: lanHostOverride ?? '192.168.1.20',
-            lanHostOverride: lanHostOverride,
-            lastStateAt: h.lastStateAt,
-          ),
+          _gatewayInfo('enrolling', online: false, inSync: false),
         );
-        return _hubs[householdId]!;
+        // Simulate the gateway fetching its credential, connecting and syncing.
+        _timers.add(
+          Timer(const Duration(seconds: 3), () {
+            _setGateway(
+              householdId,
+              _gatewayInfo('online', online: true, inSync: false),
+            );
+          }),
+        );
+        _timers.add(
+          Timer(const Duration(seconds: 5), () {
+            _setGateway(
+              householdId,
+              _gatewayInfo('online', online: true, inSync: true),
+            );
+          }),
+        );
+        _emit(householdId, const LiveEvent(LiveEventKind.device));
+        return _gateways[householdId]!;
       });
 
   @override
-  Future<void> removeHub(String householdId) => _delay(() {
+  Future<GatewayInfo> setGatewayLanHost(
+    String householdId,
+    String? lanHostOverride,
+  ) => _delay(() {
+    _requireRole(householdId, Role.admin);
+    final h = _gateways[householdId]!;
+    _setGateway(
+      householdId,
+      GatewayInfo(
+        id: h.id,
+        status: h.status,
+        online: h.online,
+        inSync: h.inSync,
+        offlineSince: h.offlineSince,
+        version: h.version,
+        latestVersion: h.latestVersion,
+        arch: h.arch,
+        adapters: h.adapters,
+        outboxDepth: h.outboxDepth,
+        timeSynced: h.timeSynced,
+        lanHost: lanHostOverride ?? '192.168.1.20',
+        lanHostOverride: lanHostOverride,
+        lastStateAt: h.lastStateAt,
+      ),
+    );
+    return _gateways[householdId]!;
+  });
+
+  @override
+  Future<void> removeGateway(String householdId) => _delay(() {
     _requireRole(householdId, Role.admin);
     _devices[householdId] = [
-      for (final d in _devices[householdId]!) _withGateway(d, Gateway.none),
+      for (final d in _devices[householdId]!) _withGateway(d, GatewayLink.none),
     ];
-    _setHub(householdId, null);
+    _setGateway(householdId, null);
     _emit(householdId, const LiveEvent(LiveEventKind.device));
   });
 
-  HubInfo _hubInfo(
+  GatewayInfo _gatewayInfo(
     String status, {
     required bool online,
     required bool inSync,
-  }) => HubInfo(
-    id: 'hub-4k9m2x7q1v8w3h5t',
+  }) => GatewayInfo(
+    id: 'gw-4k9m2x7q1v8w3h5t',
     status: status,
     online: online,
     inSync: inSync,
     offlineSince: online ? null : _clock(),
-    agentVersion: online ? '0.1.0' : null,
-    latestAgentVersion: '0.1.0',
+    version: online ? '0.1.0' : null,
+    latestVersion: '0.1.0',
     arch: 'arm64',
-    queueDepth: 0,
+    adapters: const ['esp32-mqtt'],
+    outboxDepth: 0,
     timeSynced: online ? true : null,
     lanHost: online ? '192.168.1.20' : null,
     lastStateAt: online ? _clock() : null,
   );
 
-  void _setHub(String householdId, HubInfo? hub) {
-    _hubs[householdId] = hub;
+  void _setGateway(String householdId, GatewayInfo? gateway) {
+    _gateways[householdId] = gateway;
     final h = _households[householdId]!;
     _households[householdId] = Household(
       id: h.id,
       name: h.name,
       timezone: h.timezone,
       role: h.role,
-      hub: hub == null
+      gateway: gateway == null
           ? null
-          : HubStatus(online: hub.online, offlineSince: hub.offlineSince),
+          : GatewayStatus(
+              online: gateway.online,
+              offlineSince: gateway.offlineSince,
+            ),
     );
-    _emit(householdId, const LiveEvent(LiveEventKind.hub));
+    _emit(householdId, const LiveEvent(LiveEventKind.gateway));
   }
 
-  Device _withGateway(Device d, Gateway g) => Device(
+  Device _withGateway(Device d, GatewayLink g) => Device(
     id: d.id,
     name: d.name,
     board: d.board,
@@ -426,14 +446,14 @@ class FakeMoistureRepository implements MoistureRepository {
       name: 'Home',
       timezone: 'Europe/Berlin',
       role: Role.owner,
-      hub: HubStatus(online: true, version: '1.2.0'),
+      gateway: GatewayStatus(online: true, version: '1.2.0'),
     );
     _households['h2'] = Household(
       id: 'h2',
       name: "Parents' garden",
       timezone: 'Europe/Berlin',
       role: Role.viewer,
-      hub: HubStatus(
+      gateway: GatewayStatus(
         online: false,
         offlineSince: ago(const Duration(hours: 3)),
         version: '1.1.4',
@@ -463,7 +483,7 @@ class FakeMoistureRepository implements MoistureRepository {
       configSync: sync,
       configRev: 7,
       configError: configError,
-      gateway: Gateway.hub,
+      gateway: GatewayLink.gateway,
       slots: const [
         Slot(index: 0, module: 'capacitive_moisture', pin: 34),
         Slot(index: 1, module: 'capacitive_moisture', pin: 35),
@@ -471,29 +491,31 @@ class FakeMoistureRepository implements MoistureRepository {
       ],
     );
 
-    _hubs['h1'] = HubInfo(
-      id: 'hub-4k9m2x7q1v8w3h5t',
+    _gateways['h1'] = GatewayInfo(
+      id: 'gw-4k9m2x7q1v8w3h5t',
       status: 'online',
       online: true,
       inSync: true,
-      agentVersion: '0.1.0',
-      latestAgentVersion: '0.2.0',
+      version: '0.1.0',
+      latestVersion: '0.2.0',
       arch: 'arm64',
-      queueDepth: 0,
+      adapters: const ['esp32-mqtt'],
+      outboxDepth: 0,
       timeSynced: true,
       lanHost: '192.168.1.20',
       lastStateAt: ago(const Duration(minutes: 4)),
     );
-    _hubs['h2'] = HubInfo(
-      id: 'hub-7c2m9x1q4v8w3h5z',
+    _gateways['h2'] = GatewayInfo(
+      id: 'gw-7c2m9x1q4v8w3h5z',
       status: 'offline',
       online: false,
       inSync: true,
       offlineSince: ago(const Duration(hours: 3)),
-      agentVersion: '0.1.0',
-      latestAgentVersion: '0.2.0',
+      version: '0.1.0',
+      latestVersion: '0.2.0',
       arch: 'amd64',
-      queueDepth: 212,
+      adapters: const ['esp32-mqtt'],
+      outboxDepth: 212,
       timeSynced: true,
       lanHost: '192.168.178.40',
       lastStateAt: ago(const Duration(hours: 3)),
@@ -637,7 +659,7 @@ class FakeMoistureRepository implements MoistureRepository {
         createdAt: ago(const Duration(hours: 26)),
         expectedAt: ago(const Duration(hours: 26)),
         finishedAt: ago(const Duration(hours: 25, minutes: 40)),
-        origin: CommandOrigin.hubRule,
+        origin: CommandOrigin.rule,
       ),
     ];
 

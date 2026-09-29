@@ -6,7 +6,7 @@ import '../core/format.dart';
 import '../core/permissions.dart';
 import '../data/models.dart';
 
-/// Household-wide banner, e.g. "hub offline since …" (App_Specs §7).
+/// Household-wide banner, e.g. "gateway offline since …" (App_Specs §7).
 class HouseholdBanner extends StatelessWidget {
   const HouseholdBanner({super.key, required this.message});
 

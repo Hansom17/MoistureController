@@ -51,7 +51,7 @@ class _PlantBody extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final banner = hubOfflineMessage(context, household);
+    final banner = gatewayOfflineMessage(context, household);
     final overview = _Overview(household: household, plant: plant);
     final history = _History(household: household, plant: plant);
     final commands = _Commands(household: household, plant: plant);

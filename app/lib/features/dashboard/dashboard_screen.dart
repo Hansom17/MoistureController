@@ -24,7 +24,7 @@ class DashboardScreen extends StatelessWidget {
         ),
         body: Column(
           children: [
-            if (hubOfflineMessage(context, household) case final message?)
+            if (gatewayOfflineMessage(context, household) case final message?)
               HouseholdBanner(message: message),
             Expanded(child: _PlantGrid(household: household)),
           ],
@@ -34,12 +34,12 @@ class DashboardScreen extends StatelessWidget {
   }
 }
 
-/// Banner text for households whose hub is offline, else null.
-String? hubOfflineMessage(BuildContext context, Household household) {
-  final hub = household.hub;
-  if (hub == null || hub.online) return null;
-  final since = hub.offlineSince;
-  return context.l10n.hubOfflineBanner(
+/// Banner text for households whose gateway is offline, else null.
+String? gatewayOfflineMessage(BuildContext context, Household household) {
+  final gateway = household.gateway;
+  if (gateway == null || gateway.online) return null;
+  final since = gateway.offlineSince;
+  return context.l10n.gatewayOfflineBanner(
     since == null ? '—' : formatTime(context, since),
   );
 }

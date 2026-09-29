@@ -63,9 +63,9 @@ void applyLiveEvent(Ref ref, String householdId, LiveEvent event) {
       ref.invalidate(devicesProvider(householdId));
     case LiveEventKind.alert:
       ref.invalidate(alertsProvider(householdId));
-    case LiveEventKind.hub:
+    case LiveEventKind.gateway:
       ref.invalidate(householdsProvider);
-      ref.invalidate(hubProvider(householdId));
+      ref.invalidate(gatewayProvider(householdId));
     case LiveEventKind.household:
       ref.invalidate(householdsProvider);
     case LiveEventKind.rule:
@@ -78,6 +78,6 @@ void applyLiveEvent(Ref ref, String householdId, LiveEvent event) {
       ref.invalidate(rulesProvider);
       ref.invalidate(devicesProvider(householdId));
       ref.invalidate(alertsProvider(householdId));
-      ref.invalidate(hubProvider(householdId));
+      ref.invalidate(gatewayProvider(householdId));
   }
 }

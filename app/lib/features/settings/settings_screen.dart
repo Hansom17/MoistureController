@@ -89,19 +89,19 @@ class SettingsScreen extends ConsumerWidget {
                   ListTile(
                     contentPadding: EdgeInsets.zero,
                     leading: const Icon(Icons.router_outlined),
-                    title: Text(l.hubTitle),
-                    subtitle: Text(switch (household.hub) {
-                      null => l.hubNone,
-                      final hub when hub.online => l.deviceOnline,
-                      final hub =>
-                        hub.offlineSince == null
+                    title: Text(l.gatewayTitle),
+                    subtitle: Text(switch (household.gateway) {
+                      null => l.gatewayNone,
+                      final gateway when gateway.online => l.deviceOnline,
+                      final gateway =>
+                        gateway.offlineSince == null
                             ? l.deviceOffline
-                            : l.hubOfflineSince(
-                                formatTime(context, hub.offlineSince!),
+                            : l.gatewayOfflineSince(
+                                formatTime(context, gateway.offlineSince!),
                               ),
                     }),
                     trailing: const Icon(Icons.chevron_right),
-                    onTap: () => context.go('/settings/hub'),
+                    onTap: () => context.go('/settings/gateway'),
                   ),
                 ],
               ),

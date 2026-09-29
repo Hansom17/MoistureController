@@ -12,25 +12,25 @@ import '../../ui/common.dart';
 import '../../ui/household_scope.dart';
 import '../../ui/status_chip.dart';
 
-/// Household settings → Hub (App_Specs §4, §12).
-class HubScreen extends StatelessWidget {
-  const HubScreen({super.key, this.initialCode});
+/// Household settings → Gateway (App_Specs §4, §12).
+class GatewayScreen extends StatelessWidget {
+  const GatewayScreen({super.key, this.initialCode});
 
-  /// Pre-filled from the deep link `/hub#u=<code>`.
+  /// Pre-filled from the deep link `/gateway#u=<code>` (the gateway prints it as a QR code).
   final String? initialCode;
 
   @override
   Widget build(BuildContext context) {
     return HouseholdScope(
       builder: (context, household) => Scaffold(
-        appBar: AppBar(title: Text(context.l10n.hubTitle)),
+        appBar: AppBar(title: Text(context.l10n.gatewayTitle)),
         body: Consumer(
           builder: (context, ref, _) => AsyncBody(
-            value: ref.watch(hubProvider(household.id)),
-            onRetry: () => ref.invalidate(hubProvider(household.id)),
-            data: (hub) => hub == null
-                ? _NoHub(household: household, initialCode: initialCode)
-                : _HubDetails(household: household, hub: hub),
+            value: ref.watch(gatewayProvider(household.id)),
+            onRetry: () => ref.invalidate(gatewayProvider(household.id)),
+            data: (gateway) => gateway == null
+                ? _NoGateway(household: household, initialCode: initialCode)
+                : _GatewayDetails(household: household, gateway: gateway),
           ),
         ),
       ),
@@ -38,10 +38,10 @@ class HubScreen extends StatelessWidget {
   }
 }
 
-// --- no hub yet: explain and claim ----------------------------------------------
+// --- no gateway yet: explain and claim ----------------------------------------------
 
-class _NoHub extends StatelessWidget {
-  const _NoHub({required this.household, this.initialCode});
+class _NoGateway extends StatelessWidget {
+  const _NoGateway({required this.household, this.initialCode});
 
   final Household household;
   final String? initialCode;
@@ -66,9 +66,9 @@ class _NoHub extends StatelessWidget {
                     color: theme.colorScheme.primary,
                   ),
                   const SizedBox(height: Spacing.md),
-                  Text(l.hubNoneTitle, style: theme.textTheme.titleLarge),
+                  Text(l.gatewayNoneTitle, style: theme.textTheme.titleLarge),
                   const SizedBox(height: Spacing.sm),
-                  Text(l.hubNoneBody, style: theme.textTheme.bodyMedium),
+                  Text(l.gatewayNoneBody, style: theme.textTheme.bodyMedium),
                   const SizedBox(height: Spacing.xl),
                   if (can(household.role, AppAction.manageDevices))
                     _ClaimForm(household: household, initialCode: initialCode)
@@ -118,7 +118,7 @@ class _ClaimFormState extends ConsumerState<_ClaimForm> {
   Future<void> _submit() async {
     final l = context.l10n;
     if (!_valid(_code.text)) {
-      setState(() => _error = l.hubCodeInvalid);
+      setState(() => _error = l.gatewayCodeInvalid);
       return;
     }
     setState(() {
@@ -128,8 +128,8 @@ class _ClaimFormState extends ConsumerState<_ClaimForm> {
     try {
       await ref
           .read(householdActionsProvider)
-          .claimHub(widget.household.id, _code.text);
-      if (mounted) showSnackBar(context, l.hubAdded);
+          .claimGateway(widget.household.id, _code.text);
+      if (mounted) showSnackBar(context, l.gatewayAdded);
     } catch (e) {
       if (mounted) setState(() => _error = describeError(l, e));
     } finally {
@@ -155,7 +155,7 @@ class _ClaimFormState extends ConsumerState<_ClaimForm> {
             fontFeatures: [FontFeature.tabularFigures()],
           ),
           decoration: InputDecoration(
-            labelText: l.hubCodeLabel,
+            labelText: l.gatewayCodeLabel,
             hintText: 'K7QM-2XPA',
             errorText: _error,
             errorMaxLines: 3,
@@ -166,7 +166,7 @@ class _ClaimFormState extends ConsumerState<_ClaimForm> {
           onSubmitted: (_) => _submit(),
         ),
         const SizedBox(height: Spacing.md),
-        Text(l.hubClaimNote, style: Theme.of(context).textTheme.bodySmall),
+        Text(l.gatewayClaimNote, style: Theme.of(context).textTheme.bodySmall),
         const SizedBox(height: Spacing.lg),
         FilledButton.icon(
           onPressed: _busy ? null : _submit,
@@ -176,20 +176,20 @@ class _ClaimFormState extends ConsumerState<_ClaimForm> {
                   child: CircularProgressIndicator(strokeWidth: 2),
                 )
               : const Icon(Icons.add_link),
-          label: Text(l.hubAdd),
+          label: Text(l.gatewayAdd),
         ),
       ],
     );
   }
 }
 
-// --- hub present -----------------------------------------------------------------
+// --- gateway present -----------------------------------------------------------------
 
-class _HubDetails extends ConsumerWidget {
-  const _HubDetails({required this.household, required this.hub});
+class _GatewayDetails extends ConsumerWidget {
+  const _GatewayDetails({required this.household, required this.gateway});
 
   final Household household;
-  final HubInfo hub;
+  final GatewayInfo gateway;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -205,17 +205,17 @@ class _HubDetails extends ConsumerWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              _StatusCard(hub: hub),
+              _StatusCard(gateway: gateway),
               const SizedBox(height: Spacing.md),
-              _LanCard(household: household, hub: hub, admin: admin),
+              _LanCard(household: household, gateway: gateway, admin: admin),
               if (toRepair.isNotEmpty) ...[
                 const SizedBox(height: Spacing.md),
                 SectionCard(
-                  title: l.hubRepairTitle,
+                  title: l.gatewayRepairTitle,
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(l.hubRepairBody),
+                      Text(l.gatewayRepairBody),
                       const SizedBox(height: Spacing.sm),
                       for (final d in toRepair)
                         ListTile(
@@ -240,7 +240,7 @@ class _HubDetails extends ConsumerWidget {
                       foregroundColor: Theme.of(context).colorScheme.error,
                     ),
                     icon: const Icon(Icons.delete_outline),
-                    label: Text(l.hubRemove),
+                    label: Text(l.gatewayRemove),
                     onPressed: () => _remove(context, ref),
                   ),
                 ),
@@ -258,8 +258,8 @@ class _HubDetails extends ConsumerWidget {
       context: context,
       builder: (context) => AlertDialog(
         icon: const Icon(Icons.warning_amber_rounded),
-        title: Text(l.hubRemoveTitle),
-        content: Text(l.hubRemoveBody),
+        title: Text(l.gatewayRemoveTitle),
+        content: Text(l.gatewayRemoveBody),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
@@ -271,15 +271,15 @@ class _HubDetails extends ConsumerWidget {
               foregroundColor: Theme.of(context).colorScheme.onError,
             ),
             onPressed: () => Navigator.pop(context, true),
-            child: Text(l.hubRemove),
+            child: Text(l.gatewayRemove),
           ),
         ],
       ),
     );
     if (ok != true || !context.mounted) return;
     try {
-      await ref.read(householdActionsProvider).removeHub(household.id);
-      if (context.mounted) showSnackBar(context, l.hubRemoved);
+      await ref.read(householdActionsProvider).removeGateway(household.id);
+      if (context.mounted) showSnackBar(context, l.gatewayRemoved);
     } catch (e) {
       if (context.mounted) showErrorSnackBar(context, e);
     }
@@ -287,9 +287,9 @@ class _HubDetails extends ConsumerWidget {
 }
 
 class _StatusCard extends StatelessWidget {
-  const _StatusCard({required this.hub});
+  const _StatusCard({required this.gateway});
 
-  final HubInfo hub;
+  final GatewayInfo gateway;
 
   @override
   Widget build(BuildContext context) {
@@ -300,22 +300,25 @@ class _StatusCard extends StatelessWidget {
     );
 
     final StatusChip connection;
-    if (hub.enrolling) {
-      connection = StatusChip(kind: StatusKind.pending, label: l.hubEnrolling);
-    } else if (hub.online) {
+    if (gateway.enrolling) {
+      connection = StatusChip(
+        kind: StatusKind.pending,
+        label: l.gatewayEnrolling,
+      );
+    } else if (gateway.online) {
       connection = StatusChip(
         kind: StatusKind.ok,
         label: l.deviceOnline,
         icon: Icons.cloud_done_outlined,
       );
     } else {
-      final since = hub.offlineSince;
+      final since = gateway.offlineSince;
       connection = StatusChip(
         kind: StatusKind.warning,
         icon: Icons.cloud_off_outlined,
         label: since == null
             ? l.deviceOffline
-            : l.hubOfflineSince(formatTime(context, since)),
+            : l.gatewayOfflineSince(formatTime(context, since)),
       );
     }
 
@@ -345,7 +348,7 @@ class _StatusCard extends StatelessWidget {
                 const SizedBox(width: Spacing.md),
                 Expanded(
                   child: Text(
-                    hub.id,
+                    gateway.id,
                     style: theme.textTheme.titleMedium,
                     overflow: TextOverflow.ellipsis,
                   ),
@@ -358,20 +361,20 @@ class _StatusCard extends StatelessWidget {
               runSpacing: Spacing.xs,
               children: [
                 connection,
-                if (!hub.enrolling)
-                  hub.inSync
+                if (!gateway.enrolling)
+                  gateway.inSync
                       ? StatusChip(
                           kind: StatusKind.ok,
-                          label: l.hubInSync,
+                          label: l.gatewayInSync,
                           icon: Icons.sync,
                         )
                       : StatusChip(
                           kind: StatusKind.pending,
-                          label: l.hubSyncing,
+                          label: l.gatewaySyncing,
                         ),
               ],
             ),
-            if (hub.enrolling) ...[
+            if (gateway.enrolling) ...[
               const SizedBox(height: Spacing.lg),
               const LinearProgressIndicator(),
             ] else ...[
@@ -379,46 +382,53 @@ class _StatusCard extends StatelessWidget {
               const Divider(height: 1),
               const SizedBox(height: Spacing.sm),
               row(
-                l.hubAgentVersion,
+                l.gatewayVersion,
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
-                    Text([hub.agentVersion ?? '—', ?hub.arch].join(' · ')),
-                    if (hub.updateAvailable)
+                    Text([gateway.version ?? '—', ?gateway.arch].join(' · ')),
+                    if (gateway.updateAvailable)
                       Padding(
                         padding: const EdgeInsets.only(top: Spacing.xs),
                         child: StatusChip(
                           kind: StatusKind.pending,
                           icon: Icons.system_update_alt,
-                          label: l.hubUpdateAvailable(hub.latestAgentVersion!),
+                          label: l.gatewayUpdateAvailable(
+                            gateway.latestVersion!,
+                          ),
                         ),
                       ),
                   ],
                 ),
               ),
-              if (hub.updateAvailable)
+              if (gateway.updateAvailable)
                 Padding(
                   padding: const EdgeInsets.only(bottom: Spacing.xs),
                   child: SelectableText(
-                    l.hubUpdateHint,
+                    l.gatewayUpdateHint,
                     style: theme.textTheme.bodySmall?.copyWith(
                       fontFamily: 'monospace',
                     ),
                   ),
                 ),
               row(
-                l.hubClock,
-                hub.timeSynced == false
-                    ? StatusChip(kind: StatusKind.error, label: l.hubClockBad)
-                    : Text(hub.timeSynced == true ? l.hubClockOk : '—'),
+                l.gatewayClock,
+                gateway.timeSynced == false
+                    ? StatusChip(
+                        kind: StatusKind.error,
+                        label: l.gatewayClockBad,
+                      )
+                    : Text(gateway.timeSynced == true ? l.gatewayClockOk : '—'),
               ),
-              row(l.hubQueue, Text('${hub.queueDepth ?? '—'}')),
+              if (gateway.adapters.isNotEmpty)
+                row(l.gatewayAdapters, Text(gateway.adapters.join(', '))),
+              row(l.gatewayOutbox, Text('${gateway.outboxDepth ?? '—'}')),
               row(
-                l.hubLastReport,
+                l.gatewayLastReport,
                 Text(
-                  hub.lastStateAt == null
+                  gateway.lastStateAt == null
                       ? '—'
-                      : formatAgo(l, hub.lastStateAt!),
+                      : formatAgo(l, gateway.lastStateAt!),
                 ),
               ),
             ],
@@ -432,22 +442,22 @@ class _StatusCard extends StatelessWidget {
 class _LanCard extends ConsumerWidget {
   const _LanCard({
     required this.household,
-    required this.hub,
+    required this.gateway,
     required this.admin,
   });
 
   final Household household;
-  final HubInfo hub;
+  final GatewayInfo gateway;
   final bool admin;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final l = context.l10n;
     final theme = Theme.of(context);
-    final overridden = hub.lanHostOverride != null;
+    final overridden = gateway.lanHostOverride != null;
     return SectionCard(
-      title: l.hubLanAddress,
-      trailing: admin && !hub.enrolling
+      title: l.gatewayLanAddress,
+      trailing: admin && !gateway.enrolling
           ? TextButton(
               onPressed: () => _edit(context, ref),
               child: Text(l.edit),
@@ -457,20 +467,22 @@ class _LanCard extends ConsumerWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            hub.lanHost ?? l.hubLanUnknown,
+            gateway.lanHost == null
+                ? l.gatewayLanUnknown
+                : '${gateway.lanHost}:${gateway.lanPort}',
             style: theme.textTheme.titleLarge?.copyWith(
               fontFeatures: const [FontFeature.tabularFigures()],
             ),
           ),
           const SizedBox(height: Spacing.xs),
-          if (hub.lanHost != null)
+          if (gateway.lanHost != null)
             Text(
-              overridden ? l.hubLanOverridden : l.hubLanReported,
+              overridden ? l.gatewayLanOverridden : l.gatewayLanReported,
               style: theme.textTheme.labelMedium,
             ),
           const SizedBox(height: Spacing.sm),
           Text(
-            l.hubLanHint,
+            l.gatewayLanHint,
             style: theme.textTheme.bodySmall?.copyWith(
               color: theme.colorScheme.onSurfaceVariant,
             ),
@@ -483,13 +495,13 @@ class _LanCard extends ConsumerWidget {
   Future<void> _edit(BuildContext context, WidgetRef ref) async {
     final l = context.l10n;
     final controller = TextEditingController(
-      text: hub.lanHostOverride ?? hub.lanHost,
+      text: gateway.lanHostOverride ?? gateway.lanHost,
     );
     // null = cancelled; '' = back to the reported address.
     final result = await showDialog<String>(
       context: context,
       builder: (context) => AlertDialog(
-        title: Text(l.hubLanAddress),
+        title: Text(l.gatewayLanAddress),
         content: TextField(
           controller: controller,
           autofocus: true,
@@ -497,10 +509,10 @@ class _LanCard extends ConsumerWidget {
           decoration: const InputDecoration(hintText: '192.168.1.20'),
         ),
         actions: [
-          if (hub.lanHostOverride != null)
+          if (gateway.lanHostOverride != null)
             TextButton(
               onPressed: () => Navigator.pop(context, ''),
-              child: Text(l.hubLanReset),
+              child: Text(l.gatewayLanReset),
             ),
           TextButton(
             onPressed: () => Navigator.pop(context),
@@ -518,7 +530,7 @@ class _LanCard extends ConsumerWidget {
     try {
       await ref
           .read(householdActionsProvider)
-          .setHubLanHost(household.id, result.isEmpty ? null : result);
+          .setGatewayLanHost(household.id, result.isEmpty ? null : result);
     } catch (e) {
       if (context.mounted) showErrorSnackBar(context, e);
     }
