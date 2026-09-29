@@ -22,12 +22,18 @@ class MeOut(Out):
     email_verified: bool
 
 
+class GatewaySummary(Out):
+    online: bool
+    offline_since: datetime | None
+
+
 class HouseholdOut(Out):
     id: str
     name: str
     timezone: str
     battery_low_mv: int
     role: RoleName
+    gateway: GatewaySummary | None = None
 
 
 class TicketOut(Out):
@@ -58,11 +64,13 @@ class MemberOut(Out):
     display_name: str | None
     email: str | None
     role: RoleName
+    gateway: GatewaySummary | None = None
     joined_at: datetime
 
 
 class MemberPatch(BaseModel):
     role: RoleName
+    gateway: GatewaySummary | None = None
 
 
 class TransferIn(BaseModel):
@@ -77,6 +85,7 @@ class InviteCreate(BaseModel):
 class InviteOut(Out):
     id: str
     role: RoleName
+    gateway: GatewaySummary | None = None
     created_at: datetime
     expires_at: datetime
 
@@ -89,6 +98,7 @@ class InviteCreated(InviteOut):
 class InvitePreview(Out):
     household_name: str
     role: RoleName
+    gateway: GatewaySummary | None = None
     invited_by: str | None
     expires_at: datetime
 
@@ -109,7 +119,8 @@ class DeviceOut(Out):
     name: str
     board: str
     status: Literal["new", "online", "sleeping", "late", "offline", "service"]
-    gateway: Literal["cloud", "hub", "none"]
+    adapter: str
+    needs_repair: bool
     fw: str | None
     batt_mv: int | None
     battery_percent: int | None
@@ -126,6 +137,7 @@ class DeviceOut(Out):
 
 class DeviceCreate(BaseModel):
     name: str = Field(min_length=1, max_length=100)
+    adapter: str = "esp32-mqtt"
 
 
 class DevicePatch(BaseModel):
@@ -251,7 +263,7 @@ class CommandOut(BaseModel):
                    "cancelled"]
     reason: str | None
     source: Literal["manual", "rule", "local"]
-    origin: Literal["cloud", "hub"]
+    origin: Literal["api", "gateway"]
     rule_id: str | None
     created_at: datetime
     exp: datetime
@@ -306,7 +318,7 @@ class RuleExecutionOut(Out):
     decision: Literal["water", "skip"]
     skip_reason: str | None
     command_id: str | None
-    origin: Literal["cloud", "hub"]
+    origin: Literal["api", "gateway"]
 
 
 # --- alerts ---------------------------------------------------------------------------------
@@ -324,3 +336,36 @@ class AlertOut(Out):
     acked_by: str | None
     acked_at: datetime | None
     detail: dict | None
+
+
+# --- gateway --------------------------------------------------------------------------------
+
+
+class GatewayOut(BaseModel):
+    id: str
+    status: str
+    online: bool
+    offline_since: datetime | None
+    version: str | None
+    latest_version: str | None
+    arch: str | None
+    adapters: list[str]
+    in_sync: bool
+    snapshot_rev: int
+    snapshot_rev_applied: int
+    keys_rev: int
+    keys_rev_applied: int
+    outbox_depth: int | None
+    time_synced: bool | None
+    lan_host: str | None
+    lan_port: int
+    lan_host_override: str | None
+    last_state_at: datetime | None
+
+
+class GatewayClaim(BaseModel):
+    user_code: str = Field(min_length=8, max_length=12)
+
+
+class GatewayPatch(BaseModel):
+    lan_host_override: str | None = Field(None, max_length=255)

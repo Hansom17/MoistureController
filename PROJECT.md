@@ -609,10 +609,10 @@ The code written until 2026-09-29 targets the v1 architecture; most of it moves.
 
 | Existing | Becomes |
 |---|---|
-| `server/src/mc_server/` (FastAPI, auth, households, invites, devices, commands, config sync, alerts, export, SSE) | **`api/`**. Replace the MQTT client, outbox-to-MQTT and cloud-broker ACL/PSK files by the gateway WebSocket endpoint; hub enrollment becomes gateway enrollment; cloud rules engine removed (rules only on the gateway); households without a gateway can't add devices. |
+| `server/src/mc_server/` (FastAPI, auth, households, invites, devices, commands, config sync, alerts, export, SSE) | **`api/`**. *Done in place (still under `server/`):* Replace the MQTT client, outbox-to-MQTT and cloud-broker ACL/PSK files by the gateway WebSocket endpoint; hub enrollment becomes gateway enrollment; cloud rules engine removed (rules only on the gateway); households without a gateway can't add devices. |
 | `server/tools/fake_device.py` | `gateway/tools/fake_device.py`, unchanged (speaks mqtt.md). |
-| `hub/src/mc_hub/` (agent: enrollment, snapshot/keys, local rules, SQLite store, CLI) | **`gateway/`**. Enrollment and CLI stay; the MQTT bridge is replaced by the WebSocket uplink + outbox; device traffic is forwarded up by the gateway itself (no bridge). |
+| `hub/src/mc_hub/` (agent: enrollment, snapshot/keys, local rules, SQLite store, CLI) | **`gateway/`**. *Done in place (still under `hub/`):* Enrollment and CLI stay; the MQTT bridge is replaced by the WebSocket uplink + outbox; device traffic is forwarded up by the gateway itself (no bridge). |
 | `broker/` | Gateway broker config only; cloud config and cloud ACL generation removed; no bridge. |
 | `core/` | Unchanged; contract tests switch from `hub.md` to `gateway_api.md`. |
 | `app/` | Mostly unchanged: API base URL stays central; the "Hub" screen becomes the "Gateway" screen; "no hub" households disappear. |
-| `scripts/dev-start.sh` | Starts the central stack + one gateway + simulator + app. |
+| `scripts/dev-start.sh` | *Done:* starts the central stack + one gateway (claimed by `seed-dev`) + simulator + app. |

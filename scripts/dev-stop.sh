@@ -17,11 +17,13 @@ done
 
 if docker info >/dev/null 2>&1; then
   # No arrays: macOS bash 3.2 treats an empty array as unset under `set -u`.
-  if [ "$WIPE" = 1 ]; then
-    docker compose -f "$ROOT/server/docker-compose.yml" --env-file "$ROOT/server/.env.dev" down -v 2>&1 | tail -1
-  else
-    docker compose -f "$ROOT/server/docker-compose.yml" --env-file "$ROOT/server/.env.dev" down 2>&1 | tail -1
-  fi
+  for stack in hub server; do
+    if [ "$WIPE" = 1 ]; then
+      docker compose -f "$ROOT/$stack/docker-compose.yml" --env-file "$ROOT/$stack/.env.dev" down -v 2>&1 | tail -1
+    else
+      docker compose -f "$ROOT/$stack/docker-compose.yml" --env-file "$ROOT/$stack/.env.dev" down 2>&1 | tail -1
+    fi
+  done
 fi
 
 if [ "$WIPE" = 1 ]; then

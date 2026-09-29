@@ -11,6 +11,7 @@ from ..context import Uow
 from ..db.models import ROLES, Household, Invite, Membership, User
 from ..db.types import utcnow
 from ..errors import Problem, not_found
+from . import gateways
 from .common import audit
 
 INVITE_MAX_H = 24 * 14
@@ -63,6 +64,8 @@ async def update(uow: Uow, household: Household, uid: str, *, name: str | None,
         household.timezone = timezone
     if battery_low_mv is not None:
         household.battery_low_mv = battery_low_mv
+    if timezone is not None or battery_low_mv is not None:
+        await gateways.republish_snapshot(uow, household.id)
     audit(uow, household.id, uid, "household.update")
     uow.emit(household.id, "household", {})
     await uow.commit()

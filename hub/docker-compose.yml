@@ -1,6 +1,6 @@
-# Gateway stack (v1 hub code, becomes gateway/): Mosquitto (LAN broker) and the
-# gateway service (Gateway_Specs §2). The uplink to the API is not implemented
-# yet; up messages stay in the outbox (`mc-hub outbox`).
+# Gateway stack (hub code, becomes gateway/): Mosquitto (LAN broker) and the
+# gateway service (Gateway_Specs §2), which keeps one outbound WebSocket to the
+# API server.
 #
 #   ./scripts/make-secrets.sh && docker compose up -d
 #   docker compose logs -f agent      # shows the enrollment code

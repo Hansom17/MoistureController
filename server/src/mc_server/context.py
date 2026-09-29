@@ -1,25 +1,27 @@
 """Application context and unit of work.
 
-`AppContext` holds the long-lived objects (DB engine, key box, SSE bus, …).
-`Uow` wraps one DB session: services add rows, queue messages for devices in
-the outbox (v1; becomes the per-gateway downlink, Api_Specs §9.3) and record
-live events; `commit()` makes it all happen atomically and only then notifies
-SSE subscribers.
+`AppContext` holds the long-lived objects (DB engine, key box, SSE bus,
+gateway sessions). `Uow` wraps one DB session: services add rows, queue
+messages for a gateway in the downlink table and record live events;
+`commit()` makes it all happen atomically and only then notifies SSE
+subscribers and the gateway senders (Api_Specs §3, §9.3).
 """
 
 import asyncio
-import json
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from dataclasses import dataclass, field
 
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker
 
+from mc_core.ids import new_id
+
 from .config import Settings
 from .crypto import KeyBox
-from .db.models import Outbox
+from .db.models import Downlink
 from .notify.push import PushSender
 from .realtime.bus import EventBus
+from .realtime.gateways import GatewayRegistry
 
 
 @dataclass
@@ -30,7 +32,7 @@ class AppContext:
     keys: KeyBox
     bus: EventBus
     push: PushSender
-    outbox_wakeup: asyncio.Event = field(default_factory=asyncio.Event)
+    gateways: GatewayRegistry = field(default_factory=GatewayRegistry)
 
     @asynccontextmanager
     async def uow(self) -> AsyncIterator["Uow"]:
@@ -44,18 +46,21 @@ class Uow:
         self.s = session
         self._events: list[tuple[str, str, dict]] = []
         self._pushes: list[tuple[str, str, dict]] = []
-        self._outbox = False
+        self._woken: set[str] = set()
 
     # Recorded now, delivered after commit.
 
     def emit(self, household_id: str, kind: str, data: dict | None = None) -> None:
         self._events.append((household_id, kind, data or {}))
 
-    def publish(self, topic: str, payload: dict | None, *, retain: bool = False, qos: int = 1):
-        """Queue an MQTT publish in the outbox (None payload clears a retained topic)."""
-        body = None if payload is None else json.dumps(payload, separators=(",", ":"))
-        self.s.add(Outbox(topic=topic, payload=body, qos=qos, retain=retain))
-        self._outbox = True
+    def send_down(self, gateway_id: str, type_: str, body: dict) -> Downlink:
+        """Queue a down message (gateway_api.md §6) for the gateway."""
+        msg_id = new_id()
+        row = Downlink(id=msg_id, gateway_id=gateway_id, type=type_,
+                       body={"t": type_, "id": msg_id, **body})
+        self.s.add(row)
+        self._woken.add(gateway_id)
+        return row
 
     def notify(self, household_id: str, title: str, data: dict) -> None:
         self._pushes.append((household_id, title, data))
@@ -65,17 +70,17 @@ class Uow:
         await self.s.rollback()
         self._events.clear()
         self._pushes.clear()
-        self._outbox = False
+        self._woken.clear()
 
     async def commit(self) -> None:
         await self.s.commit()
         for household_id, kind, data in self._events:
             self.ctx.bus.publish(household_id, kind, data)
-        if self._outbox:
-            self.ctx.outbox_wakeup.set()
+        for gateway_id in self._woken:
+            self.ctx.gateways.wake(gateway_id)
         pushes, self._pushes = self._pushes, []
         for household_id, title, data in pushes:
             asyncio.get_running_loop().create_task(
                 self.ctx.push.send_to_household(self.ctx, household_id, title, data))
         self._events.clear()
-        self._outbox = False
+        self._woken.clear()

@@ -1,7 +1,7 @@
-"""The running service: enrollment, then the local MQTT connection (Gateway_Specs §3).
-
-The WebSocket uplink to the API server is not implemented yet; until then up
-messages accumulate in the outbox (`mc-hub outbox`).
+"""The running service (Gateway_Specs §3): the local MQTT connection, and
+enrollment followed by the WebSocket uplink to the API server. Both run
+independently — devices keep being served (and the outbox keeps filling)
+while the API is unreachable.
 """
 
 import asyncio
@@ -13,6 +13,7 @@ from .agent import Agent
 from .config import HubConfig
 from .enrollment import enroll
 from .store import Store
+from .uplink import Uplink
 
 log = logging.getLogger(__name__)
 
@@ -32,14 +33,23 @@ async def run(cfg: HubConfig) -> None:
         (cfg.broker_dir / "psk").chmod(0o640)
     store = Store(cfg.db_path)
     agent = Agent(cfg, store)
+    local = asyncio.create_task(_local(cfg, agent))
+    try:
+        while True:
+            if not agent.gateway_id or not agent.credential:
+                log.info("not enrolled yet")
+                creds = await enroll(cfg)
+                agent.enrolled(creds.gateway_id, creds.credential)
+                log.info("enrolled as %s for household '%s'", creds.gateway_id,
+                         creds.household_name)
+            await Uplink(cfg, agent).run()  # returns when removed in the app
+            log.warning("removed: forgetting keys and snapshot, back to enrollment")
+            agent.reset()
+    finally:
+        local.cancel()
 
-    if not agent.gateway_id:
-        log.info("not enrolled yet")
-        creds = await enroll(cfg)
-        agent.enrolled(creds.gateway_id, creds.credential)
-        log.info("enrolled as %s for household '%s'", creds.gateway_id, creds.household_name)
-    log.warning("uplink to the API server not implemented yet: up messages stay in the outbox")
 
+async def _local(cfg: HubConfig, agent: Agent) -> None:
     backoff = 1
     while True:
         try:
@@ -66,7 +76,8 @@ async def run(cfg: HubConfig) -> None:
                         payload = message.payload if isinstance(message.payload, bytes) \
                             else str(message.payload or "").encode()
                         try:
-                            await agent.on_message(str(message.topic), payload)
+                            await agent.on_message(str(message.topic), payload,
+                                                   bool(message.retain))
                         except Exception:
                             log.exception("handling %s failed", message.topic)
                 finally:

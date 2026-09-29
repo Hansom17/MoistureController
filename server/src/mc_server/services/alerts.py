@@ -16,10 +16,13 @@ TITLES = {
     "config_rejected": "{name}: configuration rejected",
     "safety_stop": "{name}: pump stopped by safety limit",
     "rule_limit_reached": "{name}: daily watering limit reached",
+    "gateway_offline": "Gateway offline",
+    "gateway_sync_failed": "Gateway could not apply the latest settings",
+    "gateway_buffer_overflow": "Gateway dropped old readings while offline",
 }
 
 # Alerts that close only when a user acknowledges them.
-ACK_ONLY = {"command_failed", "safety_stop", "rule_limit_reached"}
+ACK_ONLY = {"command_failed", "safety_stop", "rule_limit_reached", "gateway_buffer_overflow"}
 
 
 async def _open_alert(uow: Uow, household_id: str, kind: str, subject_id: str) -> Alert | None:

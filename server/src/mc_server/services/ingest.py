@@ -1,7 +1,6 @@
-"""Ingest of device messages (mqtt.md payloads).
+"""Ingest of normalized device messages from gateways (Api_Specs §9.5).
 
-v1 entry point is an MQTT topic + payload; in v2 the same logic is fed by the
-gateway WebSocket's normalized device messages (Api_Specs §9.5).
+The payloads are the mqtt.md shapes (the canonical device model).
 """
 
 import json
@@ -12,7 +11,6 @@ from datetime import timedelta
 from pydantic import ValidationError
 from sqlalchemy import select
 
-from mc_core.contract import topics
 from mc_core.contract.device import (
     MAX_DEVICE_TO_SERVER,
     CmdAck,
@@ -21,6 +19,7 @@ from mc_core.contract.device import (
     Status,
     Telemetry,
 )
+from mc_core.contract.gateway import DeviceMessage
 
 from ..context import Uow
 from ..db.models import (
@@ -44,43 +43,48 @@ SENSOR_ERROR_CYCLES = 3
 _unknown_logged: dict[str, float] = {}
 
 
-async def handle(uow: Uow, topic: str, payload: bytes, retained: bool = False) -> None:
-    t = topics.parse(topic)
-    if t is None:
-        log.debug("foreign topic %s", topic)
+PARSERS = {"status": Status, "telemetry": Telemetry, "event": Event, "cmd_ack": CmdAck,
+           "config_state": ConfigState}
+
+
+async def handle_device(uow: Uow, household_id: str, msg: DeviceMessage,
+                        outage_s: int = 0, commit: bool = True) -> None:
+    """One normalized device message from the household's gateway (Api_Specs §9.5).
+
+    Messages for devices of other households are dropped. With `commit=False`
+    the caller commits (together with the gateway's `last_up_seq`).
+    """
+    device = await uow.s.get(Device, msg.device)
+    if device is None or device.deleted_at is not None or device.household_id != household_id:
+        if time.monotonic() - _unknown_logged.get(msg.device, 0) > 300:
+            _unknown_logged[msg.device] = time.monotonic()
+            log.info("message for unknown or foreign device %s", msg.device)
         return
-    if t.suffix not in topics.DEVICE_UP:
-        return  # our own cmd / config/desired echoing back
-    device = await uow.s.get(Device, t.id)
-    if device is None or device.deleted_at is not None:
-        if time.monotonic() - _unknown_logged.get(t.id, 0) > 300:
-            _unknown_logged[t.id] = time.monotonic()
-            log.info("message from unknown device %s", t.id)
-        return
-    if not payload:
-        return  # cleared retained message
     device_id = device.id  # stays valid after a rollback
-    if len(payload) > MAX_DEVICE_TO_SERVER:
-        _invalid(uow, device_id, f"{t.suffix}: payload too large")
-        await uow.commit()
+    received = to_dt(msg.received_at)
+    if len(json.dumps(msg.payload)) > MAX_DEVICE_TO_SERVER:
+        _invalid(uow, device_id, f"{msg.kind}: payload too large")
+        if commit:
+            await uow.commit()
         return
     try:
-        body = json.loads(payload)
-        match t.suffix:
+        body = PARSERS[msg.kind].model_validate(msg.payload)
+        match msg.kind:
             case "status":
-                await _status(uow, device, Status.model_validate(body), retained)
+                await _status(uow, device, body, received)
             case "telemetry":
-                await _telemetry(uow, device, Telemetry.model_validate(body))
+                await _telemetry(uow, device, body, received, outage_s)
             case "event":
-                await _event(uow, device, Event.model_validate(body))
-            case "cmd/ack":
-                await commands.handle_ack(uow, device, CmdAck.model_validate(body))
-            case "config/state":
-                await _config_state(uow, device, ConfigState.model_validate(body))
+                await _event(uow, device, body, received, outage_s)
+            case "cmd_ack":
+                await commands.handle_ack(uow, device, body)
+            case "config_state":
+                await _config_state(uow, device, body)
     except (ValueError, ValidationError) as e:
         await uow.rollback()
-        _invalid(uow, device_id, f"{t.suffix}: {str(e)[:200]}")
-    await uow.commit()
+        _invalid(uow, device_id, f"{msg.kind}: {str(e)[:200]}")
+    if commit:
+        await uow.commit()
 
 
 def _invalid(uow: Uow, device_id: str, detail: str) -> None:
@@ -91,11 +95,8 @@ def _invalid(uow: Uow, device_id: str, detail: str) -> None:
 # --- status (§8.3) -------------------------------------------------------------------
 
 
-async def _status(uow: Uow, device: Device, msg: Status, retained: bool) -> None:
-    if retained and device.status != "new":
-        # Replayed retained state after our own reconnect: nothing new happened.
-        return
-    now = utcnow()
+async def _status(uow: Uow, device: Device, msg: Status, received) -> None:
+    now = received  # replayed messages count from when the gateway got them
     hid = device.household_id
     if msg.boot is not None:
         if device.last_boot is not None and msg.boot < device.last_boot:
@@ -127,23 +128,23 @@ async def _accept_seq(device: Device, seq: int) -> bool:
     return True
 
 
-async def _timestamp(uow: Uow, device: Device, ts: int | None):
-    now = utcnow()
+def _timestamp(ts: int | None, received, outage_s: int):
+    """Device time if plausible: [received − 2 h − gateway outage, received + 5 min]."""
     if ts is None:
-        return now, "server"
+        return received, "gateway"
     at = to_dt(ts)
-    past = TS_PAST  # v2: + the gateway's offline duration (Api_Specs §9.5)
-    if now - past <= at <= now + TS_FUTURE:
+    if received - TS_PAST - timedelta(seconds=outage_s) <= at <= received + TS_FUTURE:
         return at, "device"
-    return now, "server"
+    return received, "gateway"
 
 
-async def _telemetry(uow: Uow, device: Device, msg: Telemetry) -> None:
+async def _telemetry(uow: Uow, device: Device, msg: Telemetry, received,
+                     outage_s: int) -> None:
     if not await _accept_seq(device, msg.seq):
         return  # duplicate after reconnect
     hid = device.household_id
     household = await uow.s.get(Household, hid)
-    at, source = await _timestamp(uow, device, msg.ts)
+    at, source = _timestamp(msg.ts, received, outage_s)
     plants = {(p.sensor_slot): p for p in await uow.s.scalars(select(Plant).where(
         Plant.household_id == hid, Plant.sensor_device_id == device.id,
         Plant.archived_at.is_(None)))}
@@ -174,7 +175,7 @@ async def _telemetry(uow: Uow, device: Device, msg: Telemetry) -> None:
     uow.s.add(HealthReport(device_id=device.id, ts=at, seq=msg.seq, batt_mv=h.batt_mv,
                            rssi=h.rssi, wake=h.wake, cycle_ms=h.cycle_ms, wifi_ms=h.wifi_ms))
     device.batt_mv, device.rssi = h.batt_mv, h.rssi
-    device.last_seen_at = utcnow()
+    device.last_seen_at = received
     await _battery(uow, device, household)
     uow.emit(hid, "reading", {"device_id": device.id, "plant_ids": touched})
 
@@ -195,10 +196,10 @@ async def _battery(uow: Uow, device: Device, household: Household) -> None:
 # --- events ----------------------------------------------------------------------------
 
 
-async def _event(uow: Uow, device: Device, msg: Event) -> None:
+async def _event(uow: Uow, device: Device, msg: Event, received, outage_s: int) -> None:
     if not await _accept_seq(device, msg.seq):
         return
-    at, _ = await _timestamp(uow, device, msg.ts)
+    at, _ = _timestamp(msg.ts, received, outage_s)
     hid = device.household_id
     uow.s.add(DeviceEvent(device_id=device.id, ts=at, seq=msg.seq, kind=msg.kind,
                           slot=msg.slot, detail=msg.detail))
@@ -216,6 +217,7 @@ async def _event(uow: Uow, device: Device, msg: Event) -> None:
 async def _config_state(uow: Uow, device: Device, msg: ConfigState) -> None:
     hid = device.household_id
     body = msg.model_dump(exclude_none=True)
+    before = _snapshot_relevant(device.reported_config)
     device.reported_rev = msg.rev
     device.reported_config = body
     device.wake_interval_s = msg.wake_interval_s
@@ -231,4 +233,16 @@ async def _config_state(uow: Uow, device: Device, msg: ConfigState) -> None:
     elif device.reported_rev == device.desired_rev:
         device.rejected_rev, device.config_error = None, None
         await alerts.resolve_alert(uow, hid, "config_rejected", device.id)
+    if _snapshot_relevant(body) != before:
+        # Pump limits and wake interval are part of the gateway's snapshot.
+        from . import gateways
+
+        await gateways.republish_snapshot(uow, hid)
     uow.emit(hid, "config", {"device_id": device.id, "rev": msg.rev})
+
+
+def _snapshot_relevant(body: dict | None) -> list:
+    body = body or {}
+    return [body.get("wake_interval_s"), body.get("limits")] + [
+        (s.get("slot"), s.get("max_run_s"), s.get("min_pause_s"))
+        for s in body.get("slots", []) if s.get("module") == "pump_relay"]

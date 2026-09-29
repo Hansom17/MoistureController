@@ -44,8 +44,7 @@ def cmd_status(cfg: HubConfig, args) -> None:
     snap = store.snapshot() or {}
     depth, oldest = store.outbox_depth()
     print(f"gateway       {gateway_id}")
-    print(f"outbox        {depth} messages{f', oldest {_ago(oldest)}' if oldest else ''}"
-          " (uplink not implemented yet)")
+    print(f"outbox        {depth} messages{f', oldest {_ago(oldest)}' if oldest else ''}")
     print(f"snapshot rev  {store.get('snapshot_rev', '—')}   keys rev {store.get('keys_rev', '—')}")
     print(f"LAN address   {cfg.lan_host}:{cfg.lan_port}")
     print(f"time zone     {snap.get('timezone', '—')}")

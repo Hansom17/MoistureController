@@ -1,7 +1,6 @@
 """FastAPI application: API, SSE and jobs in one process.
 
-v1 code kept as the starting point for api/ (PROJECT.md §11); the gateway
-WebSocket endpoint replaces the removed MQTT connection.
+Gateways connect over the WebSocket at /gateway/v1/connect (api/gateway.py).
 """
 
 import asyncio
@@ -15,7 +14,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from mc_core.commands import CommandRejected
 
-from .api import activity, devices, export, households, me, plants
+from .api import activity, devices, export, gateway, households, me, plants
 from .auth.verify import DevVerifier, FirebaseVerifier, TokenVerifier
 from .config import Settings
 from .context import AppContext
@@ -106,8 +105,10 @@ def create_app(settings: Settings | None = None, *, verifier: TokenVerifier | No
                            expose_headers=["Content-Disposition"])
 
     for r in (me.router, households.router, devices.router, plants.router, activity.router,
-              export.router):
+              gateway.router, export.router):
         app.include_router(r, prefix=API_PREFIX)
+    app.include_router(gateway.enroll_router)
+    app.include_router(gateway.ws_router)
 
     @app.get("/healthz", include_in_schema=False)
     async def healthz():

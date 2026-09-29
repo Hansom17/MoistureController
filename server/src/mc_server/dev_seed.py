@@ -1,8 +1,13 @@
 """`mc-server seed-dev`: a ready household for local development.
 
-Creates (idempotently) a household owned by the dev user, one device with a
-pairing bundle, a plant on slot 0/2 and a rule, and prints the bundle for
+Creates (idempotently) a household owned by the dev user, claims the newest
+pending gateway enrollment for it if it has no gateway yet, one device keyed on
+that gateway, a plant on slot 0/2 and a rule, and prints the pairing bundle for
 `tools/fake_device.py` on stdout. Dev auth mode only.
+
+It runs outside the API process, so it can't see whether the gateway is
+connected: the keys and snapshot wait in the downlink and the API's sender
+delivers them within a few seconds.
 """
 
 import json
@@ -20,7 +25,7 @@ from .db.models import Device, Household, Membership, Plant, User
 from .db.session import create_all, make_engine, make_sessionmaker
 from .notify.push import PushSender
 from .realtime.bus import EventBus
-from .services import devices, households, plants
+from .services import devices, gateways, households, plants
 
 DEV_CONFIG = ConfigDesired(rev=2, wake_interval_s=600, slots=[
     {"slot": 0, "module": "moisture_capacitive", "pin": 34, "cal": {"dry": 3000, "wet": 1200}},
@@ -32,11 +37,15 @@ DEV_CONFIG = ConfigDesired(rev=2, wake_interval_s=600, slots=[
 
 async def _bundle(uow, ctx: AppContext, device: Device, uid: str) -> dict:
     """The existing key (reusing it keeps a running simulator connected)."""
-    if device.psk_enc is None:
-        return await devices.rekey(uow, device, uid)
-    host, port = ctx.settings.broker_public_host, ctx.settings.broker_public_port
-    return {"device_id": device.id,
-            "mqtt": {"host": host, "port": port, "psk": ctx.keys.decrypt(device.psk_enc)}}
+    if device.psk_enc is None or device.gateway != "gateway":
+        bundle = await devices.rekey(uow, device, uid, require_online=False)
+    else:
+        gw = await gateways.get_gateway(uow, device.household_id)
+        host, port = gateways.lan_address(gw)
+        bundle = {"device_id": device.id,
+                  "mqtt": {"host": host, "port": port, "psk": ctx.keys.decrypt(device.psk_enc)}}
+    bundle["mqtt"]["host"] = bundle["mqtt"]["host"] or "localhost"  # state not reported yet
+    return bundle
 
 
 async def seed(uid: str) -> None:
@@ -58,10 +67,20 @@ async def seed(uid: str) -> None:
             Membership.user_uid == uid, Household.name == "Dev home"))
         household = existing or await households.create(uow, user, "Dev home", "Europe/Berlin")
 
+        if await gateways.get_gateway(uow, household.id) is None:
+            enrollment = await gateways.pending_enrollment(uow)
+            if enrollment is None:
+                raise SystemExit("no gateway: start the gateway stack first so it enrolls, "
+                                 "then run seed-dev again")
+            gw = await gateways.claim_enrollment(uow, household, enrollment, uid)
+            print(f"claimed gateway {gw.id}", file=sys.stderr)
+
         device = await uow.s.scalar(select(Device).where(
             Device.household_id == household.id, Device.deleted_at.is_(None)))
         if device is None:
-            device, bundle = await devices.create_device(uow, household.id, "Sim device", uid)
+            device, bundle = await devices.create_device(uow, household.id, "Sim device", uid,
+                                                         require_online=False)
+            bundle["mqtt"]["host"] = bundle["mqtt"]["host"] or "localhost"
         else:
             bundle = await _bundle(uow, ctx, device, uid)
         if device.desired_rev < DEV_CONFIG.rev:

@@ -20,8 +20,6 @@ def _env(name: str, default: str | None = None) -> str | None:
 class Settings:
     database_url: str = "sqlite+aiosqlite:///./mc-dev.db"
 
-    broker_public_host: str = "mqtt.localhost"
-    broker_public_port: int = 8883
 
     # 32 bytes hex; encrypts device PSKs in the database.
     key_encryption_key: str = field(default_factory=lambda: secrets.token_hex(32))
@@ -37,6 +35,7 @@ class Settings:
     cors_origins: list[str] = field(default_factory=list)
     max_households_per_user: int = 10
     min_app_version: str | None = None
+    latest_gateway_version: str = "0.1.0"
     docs_enabled: bool = True
     jobs_interval_s: float = 30.0
 
@@ -49,8 +48,6 @@ class Settings:
             from urllib.parse import quote
 
             s.database_url = s.database_url.replace("{password}", quote(db_password, safe=""))
-        s.broker_public_host = _env("MC_BROKER_PUBLIC_HOST", s.broker_public_host)
-        s.broker_public_port = int(_env("MC_BROKER_PUBLIC_PORT", str(s.broker_public_port)))
         s.auth_mode = _env("MC_AUTH_MODE", "firebase")
         key = _env("MC_KEY_ENCRYPTION_KEY")
         if key:
@@ -71,5 +68,6 @@ class Settings:
         s.max_households_per_user = int(
             _env("MC_MAX_HOUSEHOLDS_PER_USER", str(s.max_households_per_user)))
         s.min_app_version = _env("MC_MIN_APP_VERSION")
+        s.latest_gateway_version = _env("MC_LATEST_GATEWAY_VERSION", s.latest_gateway_version)
         s.docs_enabled = _env("MC_DOCS", "1" if s.auth_mode == "dev" else "0") == "1"
         return s

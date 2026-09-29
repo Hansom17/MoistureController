@@ -30,8 +30,11 @@ router = APIRouter(tags=["households"])
 
 
 async def _out(uow, household, role: str) -> HouseholdOut:
+    from .me import gateway_summary
+
     return HouseholdOut(id=household.id, name=household.name, timezone=household.timezone,
-                        battery_low_mv=household.battery_low_mv, role=role)
+                        battery_low_mv=household.battery_low_mv, role=role,
+                        gateway=await gateway_summary(uow, household.id))
 
 
 @router.post("/households", response_model=HouseholdOut, status_code=201)

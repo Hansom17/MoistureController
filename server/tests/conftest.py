@@ -1,14 +1,16 @@
-import json
+import hashlib
+import secrets
 import time
 
 import httpx
 import pytest
 from sqlalchemy import select
 
+from mc_core.contract import gateway as g
 from mc_server.config import Settings
-from mc_server.db.models import Outbox
+from mc_server.db.models import Downlink, Gateway
 from mc_server.main import create_app
-from mc_server.services import ingest
+from mc_server.services import gateways
 
 
 def auth(uid: str, stale: bool = False) -> dict:
@@ -45,19 +47,45 @@ class Api:
         return await self.req("DELETE", path, expect, **kw)
 
 
-class FakeDevice:
-    """Feeds contract messages into the ingest pipeline as if they came over MQTT."""
+class FakeGateway:
+    """An enrolled gateway with a live (fake) session: up messages go straight
+    into `gateways.process_up`, down messages are read from the downlink table."""
 
-    def __init__(self, ctx, device_id: str):
+    def __init__(self, ctx, gateway_id: str):
         self.ctx = ctx
+        self.gateway_id = gateway_id
+        self.seq = 0
+        self.closed: list[int] = []
+
+    async def close(self, code: int, reason: str) -> None:
+        self.closed.append(code)
+
+    async def up(self, msg: dict) -> None:
+        self.seq += 1
+        async with self.ctx.uow() as uow:
+            gw = await uow.s.get(Gateway, self.gateway_id)
+            await gateways.process_up(uow, gw, {**msg, "seq": self.seq})
+
+    async def down_ack(self, row: Downlink, result: str = "applied", error: str | None = None):
+        async with self.ctx.uow() as uow:
+            gw = await uow.s.get(Gateway, self.gateway_id)
+            await gateways.process_down_ack(uow, gw, g.DownAck(id=row.id, result=result,
+                                                               error=error))
+
+
+class FakeDevice:
+    """Feeds contract messages in as if the gateway had received them over MQTT."""
+
+    def __init__(self, gateway: FakeGateway, device_id: str):
+        self.gw = gateway
         self.id = device_id
         self.seq = 0
         self.boot = 1
 
-    async def send(self, suffix: str, payload: dict | bytes, retained: bool = False):
-        body = payload if isinstance(payload, bytes) else json.dumps(payload).encode()
-        async with self.ctx.uow() as uow:
-            await ingest.handle(uow, f"mc/v1/{self.id}/{suffix}", body, retained)
+    async def send(self, kind: str, payload: dict):
+        await self.gw.up({"t": "device", "device": self.id, "adapter": "esp32-mqtt",
+                          "kind": kind.replace("/", "_"), "received_at": int(time.time()),
+                          "payload": payload})
 
     async def report_config(self, rev=1, slots=None, max_run_s=60, result="applied", **extra):
         slots = slots if slots is not None else [
@@ -93,7 +121,7 @@ class FakeDevice:
 @pytest.fixture
 async def app(tmp_path):
     settings = Settings(database_url=f"sqlite+aiosqlite:///{tmp_path}/test.db",
-                        auth_mode="dev", broker_public_host="mqtt.example.com")
+                        auth_mode="dev")
     application = create_app(settings, background=False)
     async with application.router.lifespan_context(application):
         yield application
@@ -126,20 +154,57 @@ async def household(owner):
     return await owner.post("/households", {"name": "Home"}, expect=201)
 
 
+async def enroll(client, owner, h: str) -> dict:
+    """Enrollment start → claim by the owner → poll: the gateway's credentials."""
+    secret = secrets.token_bytes(32)
+    r = await client.post("/gateway/v1/enroll/start", json={
+        "secret_sha256": hashlib.sha256(secret).hexdigest(), "version": "0.1.0",
+        "arch": "arm64", "adapters": ["esp32-mqtt"]})
+    assert r.status_code == 201, r.text
+    start = r.json()
+    await owner.post(f"/households/{h}/gateway", {"user_code": start["user_code"]}, expect=201)
+    r = await client.post("/gateway/v1/enroll/poll",
+                          json={"enroll_id": start["enroll_id"], "secret": secret.hex()})
+    assert r.status_code == 200, r.text
+    return r.json()
+
+
 @pytest.fixture
-async def setup(owner, household, ctx):
-    """Household with one paired device (reported config) and one plant."""
+async def gateway(client, owner, household, ctx) -> FakeGateway:
+    """The household's gateway, connected and reporting its LAN address."""
+    creds = await enroll(client, owner, household["id"])
+    gw = FakeGateway(ctx, creds["gateway_id"])
+    await ctx.gateways.register(gw)
+    async with ctx.uow() as uow:
+        row = await uow.s.get(Gateway, gw.gateway_id)
+        await gateways.connected(uow, row, g.Hello(version="0.1.0", adapters=["esp32-mqtt"],
+                                                   snapshot_rev=0, keys_rev=0))
+    await gw.up({"t": "gateway_state", "version": "0.1.0", "arch": "arm64",
+                 "adapters": {"esp32-mqtt": {"devices": 0}}, "lan_host": "192.168.1.20", "lan_port": 8883,
+                 "time_synced": True, "outbox_depth": 0, "snapshot_rev": 0, "keys_rev": 0,
+                 "uptime_s": 10})
+    return gw
+
+
+@pytest.fixture
+async def setup(owner, household, gateway):
+    """Household with a gateway, one paired device (reported config) and one plant."""
     h = household["id"]
     created = await owner.post(f"/households/{h}/devices", {"name": "Kitchen"}, expect=201)
-    device = FakeDevice(ctx, created["device"]["id"])
+    device = FakeDevice(gateway, created["device"]["id"])
     await device.report_config()
     plant = await owner.post(f"/households/{h}/plants", {
         "name": "Basil", "sensor_device_id": device.id, "sensor_slot": 0,
         "pump_device_id": device.id, "pump_slot": 2}, expect=201)
-    return {"h": h, "device": device, "plant": plant, "bundle": created["bundle"]}
+    return {"h": h, "device": device, "plant": plant, "bundle": created["bundle"],
+            "gateway": gateway}
 
 
-async def outbox(ctx, topic_suffix: str | None = None) -> list[Outbox]:
+async def downlink(ctx, type_: str | None = None, pending: bool = False) -> list[Downlink]:
     async with ctx.sessionmaker() as s:
-        rows = list(await s.scalars(select(Outbox).order_by(Outbox.id)))
-    return [r for r in rows if topic_suffix is None or r.topic.endswith(topic_suffix)]
+        q = select(Downlink).order_by(Downlink.created_at, Downlink.id)
+        if type_:
+            q = q.where(Downlink.type == type_)
+        if pending:
+            q = q.where(Downlink.acked_at.is_(None))
+        return list(await s.scalars(q))

@@ -40,8 +40,6 @@ services:
       MC_AUTH_MODE: ${MC_AUTH_MODE:-firebase}
       MC_DATABASE_URL: postgresql+asyncpg://mc:{password}@postgres:5432/mc
       MC_DATABASE_PASSWORD_FILE: /run/secrets/postgres_password
-      MC_BROKER_PUBLIC_HOST: ${MC_BROKER_PUBLIC_HOST:-localhost}   # pairing-bundle host until gateways key devices
-      MC_BROKER_PUBLIC_PORT: ${MC_BROKER_PUBLIC_PORT:-8883}
       MC_KEY_ENCRYPTION_KEY_FILE: /run/secrets/key_encryption_key
       MC_FIREBASE_CREDENTIALS: ${MC_FIREBASE_CREDENTIALS:-}
       MC_FIREBASE_PROJECT_ID: ${MC_FIREBASE_PROJECT_ID:-}

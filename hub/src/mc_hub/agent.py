@@ -2,9 +2,9 @@
 
 v1 code of the hub agent, switched to the gateway_api.md message shapes; it
 moves to `gateway/` (PROJECT.md §11). Everything that goes up to the API is
-appended to the SQLite outbox with a `seq`; down messages are applied by the
-`apply_*` methods, which return the `down_ack` for the uplink. The uplink
-(WebSocket) itself is not implemented yet — until then the outbox only fills.
+appended to the SQLite outbox with a `seq` and sent by the uplink (uplink.py);
+down messages are applied by the `apply_*` methods, which return the
+`down_ack` for the uplink.
 
 Device traffic is `esp32-mqtt` only: MQTT messages come in via `on_message`,
 commands and configs go out through the injected `publish` coroutine.
@@ -52,6 +52,7 @@ class Agent:
         self.clock = clock
         self.started = clock()
         self._snapshot: Snapshot | None = None
+        self.on_report: Callable[[], None] | None = None  # uplink: new outbox entry
         raw = store.snapshot()
         if raw:
             self._snapshot = Snapshot.model_validate(raw)
@@ -85,7 +86,10 @@ class Agent:
 
     def report(self, message: dict) -> int:
         """Append an up message to the outbox; returns its `seq`."""
-        return self.store.outbox_append(message)
+        seq = self.store.outbox_append(message)
+        if self.on_report is not None:
+            self.on_report()
+        return seq
 
     @staticmethod
     def _down_ack(msg_id: str | None, result: str = "applied", error: str | None = None) -> dict:
@@ -96,13 +100,23 @@ class Agent:
 
     # --- enrollment result -------------------------------------------------------------
 
+    @property
+    def credential(self) -> str | None:
+        path = self.cfg.data_dir / "secrets" / "credential"
+        return path.read_text().strip() if path.exists() else None
+
     def enrolled(self, gateway_id: str, credential: str) -> None:
         self.store.set("gateway_id", gateway_id)
+        self.store_credential(credential)
+
+    def store_credential(self, credential: str) -> None:
         secrets_dir = self.cfg.data_dir / "secrets"
         secrets_dir.mkdir(parents=True, exist_ok=True)
         key_file = secrets_dir / "credential"
-        key_file.write_text(credential)
-        key_file.chmod(0o600)
+        tmp = secrets_dir / "credential.tmp"
+        tmp.write_text(credential)
+        tmp.chmod(0o600)
+        tmp.replace(key_file)
 
     def reset(self) -> None:
         """Forget enrollment, keys and snapshot (removed in the app, or `reset`)."""
@@ -113,9 +127,10 @@ class Agent:
 
     # --- device traffic from the local broker (§5.1) -------------------------------------
 
-    async def on_message(self, topic: str, payload: bytes) -> None:
+    async def on_message(self, topic: str, payload: bytes, retained: bool = False) -> None:
         t = topics.parse(topic)
-        if t is None or not payload:
+        # Retained messages are old state replayed by the broker on (re)subscribe.
+        if t is None or not payload or retained:
             return
         try:
             if t.suffix in DEVICE_KINDS:

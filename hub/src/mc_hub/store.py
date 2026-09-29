@@ -140,8 +140,9 @@ class Store:
         """The API stored everything ≤ seq."""
         self.db.execute("DELETE FROM outbox WHERE seq <= ?", (seq,))
 
-    def outbox_peek(self, limit: int = 100) -> list[dict]:
-        rows = self.db.execute("SELECT body FROM outbox ORDER BY seq LIMIT ?", (limit,))
+    def outbox_peek(self, limit: int = 100, after: int = 0) -> list[dict]:
+        rows = self.db.execute("SELECT body FROM outbox WHERE seq > ? ORDER BY seq LIMIT ?",
+                               (after, limit))
         return [json.loads(r["body"]) for r in rows]
 
     def outbox_depth(self) -> tuple[int, int | None]:

@@ -4,12 +4,21 @@ from mc_core import pins
 
 from ..auth.deps import CurrentUser, UowDep
 from ..db.models import PushToken, User
+from ..services import gateways
 from ..errors import not_found
 from ..realtime.bus import TICKET_TTL_S
 from ..services import households
-from .schemas import HouseholdOut, MeOut, PushTokenIn, TicketOut
+from .schemas import GatewaySummary, HouseholdOut, MeOut, PushTokenIn, TicketOut
 
 router = APIRouter(tags=["me"])
+
+
+async def gateway_summary(uow, household_id: str) -> GatewaySummary | None:
+    gw = await gateways.get_gateway(uow, household_id)
+    if gw is None:
+        return None
+    online = gateways.is_online(uow, gw)
+    return GatewaySummary(online=online, offline_since=None if online else gw.disconnected_at)
 
 
 @router.get("/me", response_model=MeOut)
@@ -30,7 +39,8 @@ async def my_households(user: CurrentUser, uow: UowDep):
     out = []
     for h, role in await households.list_for_user(uow, user.uid):
         out.append(HouseholdOut(id=h.id, name=h.name, timezone=h.timezone,
-                                battery_low_mv=h.battery_low_mv, role=role))
+                                battery_low_mv=h.battery_low_mv, role=role,
+                                gateway=await gateway_summary(uow, h.id)))
     return out
 
 

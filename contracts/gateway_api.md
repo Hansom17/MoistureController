@@ -93,7 +93,7 @@ Request: `{ "enroll_id": "…", "secret": "<64 hex chars of the raw secret>" }`
 
 ## 4. WebSocket
 
-- URL: `wss://api.<our-domain>/gateway/v1/connect`, header `Authorization: Gateway <gateway_id>:<credential>`. Wrong or revoked credential → HTTP 401 before the upgrade; the gateway then retries with backoff and, after 3 × 401 in a row, treats itself as **removed** (Gateway_Specs §3).
+- URL: `wss://api.<our-domain>/gateway/v1/connect`, header `Authorization: Gateway <gateway_id>:<credential>`. The gateway derives it from its configured API URL (`https://` → `wss://`); the `ws_url` in the enrollment response is informational. Wrong or revoked credential → HTTP 403 before the upgrade; the gateway then retries with backoff and, after 3 × 403 (or 401) in a row, treats itself as **removed** (Gateway_Specs §3).
 - One connection per gateway; a second connection with the same credential closes the first (code 4000).
 - Messages are JSON text frames: `{"t": "<type>", …}`. Max 256 KB per frame (snapshots), 16 KB otherwise.
 - Keep-alive: WebSocket ping every 30 s from the gateway; the API marks the gateway offline after 90 s without traffic.

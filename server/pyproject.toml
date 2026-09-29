@@ -12,7 +12,6 @@ dependencies = [
   "asyncpg>=0.29",
   "aiosqlite>=0.20",
   "alembic>=1.13",
-  "aiomqtt>=2.3",
   "sse-starlette>=2.1",
   "python-ulid>=3.0",
   "cryptography>=43",

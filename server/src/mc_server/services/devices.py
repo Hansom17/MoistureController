@@ -4,13 +4,13 @@ from sqlalchemy import select
 
 from mc_core import ids, pins
 from mc_core.commands import Actuator
-from mc_core.contract import topics
 from mc_core.contract.device import ConfigDesired, Limits, SlotConfig
 
 from ..context import Uow
 from ..db.models import CommandRow, ConfigRevision, Device, Plant
 from ..db.types import utcnow
 from ..errors import Problem
+from . import gateways
 from .common import audit
 
 DEFAULT_WAKE_S = 600
@@ -57,27 +57,40 @@ def actuator(d: Device, slot: int) -> Actuator | None:
 # --- adding, re-keying, removing ------------------------------------------------
 
 
-async def _install_key(uow: Uow, device: Device) -> dict:
-    """New PSK + pairing bundle.
+async def _install_key(uow: Uow, device: Device, require_online: bool = True) -> dict:
+    """New PSK, sent to the household's gateway in its key set; returns the
+    pairing bundle with the gateway's LAN address (Api_Specs §8.1).
 
-    Migration state: the bundle still points to MC_BROKER_PUBLIC_HOST; in v2 the
-    key goes to the household's gateway and the bundle to its LAN address
-    (Api_Specs §8.1).
+    The gateway applies keys within seconds; BLE pairing takes longer, so the
+    bundle is returned without waiting for its `down_ack`.
     """
-    s = uow.ctx.settings
+    gw = await gateways.get_gateway(uow, device.household_id)
+    if gw is None:
+        raise Problem(409, "no_gateway", "add a gateway to this household first")
+    if require_online and not gateways.is_online(uow, gw):
+        raise Problem(409, "gateway_offline")
+    host, port = gateways.lan_address(gw)
+    if not host and require_online:
+        raise Problem(409, "gateway_offline", "the gateway has not reported its LAN address")
+    if device.adapter not in (gw.adapters or ["esp32-mqtt"]):
+        raise Problem(422, "adapter_unsupported", device.adapter)
     psk = ids.new_psk()
     device.psk_enc = uow.ctx.keys.encrypt(psk)
-    device.gateway = "cloud"
-    return {"device_id": device.id,
-            "mqtt": {"host": s.broker_public_host, "port": s.broker_public_port, "psk": psk}}
+    device.gateway = "gateway"
+    await uow.s.flush()
+    await gateways.publish_keys(uow, device.household_id)
+    await gateways.republish_snapshot(uow, device.household_id)  # device joins the snapshot
+    return {"device_id": device.id, "mqtt": {"host": host, "port": port, "psk": psk}}
 
 
-async def create_device(uow: Uow, household_id: str, name: str, uid: str) -> tuple[Device, dict]:
+async def create_device(uow: Uow, household_id: str, name: str, uid: str,
+                        adapter: str = "esp32-mqtt",
+                        require_online: bool = True) -> tuple[Device, dict]:
     device = Device(id=ids.new_device_id(), household_id=household_id, name=name,
-                    status="new", wake_interval_s=DEFAULT_WAKE_S)
+                    adapter=adapter, status="new", wake_interval_s=DEFAULT_WAKE_S)
     uow.s.add(device)
     await uow.s.flush()
-    bundle = await _install_key(uow, device)
+    bundle = await _install_key(uow, device, require_online)
     await _set_desired(uow, device, ConfigDesired(rev=1, wake_interval_s=DEFAULT_WAKE_S), uid)
     audit(uow, household_id, uid, "device.create", {"device_id": device.id, "name": name})
     uow.emit(household_id, "device", {"id": device.id})
@@ -85,8 +98,8 @@ async def create_device(uow: Uow, household_id: str, name: str, uid: str) -> tup
     return device, bundle
 
 
-async def rekey(uow: Uow, device: Device, uid: str) -> dict:
-    bundle = await _install_key(uow, device)
+async def rekey(uow: Uow, device: Device, uid: str, require_online: bool = True) -> dict:
+    bundle = await _install_key(uow, device, require_online)
     audit(uow, device.household_id, uid, "device.rekey", {"device_id": device.id})
     uow.emit(device.household_id, "device", {"id": device.id})
     await uow.commit()
@@ -99,8 +112,7 @@ async def delete_device(uow: Uow, device: Device, uid: str) -> None:
     device.deleted_at = utcnow()
     device.psk_enc = None
     device.gateway = "none"
-    for suffix in ("status", "config/desired", "config/state"):
-        uow.publish(topics.device(device.id, suffix), None, retain=True)
+    await gateways.send_down(uow, hid, "device_removed", {"device": device.id})
     open_cmds = await uow.s.scalars(select(CommandRow).where(
         CommandRow.device_id == device.id,
         CommandRow.status.in_(("queued", "delivered", "cancelling"))))
@@ -111,6 +123,9 @@ async def delete_device(uow: Uow, device: Device, uid: str) -> None:
             p.sensor_device_id, p.sensor_slot = None, None
         if p.pump_device_id == device.id:
             p.pump_device_id, p.pump_slot = None, None
+    await uow.s.flush()
+    await gateways.publish_keys(uow, hid)
+    await gateways.republish_snapshot(uow, hid)
     audit(uow, hid, uid, "device.delete", {"device_id": device.id})
     uow.emit(hid, "device", {"id": device.id, "deleted": True})
     await uow.commit()
@@ -125,7 +140,8 @@ async def _set_desired(uow: Uow, device: Device, cfg: ConfigDesired, uid: str | 
     device.desired_config = body
     uow.s.add(ConfigRevision(device_id=device.id, rev=cfg.rev, kind="desired", body=body,
                              created_by=uid))
-    uow.publish(topics.device(device.id, "config/desired"), body, retain=True)
+    await gateways.send_down(uow, device.household_id, "config_desired",
+                             {"device": device.id, "config": body})
 
 
 async def put_config(uow: Uow, device: Device, base_rev: int, wake_interval_s: int,
@@ -165,7 +181,8 @@ def config_view(d: Device) -> dict:
 
 def view(d: Device) -> dict:
     return {
-        "id": d.id, "name": d.name, "board": d.board, "status": d.status, "gateway": d.gateway,
+        "id": d.id, "name": d.name, "board": d.board, "status": d.status, "adapter": d.adapter,
+        "needs_repair": d.gateway == "none",
         "fw": d.fw, "batt_mv": d.batt_mv, "battery_percent": battery_percent(d.batt_mv),
         "rssi": d.rssi, "last_seen_at": d.last_seen_at, "next_expected_at": d.next_expected_at,
         "wake_interval_s": d.wake_interval_s, "sync_state": sync_state(d),

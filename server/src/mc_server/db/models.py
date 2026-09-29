@@ -84,6 +84,65 @@ class Invite(Base):
     revoked_at: Mapped[datetime | None]
 
 
+class Gateway(Base):
+    """One per household (Api_Specs §4, D30)."""
+
+    __tablename__ = "gateways"
+    id: Mapped[str] = mapped_column(String(24), primary_key=True)
+    household_id: Mapped[str] = mapped_column(
+        ForeignKey("households.id", ondelete="CASCADE"), unique=True)
+    credential_hash: Mapped[str] = mapped_column(String(64))
+    # enrolling (claimed, credential not fetched) | online | offline | removed
+    status: Mapped[str] = mapped_column(String(10), default="enrolling")
+    connected_at: Mapped[datetime | None]
+    disconnected_at: Mapped[datetime | None]
+    last_outage_s: Mapped[int] = mapped_column(Integer, default=0)
+    last_state: Mapped[dict | None]
+    last_state_at: Mapped[datetime | None]
+    lan_host_override: Mapped[str | None] = mapped_column(String(255))
+    version: Mapped[str | None] = mapped_column(String(32))
+    adapters: Mapped[list | None]
+    snapshot_rev_applied: Mapped[int] = mapped_column(Integer, default=0)
+    keys_rev_applied: Mapped[int] = mapped_column(Integer, default=0)
+    last_up_seq: Mapped[int] = mapped_column(Integer, default=0)
+    created_at: Mapped[datetime] = _created()
+
+
+class GatewayEnrollment(Base):
+    __tablename__ = "gateway_enrollments"
+    id: Mapped[str] = _id()
+    secret_sha256: Mapped[str] = mapped_column(String(64))
+    user_code_hash: Mapped[str] = mapped_column(String(64), index=True)
+    expires_at: Mapped[datetime]
+    claimed_household_id: Mapped[str | None] = mapped_column(String(26))
+    claimed_by: Mapped[str | None] = mapped_column(String(128))
+    gateway_id: Mapped[str | None] = mapped_column(String(24))
+    credential_enc: Mapped[str | None] = mapped_column(Text)  # until fetched once
+    consumed_at: Mapped[datetime | None]
+    last_poll_at: Mapped[datetime | None]
+    ip: Mapped[str | None] = mapped_column(String(64))
+    version: Mapped[str | None] = mapped_column(String(32))
+    arch: Mapped[str | None] = mapped_column(String(16))
+    adapters: Mapped[list | None]
+    created_at: Mapped[datetime] = _created()
+
+
+class Downlink(Base):
+    """Messages for a gateway, written in the change's transaction (Api_Specs §9.3)."""
+
+    __tablename__ = "downlink"
+    id: Mapped[str] = _id()  # = message `id`
+    gateway_id: Mapped[str] = mapped_column(
+        ForeignKey("gateways.id", ondelete="CASCADE"), index=True)
+    type: Mapped[str] = mapped_column(String(20))
+    body: Mapped[dict]
+    created_at: Mapped[datetime] = _created()
+    sent_at: Mapped[datetime | None]
+    acked_at: Mapped[datetime | None] = mapped_column(index=True)
+    result: Mapped[str | None] = mapped_column(String(12))  # applied | rejected | superseded
+    error: Mapped[str | None] = mapped_column(String(200))
+
+
 class Device(Base):
     __tablename__ = "devices"
     id: Mapped[str] = mapped_column(String(24), primary_key=True)
@@ -91,7 +150,9 @@ class Device(Base):
         ForeignKey("households.id", ondelete="CASCADE"), index=True)
     name: Mapped[str] = mapped_column(String(100))
     psk_enc: Mapped[str | None] = mapped_column(Text)
-    gateway: Mapped[str] = mapped_column(String(8), default="cloud")  # cloud | hub | none
+    # gateway = key installed on the household's gateway; none = needs re-pairing
+    gateway: Mapped[str] = mapped_column(String(8), default="gateway")
+    adapter: Mapped[str] = mapped_column(String(16), default="esp32-mqtt")
     hw_mac: Mapped[str | None] = mapped_column(String(17))
     fw: Mapped[str | None] = mapped_column(String(32))
     board: Mapped[str] = mapped_column(String(64), default="doit_esp32_devkit_v1")
@@ -156,7 +217,7 @@ class ReadingRow(Base):
     raw: Mapped[int | None] = mapped_column(Integer)
     error: Mapped[str | None] = mapped_column(String(20))
     ts: Mapped[datetime]
-    ts_source: Mapped[str] = mapped_column(String(8))  # device | server
+    ts_source: Mapped[str] = mapped_column(String(8))  # device | gateway
     seq: Mapped[int] = mapped_column(Integer)
 
     __table_args__ = (
@@ -206,11 +267,12 @@ class CommandRow(Base):
     status: Mapped[str] = mapped_column(String(10), default="queued")
     reason: Mapped[str | None] = mapped_column(String(32))
     source: Mapped[str] = mapped_column(String(8))  # manual | rule | local
-    origin: Mapped[str] = mapped_column(String(8), default="cloud")  # cloud | hub
+    origin: Mapped[str] = mapped_column(String(8), default="api")  # api | gateway
     created_by: Mapped[str | None] = mapped_column(String(128))
     rule_id: Mapped[str | None] = mapped_column(String(26))
     created_at: Mapped[datetime] = _created()
     exp: Mapped[datetime]
+    sent_at: Mapped[datetime | None]  # handed to the gateway (down_ack applied)
     delivered_at: Mapped[datetime | None]
     finished_at: Mapped[datetime | None]
     ends_at: Mapped[datetime | None]
@@ -248,7 +310,7 @@ class RuleExecution(Base):
     decision: Mapped[str] = mapped_column(String(5))
     skip_reason: Mapped[str | None] = mapped_column(String(20))
     command_id: Mapped[str | None] = mapped_column(String(26))
-    origin: Mapped[str] = mapped_column(String(8), default="cloud")
+    origin: Mapped[str] = mapped_column(String(8), default="gateway")
 
 
 class Alert(Base):
@@ -292,14 +354,3 @@ class AuditLog(Base):
     detail: Mapped[dict | None]
     ts: Mapped[datetime] = _created()
     ip: Mapped[str | None] = mapped_column(String(64))
-
-
-class Outbox(Base):
-    __tablename__ = "outbox"
-    id: Mapped[int] = mapped_column(BigIntPK, primary_key=True, autoincrement=True)
-    topic: Mapped[str] = mapped_column(String(255))
-    payload: Mapped[str | None] = mapped_column(Text)  # None = clear retained
-    qos: Mapped[int] = mapped_column(Integer, default=1)
-    retain: Mapped[bool] = mapped_column(Boolean, default=False)
-    created_at: Mapped[datetime] = _created()
-    sent_at: Mapped[datetime | None] = mapped_column(index=True)

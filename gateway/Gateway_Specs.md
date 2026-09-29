@@ -78,7 +78,7 @@ stateDiagram-v2
     Connecting --> Online: WebSocket up, welcome received
     Online --> Offline: connection lost
     Offline --> Online: reconnected, outbox replayed
-    Online --> Unenrolled: "removed" message or 3 × 401 (removed in the app)
+    Online --> Unenrolled: "removed" message, close 4001 or 3 × 403 (removed in the app)
 ```
 
 - **Unenrolled / Enrolling:** device-code enrollment ([gateway_api.md §3](../contracts/gateway_api.md)); the code and a QR of the `claim_url` are printed to the container log and `mc-gateway status`. Adapters don't start yet (the PSK file stays empty).

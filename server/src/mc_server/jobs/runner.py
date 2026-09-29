@@ -1,4 +1,4 @@
-"""Periodic jobs: expiry, late/offline, cleanup."""
+"""Periodic jobs: expiry, late/offline, gateway offline, cleanup."""
 
 import asyncio
 import logging
@@ -7,21 +7,24 @@ from datetime import timedelta
 from sqlalchemy import delete, select
 
 from ..context import AppContext, Uow
-from ..db.models import Device, Outbox
+from ..db.models import Device, Downlink, GatewayEnrollment
 from ..db.types import utcnow
-from ..services import alerts, commands
+from ..services import alerts, commands, gateways
 
 log = logging.getLogger(__name__)
 
 
 async def device_status(uow: Uow) -> None:
-    """late after 1 missed interval, offline after 3 (Api_Specs §8.3)."""
+    """late after 1 missed interval, offline after 3; paused while the
+    household's gateway is offline (Api_Specs §8.3)."""
     now = utcnow()
+    offline = await gateways.offline_households(uow)
     devices = await uow.s.scalars(select(Device).where(
         Device.deleted_at.is_(None), Device.next_expected_at.is_not(None),
         Device.status.in_(("online", "sleeping", "service", "late"))))
     for d in devices:
-        # v2: skip households whose gateway is offline (Api_Specs §8.3).
+        if d.household_id in offline:
+            continue
         interval = timedelta(seconds=d.wake_interval_s)
         overdue = now - d.next_expected_at
         if overdue > 3 * interval:
@@ -37,8 +40,10 @@ async def device_status(uow: Uow) -> None:
 
 async def cleanup(uow: Uow) -> None:
     now = utcnow()
-    await uow.s.execute(delete(Outbox).where(
-        Outbox.sent_at.is_not(None), Outbox.sent_at < now - timedelta(days=7)))
+    await uow.s.execute(delete(Downlink).where(
+        Downlink.acked_at.is_not(None), Downlink.acked_at < now - timedelta(days=7)))
+    await uow.s.execute(delete(GatewayEnrollment).where(
+        GatewayEnrollment.created_at < now - timedelta(hours=24)))
     # Devices never paired within 24 h are removed with their keys (§8.1).
     stale = (await uow.s.scalars(select(Device).where(
         Device.status == "new", Device.deleted_at.is_(None),
@@ -49,7 +54,7 @@ async def cleanup(uow: Uow) -> None:
     await uow.commit()
 
 
-JOBS = (commands.expire_overdue, device_status, cleanup)
+JOBS = (commands.expire_overdue, device_status, gateways.raise_offline_alerts, cleanup)
 
 
 async def run_once(ctx: AppContext) -> None:
