@@ -534,8 +534,7 @@ MoistureController/
 ├── broker/                 ← Mosquitto image + gateway broker config
 ├── firebase/               ← Firebase config (auth, hosting)
 ├── app/                    ← Flutter (web + mobile)
-├── server/  (old)          ← code of the former cloud backend → moves to api/ (§11)
-└── hub/     (old)          ← code of the former hub agent → moves to gateway/ (§11)
+└── scripts/                ← dev-start.sh / dev-stop.sh: the whole system on one machine
 ```
 
 ---
@@ -554,7 +553,7 @@ Each milestone ends with something working end-to-end. From the start, devices t
 | **M6** | Accounts & sharing | BLE pairing | Enrollment (device code), CLI | Firebase auth, households, roles, invites, device creation, gateway claim, rate limits; deploy the central stack | Login, household switcher, invites, add gateway, BLE onboarding |
 | **M7** | More radios (later) | — | Second adapter (e.g. Zigbee via Zigbee2MQTT) | New module/reading types | Device types in the UI |
 
-Status 2026-09-29: most of M1–M6 exists in the former architecture (`server/` = central backend with a cloud MQTT broker, `hub/` = hub agent with an MQTT bridge) and was tested end-to-end with the device simulator; it moves to the new structure (§11).
+Status 2026-09-29: most of M1–M6 exists and was moved to this architecture (§11); it runs end-to-end on one machine with the device simulator (`scripts/dev-start.sh`). Firmware and BLE pairing are still open.
 
 ---
 
@@ -605,14 +604,14 @@ Superseded earlier by D23: D3 home server first · D14 router port forwarding ·
 
 ## 11. Migration of existing code
 
-The code written until 2026-09-29 targets the v1 architecture; most of it moves.
+The code written until 2026-09-29 targeted the v1 architecture. The migration is **done** (2026-09-29); the table records what changed.
 
-| Existing | Becomes |
+| Was | Now |
 |---|---|
-| `server/src/mc_server/` (FastAPI, auth, households, invites, devices, commands, config sync, alerts, export, SSE) | **`api/`**. *Done in place (still under `server/`):* Replace the MQTT client, outbox-to-MQTT and cloud-broker ACL/PSK files by the gateway WebSocket endpoint; hub enrollment becomes gateway enrollment; cloud rules engine removed (rules only on the gateway); households without a gateway can't add devices. |
+| `server/src/mc_server/` (FastAPI, auth, households, invites, devices, commands, config sync, alerts, export, SSE) | **`api/`** (package `mc_api`, command `mc-api`): replaced the MQTT client, outbox-to-MQTT and cloud-broker ACL/PSK files by the gateway WebSocket endpoint; hub enrollment becomes gateway enrollment; cloud rules engine removed (rules only on the gateway); households without a gateway can't add devices. |
 | `server/tools/fake_device.py` | `gateway/tools/fake_device.py`, unchanged (speaks mqtt.md). |
-| `hub/src/mc_hub/` (agent: enrollment, snapshot/keys, local rules, SQLite store, CLI) | **`gateway/`**. *Done in place (still under `hub/`):* Enrollment and CLI stay; the MQTT bridge is replaced by the WebSocket uplink + outbox; device traffic is forwarded up by the gateway itself (no bridge). |
-| `broker/` | Gateway broker config only; cloud config and cloud ACL generation removed; no bridge. |
-| `core/` | Unchanged; contract tests switch from `hub.md` to `gateway_api.md`. |
-| `app/` | *Done:* API base URL stays central; the "Hub" screen became the "Gateway" screen; "no hub" households are gone (adding a device needs a gateway). |
-| `scripts/dev-start.sh` | *Done:* starts the central stack + one gateway (claimed by `seed-dev`) + simulator + app. |
+| `hub/src/mc_hub/` (agent: enrollment, snapshot/keys, local rules, SQLite store, CLI) | **`gateway/`** (package `mc_gateway`, command `mc-gateway`): enrollment and CLI stayed; the MQTT bridge was replaced by the WebSocket uplink + outbox; device traffic is forwarded up by the gateway itself (no bridge). |
+| `broker/` | Gateway broker config only (`broker/gateway/`); cloud config and cloud ACL generation removed; no bridge. |
+| `core/` | Unchanged; contract tests switched from `hub.md` to `gateway_api.md`. |
+| `app/` | API base URL stays central; the "Hub" screen became the "Gateway" screen; "no hub" households are gone (adding a device needs a gateway). |
+| `scripts/dev-start.sh` | Starts the central stack + one gateway (claimed by `seed-dev`) + simulator + app. |

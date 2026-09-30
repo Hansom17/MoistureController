@@ -1,0 +1,63 @@
+# Gateway stack: Mosquitto (LAN broker) and the
+# gateway service (Gateway_Specs §2), which keeps one outbound WebSocket to the
+# API server.
+#
+#   ./scripts/make-secrets.sh && docker compose up -d
+#   docker compose logs -f gateway      # shows the enrollment code
+#   docker compose exec gateway mc-gateway status
+#
+# Settings in .env (see .env.example). No inbound internet exposure: the only
+# published port is the device listener on the LAN.
+
+name: mc-gateway
+
+x-restart: &restart
+  restart: unless-stopped
+
+services:
+  gateway:
+    <<: *restart
+    build:
+      context: ..
+      dockerfile: gateway/Dockerfile
+    image: mc-gateway:local
+    environment:
+      MC_API_URL: ${MC_API_URL:?set in .env}
+      MC_MQTT_HOST: mosquitto
+      MC_MQTT_PASSWORD_FILE: /run/secrets/mqtt_agent_password
+      MC_LAN_HOST: ${MC_LAN_HOST:?set in .env — the gateway's fixed LAN IP or hostname}
+      MC_LAN_PORT: ${MC_LAN_PORT:-8883}
+    secrets: [mqtt_agent_password]
+    volumes: [gateway-data:/data]
+    read_only: true
+    tmpfs: [/tmp]
+    extra_hosts: ["host.docker.internal:host-gateway"]
+
+  mosquitto:
+    <<: *restart
+    build: ../broker
+    image: mc-broker:local
+    depends_on:
+      gateway: {condition: service_started}
+    environment:
+      MC_WATCH_DIR: /data/broker
+      MC_BROKER_USER: mc-agent
+      MC_BROKER_PASSWORD_FILE: /run/secrets/mqtt_agent_password
+    secrets: [mqtt_agent_password]
+    volumes:
+      - ../broker/gateway/mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
+      - ../broker/gateway/acl:/mosquitto/config/acl:ro
+      - mosquitto-data:/mosquitto/data
+      - gateway-data:/data:ro
+    ports:
+      - "${MC_LAN_BIND:-0.0.0.0}:${MC_LAN_PORT:-8883}:8883"
+    read_only: true
+    tmpfs: [/tmp]
+    extra_hosts: ["host.docker.internal:host-gateway"]
+
+secrets:
+  mqtt_agent_password: {file: ./secrets/mqtt_agent_password}
+
+volumes:
+  gateway-data:
+  mosquitto-data:

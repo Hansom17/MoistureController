@@ -505,7 +505,7 @@ api/
 
 | # | API work |
 |---|---|
-| **M1** | Move `server/` code to `api/`; gateway WebSocket with a static dev credential; ingest of `status` + `telemetry`; one fixed household; `GET` plants/readings/devices; OpenAPI export. |
+| **M1** | Gateway WebSocket with a static dev credential; ingest of `status` + `telemetry`; one fixed household; `GET` plants/readings/devices; OpenAPI export. |
 | **M2** | Command service + downlink + acks + expiry, `POST …/water`, SSE. |
 | **M3** | Late/offline and gateway-offline handling, health history, events, alerts. |
 | **M4** | Config sync. |

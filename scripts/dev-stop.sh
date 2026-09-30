@@ -17,7 +17,7 @@ done
 
 if docker info >/dev/null 2>&1; then
   # No arrays: macOS bash 3.2 treats an empty array as unset under `set -u`.
-  for stack in hub server; do
+  for stack in gateway api; do
     if [ "$WIPE" = 1 ]; then
       docker compose -f "$ROOT/$stack/docker-compose.yml" --env-file "$ROOT/$stack/.env.dev" down -v 2>&1 | tail -1
     else
@@ -28,5 +28,5 @@ fi
 
 if [ "$WIPE" = 1 ]; then
   rm -rf "$DEV"
-  echo "all data deleted (secrets in server/secrets kept)"
+  echo "all data deleted (secrets in api/secrets and gateway/secrets kept)"
 fi
