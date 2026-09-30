@@ -116,7 +116,36 @@ If a commanded pump run (e.g. "water for 10 minutes") outlasts the time budget o
 
 There's no single right number; it's a battery-life vs. responsiveness tradeoff that depends on your battery capacity, which you haven't fixed yet. Suggest starting at **10 minutes**, config it as a normal setting (persisted, changeable via `config/desired` → `wake_interval_s`), and revisit after measuring actual current draw per wake cycle (WiFi connect + MQTT handshake will dominate — likely 1–3 seconds of ~150–250mA versus microamps in deep sleep, so the wake interval is the main lever on battery life, not sleep current).
 
+## Implementation status
+
+The code lives in `src/core/` (portable, unit-tested) and `src/hal/` (ESP32); see [`README.md`](README.md)
+for the layout, tests and a first bring-up checklist. Decisions taken while implementing, which refine the text above:
+
+- **The wake cycle is hardware independent** (`src/core/mc_cycle.c`): everything it needs (ADC, pump, network,
+  clock, storage) comes through `struct mc_io`, so the exact publish sequence runs in unit tests.
+- **Telemetry is buffered before connecting**: the new record is pushed into the RTC ring first, then the
+  ring is published oldest-first and each record dropped after its PUBACK. A failed connect loses nothing.
+  Acks work the same way (`pend[]`), so the end of a held pump run is reported even if that wake had no WiFi.
+- **Readings taken before the clock is known** (cold boot) are dated after the first SNTP sync.
+- **Clock**: Unix time is carried over deep sleep (`wall_at_sleep + slept_s`), re-synced every
+  `MC_SNTP_EVERY_WAKES` (6) wakes, the RTC oscillator drifts. Open: let the gateway serve the time.
+- **`pump.stop` and `cmd.cancel` are never refused for a missing clock** (mqtt.md §5.2 was refined): refusing to
+  switch a pump off because SNTP failed would be the wrong way round.
+- **Long runs need an RTC GPIO** (25, 26, 27, 32, 33, 4, 12-15) to hold through deep sleep. A pump on any other
+  pin runs long commands inside the wake window (awake up to `max_run_s`, at most 300 s).
+- **Runs up to 15 s** (`MC_PUMP_INLINE_MAX_S`) happen within the wake; longer ones hold through sleep.
+- **Duplicate and cancelled commands**: a `cmd.cancel` in the same delivery wins over its target; one for a
+  command not seen yet leaves a tombstone so it is acked `cancelled` when it arrives.
+- **Low battery** (< 3.3 V): one `low_battery` event, wake interval x3 until it recovers (> 3.5 V).
+- **Sensors**: only `moisture_*` has a driver. DS18B20, SHT3x and `water_level_float` report `not_found`
+  (+ one `sensor_fault` event) until their drivers exist (phase 3).
+- **Stricter than the server in one place**: `cal.dry` must differ from `cal.wet` (division by zero otherwise).
+
 ## Implementation phases
+
+Status: 1, 2, 4, 5 and 6 are implemented (phase 4/5 untested on hardware); 3 (auto-detect, more drivers) and
+BLE provisioning are open.
+
 
 1. **Module abstraction, static config** — slot table, driver interface, port the existing moisture-sensor code into a driver, add a pump/GPIO-output driver. No persistence yet, no networking yet — table is hardcoded, provable on the bench.
 2. **Settings persistence** — move the slot table into Zephyr settings/NVS; survive reboot.

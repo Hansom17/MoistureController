@@ -1,0 +1,65 @@
+# MoistureController application options (the rest is Zephyr's).
+mainmenu "MoistureController firmware"
+
+menu "MoistureController"
+
+config MC_DEV_PROVISION
+	bool "Provision from this build (development only)"
+	help
+	  Stores WiFi, broker and key from the options below on first boot, so the device
+	  can run on the bench before BLE pairing (contracts/ble.md) exists. The values end
+	  up in the firmware image: never use it for devices you hand to someone.
+
+if MC_DEV_PROVISION
+
+config MC_DEV_WIFI_SSID
+	string "WiFi network"
+
+config MC_DEV_WIFI_PASSWORD
+	string "WiFi password"
+
+config MC_DEV_BROKER_HOST
+	string "Gateway LAN address"
+	help
+	  As shown by `mc-gateway status`, or in the app's gateway screen.
+
+config MC_DEV_BROKER_PORT
+	int "Broker port"
+	default 8883
+
+config MC_DEV_DEVICE_ID
+	string "Device ID"
+	help
+	  mc-... from the pairing bundle (`mc-api seed-dev` prints one).
+
+config MC_DEV_PSK_HEX
+	string "TLS-PSK key (64 hex characters)"
+
+endif # MC_DEV_PROVISION
+
+config MC_NTP_SERVER
+	string "NTP server"
+	default "pool.ntp.org"
+	help
+	  Needed to check command expiry. Open point: the gateway could serve the time
+	  instead, so devices need no internet (contracts/mqtt.md §11).
+
+config MC_BATT_ADC_PIN
+	int "Battery voltage ADC pin (-1: not measured)"
+	default 39
+	help
+	  Must be an ADC1 pin (32-39) not used by a module slot.
+
+config MC_BATT_DIVIDER_PERCENT
+	int "Battery divider factor in percent"
+	default 200
+	help
+	  200 = two equal resistors (the ADC sees half the battery voltage).
+
+config MC_BUTTON_SERVICE_MINUTES
+	int "Service mode length after a BOOT button wake"
+	default 15
+
+endmenu
+
+source "Kconfig.zephyr"

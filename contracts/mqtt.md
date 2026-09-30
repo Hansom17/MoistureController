@@ -184,10 +184,10 @@ For things that should not wait for — or don't fit into — telemetry.
 ### 5.2 Device rules for commands
 
 - **Order:** commands are processed in the order received.
-- **Expiry:** the device needs a synced clock to check `exp`. If its clock is not synced, it runs SNTP **before** processing commands; if that fails, every command is rejected with `no_time` (a stale watering is worse than a missed one — the server will retry via a new command).
+- **Expiry:** the device needs a synced clock to check `exp`. If its clock is not synced, it runs SNTP **before** processing commands; if that fails, every command is rejected with `no_time` (a stale watering is worse than a missed one — the server will retry via a new command). `pump.stop` and `cmd.cancel` are the exception: they never wait for a clock (switching a pump off must not depend on SNTP).
 - **Duplicates:** the device remembers the IDs of the last **16** commands (RTC memory). A repeated ID is acked again with the stored result and not executed twice.
 - **Safety first:** local limits (§6.2 `max_run_s`, firmware hard limit, minimum pause between runs) are always checked; a violating command is rejected with `safety_limit`.
-- **Long runs:** if a pump run ends after the device would normally sleep, the device acks `running` with `ends_at`, holds the pump pin through deep sleep and schedules a wake at `ends_at` (a `pump_stop` wake, which is a normal full wake cycle). It then acks `done`.
+- **Long runs:** if a pump run ends after the device would normally sleep, the device acks `running` with `ends_at`, holds the pump pin through deep sleep and schedules a wake at `ends_at` (a `pump_stop` wake, which is a normal full wake cycle). It then acks `done`. Only RTC GPIOs can hold a level through deep sleep; on other pins the device stays awake for the whole run instead. A `pump.stop` for a held run acks the run's command `cancelled`.
 
 ### 5.3 `cmd/ack` (device → server)
 

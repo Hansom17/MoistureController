@@ -15,3 +15,6 @@ secrets/
 dev-bundle.json
 .fake-*.json
 .dev/
+
+# Firmware
+firmware/dev.conf

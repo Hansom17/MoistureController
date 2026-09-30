@@ -1,23 +1,39 @@
 /*
- * D15 (GPIO15) is ADC2 channel 3 on the ESP32.
+ * Moisture controller on the DOIT ESP32 DevKit V1.
+ *
+ * Module pins are NOT fixed here: they come from the config and are bound at runtime
+ * (Firmware_Specs "Module system"). The overlay only enables what they need.
  */
 
 / {
-	zephyr,user {
-		io-channels = <&adc1 3>;
+	aliases {
+		retainedmemdevice = &retainedmem0;
 	};
+
+	/* 4 KB of RTC slow RAM keep the cycle state through deep sleep (src/core/mc_rtc.h). */
+	memory@50001000 {
+		compatible = "zephyr,memory-region", "mmio-sram";
+		reg = <0x50001000 0x1000>;
+		zephyr,memory-region = "RTC_SLOW_RAM_RETAINED_MEM";
+		status = "okay";
+
+		retainedmem0: retainedmem {
+			compatible = "zephyr,retained-ram";
+			status = "okay";
+		};
+	};
+};
+
+&rtc_slow_ram {
+	/* 8 KB minus the retained 4 KB */
+	reg = <0x50000000 0x1000>;
+};
+
+/* ADC1 (GPIO 32-39) and ADC2 (GPIO 4, 12-15, 25-27): channels are set up at runtime. */
+&adc0 {
+	status = "okay";
 };
 
 &adc1 {
 	status = "okay";
-	#address-cells = <1>;
-	#size-cells = <0>;
-
-	channel@3 {
-		reg = <3>;
-		zephyr,gain = "ADC_GAIN_1_4";
-		zephyr,reference = "ADC_REF_INTERNAL";
-		zephyr,acquisition-time = <ADC_ACQ_TIME_DEFAULT>;
-		zephyr,resolution = <12>;
-	};
 };

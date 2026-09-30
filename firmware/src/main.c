@@ -1,58 +1,51 @@
 /*
- * Copyright (c) 2012-2014 Wind River Systems, Inc.
- *
- * SPDX-License-Identifier: Apache-2.0
+ * Moisture controller: wake, run one cycle (src/core/mc_cycle.c), sleep.
+ * Firmware_Specs.md has the design; contracts/mqtt.md the wire protocol.
  */
-
 #include <zephyr/kernel.h>
-#include <zephyr/drivers/gpio.h>
-#include <zephyr/drivers/adc.h>
-#include <esp32/rom/ets_sys.h>
+#include <zephyr/logging/log.h>
+#include <zephyr/sys/reboot.h>
 
-#define LED0_NODE DT_ALIAS(led0)
+#include "hal.h"
 
-static const struct gpio_dt_spec led = GPIO_DT_SPEC_GET(LED0_NODE, gpios);
-static const struct adc_dt_spec moisture_adc = ADC_DT_SPEC_GET(DT_PATH(zephyr_user));
+LOG_MODULE_REGISTER(main, LOG_LEVEL_INF);
+
+/* Nothing to connect to yet: sleep the default interval and look again (pairing comes later). */
+#define UNPROVISIONED_SLEEP_S MC_WAKE_INTERVAL_DEFAULT_S
+
+static struct mc_rtc rtc;
+static struct mc_app app;
+static struct hal_prov prov;
 
 int main(void)
 {
-	int16_t sample;
-	struct adc_sequence sequence = {
-		.buffer = &sample,
-		.buffer_size = sizeof(sample),
-	};
+	hal_board_init();
+	hal_store_init();
+	hal_rtc_load(&rtc);
 
-	if (!gpio_is_ready_dt(&led)) {
-		return 0;
+	enum mc_wake wake = hal_wake_cause(&rtc);
+
+	LOG_INF("firmware " MC_FW_VERSION ", wake: %s", mc_wake_name(wake));
+
+	if (!hal_store_load_prov(&prov)) {
+		LOG_WRN("not paired: nothing to connect to");
+		hal_sleep(UNPROVISIONED_SLEEP_S);
 	}
+	hal_net_set_prov(&prov);
 
-	if (gpio_pin_configure_dt(&led, GPIO_OUTPUT_ACTIVE) < 0) {
-		return 0;
+	enum mc_cfg_load loaded = hal_store_load_config(&app.cfg);
+
+	mc_app_begin(&app, &rtc, &hal_io, NULL, wake, loaded);
+	if (wake == MC_WAKE_BUTTON) {
+		app.service_request_s = CONFIG_MC_BUTTON_SERVICE_MINUTES * 60;
 	}
+	mc_cycle(&app);
+	hal_rtc_store(&rtc);
 
-	if (!adc_is_ready_dt(&moisture_adc)) {
-		ets_printf("Moisture ADC not ready\n");
-		return 0;
+	if (app.reboot) {
+		LOG_INF("rebooting as commanded");
+		sys_reboot(SYS_REBOOT_COLD);
 	}
-
-	if (adc_channel_setup_dt(&moisture_adc) < 0) {
-		ets_printf("Failed to set up moisture ADC channel\n");
-		return 0;
-	}
-
-	while (1) {
-		gpio_pin_toggle_dt(&led);
-
-		(void)adc_sequence_init_dt(&moisture_adc, &sequence);
-
-		if (adc_read_dt(&moisture_adc, &sequence) < 0) {
-			ets_printf("Moisture ADC read failed\n");
-		} else {
-			ets_printf("Moisture raw: %d\n", sample);
-		}
-
-		k_msleep(500);
-	}
-
+	hal_sleep(app.next_wake_s);
 	return 0;
 }

@@ -1,0 +1,12 @@
+# Bench provisioning until BLE pairing exists. Copy to dev.conf (git-ignored) and build with
+#   west build ... -- -DEXTRA_CONF_FILE=dev.conf
+# The values end up in the firmware image: only for devices that stay on your desk.
+CONFIG_MC_DEV_PROVISION=y
+CONFIG_MC_DEV_WIFI_SSID="my-wifi"
+CONFIG_MC_DEV_WIFI_PASSWORD="my-wifi-password"
+# LAN address of the gateway: `mc-gateway status`, or the gateway screen in the app
+CONFIG_MC_DEV_BROKER_HOST="192.168.1.20"
+CONFIG_MC_DEV_BROKER_PORT=8883
+# From the pairing bundle: add a device in the app, or `mc-api seed-dev` -> .dev/bundle.json
+CONFIG_MC_DEV_DEVICE_ID="mc-xxxxxxxxxxxxxxxx"
+CONFIG_MC_DEV_PSK_HEX="64 hex characters"

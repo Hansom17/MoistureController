@@ -553,7 +553,7 @@ Each milestone ends with something working end-to-end. From the start, devices t
 | **M6** | Accounts & sharing | BLE pairing | Enrollment (device code), CLI | Firebase auth, households, roles, invites, device creation, gateway claim, rate limits; deploy the central stack | Login, household switcher, invites, add gateway, BLE onboarding |
 | **M7** | More radios (later) | — | Second adapter (e.g. Zigbee via Zigbee2MQTT) | New module/reading types | Device types in the UI |
 
-Status 2026-09-29: most of M1–M6 exists and was moved to this architecture (§11); it runs end-to-end on one machine with the device simulator (`scripts/dev-start.sh`). Firmware and BLE pairing are still open.
+Status 2026-09-29: most of M1–M6 exists and was moved to this architecture (§11); it runs end-to-end on one machine with the device simulator (`scripts/dev-start.sh`). Firmware: the wake cycle, config, commands and payloads are implemented and unit-tested (`firmware/`, never run on a board); BLE pairing, the extra sensor drivers and OTA are still open.
 
 ---
 
