@@ -2,6 +2,7 @@
 
 #include <string.h>
 #include <zephyr/logging/log.h>
+#include <zephyr/storage/flash_map.h>
 #include <zephyr/settings/settings.h>
 #include <zephyr/sys/crc.h>
 
@@ -127,13 +128,11 @@ bool hal_store_load_prov(struct hal_prov *out)
 {
 	static struct prov_blob b;
 	bool corrupt;
+	bool stored = load_blob("prov", &b, sizeof(b), &corrupt) && b.version == PROV_VERSION &&
+		      b.crc == crc32_ieee((uint8_t *)&b, offsetof(struct prov_blob, crc));
 
-	if (load_blob("prov", &b, sizeof(b), &corrupt) && b.version == PROV_VERSION &&
-	    b.crc == crc32_ieee((uint8_t *)&b, offsetof(struct prov_blob, crc))) {
-		*out = b.prov;
-		return true;
-	}
 #ifdef CONFIG_MC_DEV_PROVISION
+	/* A build provisioned from dev.conf always wins over what an earlier build stored. */
 	struct hal_prov p = {.port = CONFIG_MC_DEV_BROKER_PORT};
 
 	strncpy(p.ssid, CONFIG_MC_DEV_WIFI_SSID, sizeof(p.ssid) - 1);
@@ -144,14 +143,25 @@ bool hal_store_load_prov(struct hal_prov *out)
 		LOG_ERR("MC_DEV_* options are incomplete (device id, 64 hex characters of key)");
 		return false;
 	}
-	LOG_WRN("provisioning from the build (MC_DEV_PROVISION)");
-	hal_store_save_prov(&p);
+	if (!stored || memcmp(&b.prov, &p, sizeof(p)) != 0) {
+		LOG_WRN("provisioning from the build (MC_DEV_PROVISION)");
+		hal_store_save_prov(&p);
+	}
 	*out = p;
 	return true;
 #else
 	(void)hex_to_bytes;
-	return false;
+	if (!stored) {
+		return false;
+	}
+	*out = b.prov;
+	return true;
 #endif
+}
+
+void hal_store_clear_config(void)
+{
+	settings_delete("mc/cfg");
 }
 
 /* Pairing data and config go; the factory partition with the PoP (ble.md) never does. */
@@ -159,4 +169,33 @@ void hal_store_factory_reset(void)
 {
 	settings_delete("mc/cfg");
 	settings_delete("mc/prov");
+}
+
+/* --- PoP (ble.md §2, §7.7) ------------------------------------------------------------------------- */
+
+bool hal_store_load_pop(uint8_t pop[MC_BLE_POP_LEN])
+{
+	uint8_t page[MC_FACTORY_SIZE];
+	const struct flash_area *fa;
+
+	if (flash_area_open(DT_FIXED_PARTITION_ID(DT_NODELABEL(coredump_partition)), &fa) == 0) {
+		int rc = flash_area_read(fa, 0, page, sizeof(page));
+
+		flash_area_close(fa);
+		if (rc == 0 && mc_factory_parse(page, pop)) {
+			return true;
+		}
+	}
+#ifdef CONFIG_MC_DEV_POP_HEX
+	if (sizeof(CONFIG_MC_DEV_POP_HEX) == 2 * MC_BLE_POP_LEN + 1) {
+		uint8_t dev[32] = {0};
+
+		if (hex_to_bytes(CONFIG_MC_DEV_POP_HEX, dev, MC_BLE_POP_LEN) == 0) {
+			LOG_WRN("no factory PoP: using MC_DEV_POP_HEX (development only)");
+			memcpy(pop, dev, MC_BLE_POP_LEN);
+			return true;
+		}
+	}
+#endif
+	return false;
 }

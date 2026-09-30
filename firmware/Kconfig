@@ -37,6 +37,25 @@ config MC_DEV_PSK_HEX
 
 endif # MC_DEV_PROVISION
 
+config MC_DEV_POP_HEX
+	string "Development PoP (32 hex characters), used if the factory partition is blank"
+	default ""
+	help
+	  Real devices get their PoP from the factory partition (firmware/tools/make_label.py).
+	  For a bench board without one, this lets the pairing window open anyway.
+
+config MC_LOW_TX_POWER
+	bool "Low radio transmit power (bench: weak USB supply)"
+	help
+	  Bluetooth -9 dBm, WiFi 8 dBm instead of the defaults. On a weak USB port or cable the
+	  supply dips when the radio transmits, which resets the USB serial chip (or the board).
+	  Also fine next to the gateway; it lowers the range.
+
+config MC_WIFI_DIAG
+	bool "Scan and log the visible WiFi networks when joining fails"
+	help
+	  Costs a few seconds per failed cycle: for bring-up, not for the field.
+
 config MC_NTP_SERVER
 	string "NTP server"
 	default "pool.ntp.org"
@@ -46,9 +65,11 @@ config MC_NTP_SERVER
 
 config MC_BATT_ADC_PIN
 	int "Battery voltage ADC pin (-1: not measured)"
-	default 39
+	default -1
 	help
-	  Must be an ADC1 pin (32-39) not used by a module slot.
+	  Must be an ADC1 pin (32-39) not used by a module slot, wired to the battery through a
+	  voltage divider. An unconnected pin floats and reads as a low battery: leave this at -1
+	  until the divider is there.
 
 config MC_BATT_DIVIDER_PERCENT
 	int "Battery divider factor in percent"

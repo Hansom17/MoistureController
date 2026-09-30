@@ -1,6 +1,6 @@
 # BLE Pairing Contract — App ↔ Device
 
-**Version:** v1 (draft) · **Status:** proposal, not yet implemented · **Last change:** 2026-09-29 (D33: bundle from the API server, device connects to the gateway)
+**Version:** v1 · **Status:** reference implementation in `core/src/mc_core/ble.py`, firmware in `firmware/src/core/mc_ble*.c`, both checked against `contracts/ble_vectors.json`; app pending · **Last change:** 2026-09-30 (wire format, UUIDs, error codes)
 
 How the Flutter app hands WiFi and gateway broker credentials to an ESP32 plant device over Bluetooth Low Energy, and how this is protected against a neighbour taking over or eavesdropping on the device. Firmware and app both implement this document.
 
@@ -73,7 +73,7 @@ sequenceDiagram
 
 ## 5. Messages inside the session
 
-GATT: one custom service, one write characteristic (app → device) and one notify characteristic (device → app). Messages are JSON, framed with a 2-byte length, fragmented to the negotiated MTU. Max message 1024 bytes.
+GATT: one custom service, one write characteristic (app → device) and one notify characteristic (device → app); exact UUIDs, framing and encodings in §7. Messages are JSON, at most 1024 bytes.
 
 | Request (app → device) | Response | Meaning |
 |---|---|---|
@@ -104,3 +104,68 @@ flowchart TD
     F -->|ok| H[commit]
     H --> I([Device appears online in the household])
 ```
+
+---
+
+## 7. Wire format
+
+### 7.1 GATT
+
+| | UUID | Properties |
+|---|---|---|
+| Service | `6d630001-8a3f-4b6e-9d2c-7f1e5a9b0c01` | advertised in the scan response |
+| RX (app → device) | `6d630002-8a3f-4b6e-9d2c-7f1e5a9b0c01` | write (with response) |
+| TX (device → app) | `6d630003-8a3f-4b6e-9d2c-7f1e5a9b0c01` | notify |
+
+Advertising: connectable, local name `MC-XXXX` (§3), the service UUID. The app subscribes to TX before sending anything.
+
+### 7.2 Framing
+
+The byte stream in each direction is a sequence of **frames**: `length` (2 bytes, big endian) followed by `length` bytes of body. A frame is cut into chunks of at most `ATT_MTU − 3` bytes, one write / notification each; the receiver concatenates until a frame is complete. Bodies are at most 1024 + 16 bytes; a longer frame closes the connection.
+
+### 7.3 Handshake frames (plaintext JSON, UTF-8)
+
+Binary values are standard base64 with padding.
+
+| Frame | Direction | Body |
+|---|---|---|
+| HELLO | app → device | `{"t":"hello","v":1,"pub":"<A, 32 bytes>"}` |
+| HELLO_ACK | device → app | `{"t":"hello_ack","pub":"<B, 32 bytes>","nonce":"<nonce_d, 16 bytes>"}` |
+| CONFIRM | app → device | `{"t":"confirm","mac":"<mac_a, 32 bytes>"}` |
+| CONFIRM | device → app | `{"t":"confirm","mac":"<mac_d, 32 bytes>"}` |
+
+An unsupported `v` is answered with a `{"t":"error","error":"unsupported_version"}` frame and a disconnect. `A`, `B` are raw X25519 public keys (32 bytes, RFC 7748). The key schedule is exactly §4: `HKDF-SHA256` with `salt` = the 16 raw PoP bytes, `info` = the ASCII bytes `mc-ble-v1` followed by `A`, `B` and `nonce_d` (32 + 32 + 16 bytes), 32 output bytes; `mac_a` / `mac_d` are the full 32-byte HMAC-SHA256 over `"app"` / `"dev"` followed by `A ‖ B ‖ nonce_d`. A device that does not receive a valid CONFIRM within 10 s of the HELLO drops the connection (counts as a failed handshake).
+
+### 7.4 Encrypted frames
+
+After both CONFIRM frames every frame body is `ciphertext ‖ tag` (AES-128-GCM, 16-byte tag, no associated data) of one JSON message. The 12-byte nonce is `direction` (1 byte: `0x00` app → device, `0x01` device → app), three zero bytes, then the 64-bit big-endian message counter of that direction. Both counters start at 0 and go up by one per frame; a frame whose tag does not verify, or which is not the next in sequence (the nonce is implied by the receiver's counter, so replays and reordering simply fail), closes the session.
+
+### 7.5 Messages
+
+Requests are `{"id": <int>, "op": "<name>", …}`; every request gets exactly one response `{"id": <same>, "ok": true, …}` or `{"id": <same>, "ok": false, "error": "<code>", "detail": "<text>"}`. One request at a time.
+
+| `op` | Request fields | Response fields |
+|---|---|---|
+| `info` | – | `hw_mac` (string, `AA:BB:…`), `fw` (semver), `provisioned` (bool), `device_id` (only if provisioned) |
+| `wifi_scan` | – | `networks`: up to 16 × `{ssid, rssi, secure}` (strongest first, 2.4 GHz) |
+| `set_wifi` | `ssid` (1–32 bytes), `password` (0–64 bytes; empty = open network) | – |
+| `set_mqtt` | `device_id` (`mc-…`), `host` (≤ 63 chars), `port` (1–65535), `psk` (64 hex chars) | – |
+| `test` | – | `wifi` (`"ok"` \| `"err"`), `mqtt` (`"ok"` \| `"err"`), `detail` |
+| `commit` | – | – (the device persists, closes BLE and restarts 1 s after sending the response) |
+| `abort` | – | – (RAM settings dropped; the session stays open) |
+
+Error codes: `bad_request` (malformed / missing field / out of range), `unknown_op`, `not_ready` (`test` or `commit` before both `set_wifi` and `set_mqtt`), `busy` (a `test` is running), `failed` (`test` could not run at all), `too_large`.
+
+`set_wifi` / `set_mqtt` answer `ok` right away and only touch RAM. `test` blocks until it is done (up to ~40 s: WiFi join, TLS-PSK handshake, publish); the app shows a spinner and must not send anything meanwhile.
+
+### 7.6 Label
+
+`MCPOP1:<ble-name>:<pop>` with `<pop>` the 16 PoP bytes in Crockford base32 (26 characters, no padding), e.g. `MCPOP1:MC-3F9A:000G40R40M30E209185GR38E1W`. The app's QR scanner accepts exactly this; for manual entry it asks for the 26 characters.
+
+### 7.7 Factory partition
+
+The PoP lives in a dedicated 4 KB flash partition (`factory`), outside the settings partition: `magic "MCFP"` (4) · `version 1` (1) · `pop` (16) · `crc32` (4, IEEE over the preceding 21 bytes), little endian, rest erased (0xFF). `firmware/tools/make_label.py` writes it and prints the label.
+
+## 8. Test vectors
+
+`contracts/ble_vectors.json` holds a complete session with fixed keys and nonce: inputs (PoP, both private keys as RFC 7748 clamped scalars, `nonce_d`), every intermediate value (public keys, shared secret, `K`, `k_enc`, `k_mac`, both MACs) and the byte-exact frames of a scripted exchange (`info`, `set_wifi`, `set_mqtt`, `commit` plus an error case). The Python reference generates it (`core/tests/test_ble.py` fails if the file is out of date); the firmware tests replay the app's frames and expect the device's exact answers; the app's tests do the same in Dart.

@@ -15,4 +15,6 @@ execute_process(COMMAND ${Python3_EXECUTABLE}
     ${CMAKE_CURRENT_BINARY_DIR}/contract_examples.h
     COMMAND_ERROR_IS_FATAL ANY)
 set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS
-    ${CMAKE_CURRENT_LIST_DIR}/../../../contracts/mqtt.md)
+    ${CMAKE_CURRENT_LIST_DIR}/../../../contracts/mqtt.md
+    ${CMAKE_CURRENT_LIST_DIR}/../../../contracts/ble_vectors.json
+    ${CMAKE_CURRENT_LIST_DIR}/../../scripts/gen_contract_examples.py)

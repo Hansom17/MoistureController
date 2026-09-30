@@ -139,6 +139,14 @@ for the layout, tests and a first bring-up checklist. Decisions taken while impl
 - **Low battery** (< 3.3 V): one `low_battery` event, wake interval x3 until it recovers (> 3.5 V).
 - **Sensors**: only `moisture_*` has a driver. DS18B20, SHT3x and `water_level_float` report `not_found`
   (+ one `sensor_fault` event) until their drivers exist (phase 3).
+- **BLE pairing** is `src/core/mc_ble.c` (session, PSA Crypto) plus `src/hal/hal_ble.c` (GATT, advertising,
+  windows). The PoP is read from the `factory` partition (the board's unused core-dump partition, outside the
+  settings partition so a factory reset never touches it). A new pairing also clears the stored config and the
+  retained cycle state: they belong to the previous device identity.
+- **RAM is the tight resource**: WiFi + Bluetooth + TLS fit into the ESP32's 140 KB of static data RAM only with
+  a hand-sized kernel heap (60 KB), TLS records of 2 KB instead of 16 KB and smaller network buffer pools (see
+  `prj.conf`). Heap use is logged (`hal_heap_log`): 24 KB at boot (WiFi), 36 KB with Bluetooth.
+- **Fatal errors restart the device** (`RESET_ON_FATAL_ERROR`): pump pins come up off.
 - **Stricter than the server in one place**: `cal.dry` must differ from `cal.wet` (division by zero otherwise).
 
 ## Implementation phases

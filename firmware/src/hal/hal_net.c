@@ -5,6 +5,7 @@
  * Synchronous on purpose: a wake cycle is a short, linear conversation.
  */
 #include "hal.h"
+#include "mc_payload.h"
 
 #include <string.h>
 #include <zephyr/kernel.h>
@@ -16,20 +17,25 @@
 #include <zephyr/net/socket.h>
 #include <zephyr/net/tls_credentials.h>
 #include <zephyr/net/wifi_mgmt.h>
+#ifdef CONFIG_MC_LOW_TX_POWER
+#include <esp_wifi.h>
+#endif
 
 LOG_MODULE_REGISTER(hal_net, LOG_LEVEL_INF);
 
-#define WIFI_TIMEOUT_S 15
+#define WIFI_TIMEOUT_S 25
 #define IP_TIMEOUT_S 15
 #define CONNACK_TIMEOUT_MS 10000
 #define ACK_TIMEOUT_MS 5000
 #define TLS_TAG 42
 #define MAX_IN 1024
-#define IN_QUEUE 8
 /* TLS_PSK_WITH_AES_128_GCM_SHA256 */
 #define CIPHER_PSK_AES128_GCM_SHA256 0x00A8
 
 static struct hal_prov prov;
+
+static int io_publish(void *u, const char *suffix, const char *payload, size_t len, bool retain);
+static void io_disconnect(void *u);
 
 /* --- WiFi ------------------------------------------------------------------------------------ */
 
@@ -43,12 +49,70 @@ static void net_event(struct net_mgmt_event_callback *cb, uint64_t event, struct
 	if (event == NET_EVENT_WIFI_CONNECT_RESULT) {
 		const struct wifi_status *st = cb->info;
 
+		LOG_INF("wifi: connect result %d (conn_status %d, disconn_reason %d)", st->status,
+			st->conn_status, st->disconn_reason);
 		wifi_status = st->status;
 		k_sem_give(&wifi_done);
+	} else if (event == NET_EVENT_WIFI_DISCONNECT_RESULT) {
+		const struct wifi_status *st = cb->info;
+
+		LOG_INF("wifi: disconnected (status %d, reason %d)", st->status, st->disconn_reason);
 	} else if (event == NET_EVENT_IPV4_ADDR_ADD) {
+		LOG_INF("wifi: got an IPv4 address");
 		k_sem_give(&ip_ready);
 	}
 }
+
+#ifdef CONFIG_MC_WIFI_DIAG
+/* After a failed join: what does the board actually see? (2.4 GHz only: no 5 GHz networks.) */
+static struct net_mgmt_event_callback scan_cb;
+static K_SEM_DEFINE(scan_done, 0, 1);
+static int scan_count;
+static bool scan_saw_ours;
+
+static void scan_event(struct net_mgmt_event_callback *cb, uint64_t event, struct net_if *iface)
+{
+	if (event == NET_EVENT_WIFI_SCAN_RESULT) {
+		const struct wifi_scan_result *r = cb->info;
+		char ssid[WIFI_SSID_MAX_LEN + 1] = {0};
+
+		memcpy(ssid, r->ssid, MIN(r->ssid_length, WIFI_SSID_MAX_LEN));
+		scan_count++;
+		if (strcmp(ssid, prov.ssid) == 0) {
+			scan_saw_ours = true;
+		}
+		LOG_INF("  seen: '%s' ch %u rssi %d security %s", ssid, r->channel, r->rssi,
+			wifi_security_txt(r->security));
+	} else if (event == NET_EVENT_WIFI_SCAN_DONE) {
+		k_sem_give(&scan_done);
+	}
+}
+
+static void wifi_diag(struct net_if *iface)
+{
+	struct wifi_scan_params params = {0};
+
+	scan_count = 0;
+	scan_saw_ours = false;
+	k_sem_reset(&scan_done);
+	net_mgmt_init_event_callback(&scan_cb, scan_event,
+				     NET_EVENT_WIFI_SCAN_RESULT | NET_EVENT_WIFI_SCAN_DONE);
+	net_mgmt_add_event_callback(&scan_cb);
+	LOG_INF("could not join '%s' (%u chars): scanning", prov.ssid, (unsigned)strlen(prov.ssid));
+	if (net_mgmt(NET_REQUEST_WIFI_SCAN, iface, &params, sizeof(params)) == 0) {
+		k_sem_take(&scan_done, K_SECONDS(10));
+	}
+	net_mgmt_del_event_callback(&scan_cb);
+	LOG_INF("%d networks seen, ours %s", scan_count, scan_saw_ours ? "among them" : "NOT among them");
+	if (scan_saw_ours) {
+		LOG_WRN("network is visible but the join failed: most likely a wrong password "
+			"(WPA2 handshake timeout); check MC_DEV_WIFI_PASSWORD");
+	} else {
+		LOG_WRN("network not visible: check the name, and that it is 2.4 GHz (an iPhone "
+			"hotspot needs \"Maximize Compatibility\")");
+	}
+}
+#endif
 
 static int wifi_up(int32_t *rssi)
 {
@@ -61,7 +125,8 @@ static int wifi_up(int32_t *rssi)
 	k_sem_reset(&ip_ready);
 	wifi_status = -1;
 	net_mgmt_init_event_callback(&net_cb, net_event,
-				     NET_EVENT_WIFI_CONNECT_RESULT | NET_EVENT_IPV4_ADDR_ADD);
+				     NET_EVENT_WIFI_CONNECT_RESULT | NET_EVENT_WIFI_DISCONNECT_RESULT |
+				     NET_EVENT_IPV4_ADDR_ADD);
 	net_mgmt_add_event_callback(&net_cb);
 
 	struct wifi_connect_req_params p = {
@@ -74,20 +139,28 @@ static int wifi_up(int32_t *rssi)
 		.channel = WIFI_CHANNEL_ANY,
 		.mfp = WIFI_MFP_OPTIONAL,
 	};
+#ifdef CONFIG_MC_LOW_TX_POWER
+	LOG_INF("wifi: transmit power 8 dBm (set: %d)", (int)esp_wifi_set_max_tx_power(32));
+#endif
 	int err = net_mgmt(NET_REQUEST_WIFI_CONNECT, iface, &p, sizeof(p));
 
+	LOG_INF("wifi: connect request to '%s' returned %d", prov.ssid, err);
 	if (err) {
 		LOG_ERR("wifi connect request failed: %d", err);
 		return err;
 	}
 	if (k_sem_take(&wifi_done, K_SECONDS(WIFI_TIMEOUT_S)) != 0 || wifi_status != 0) {
 		LOG_ERR("wifi: no association (status %d)", wifi_status);
+#ifdef CONFIG_MC_WIFI_DIAG
+		wifi_diag(iface);
+#endif
 		return -ETIMEDOUT;
 	}
 	if (k_sem_take(&ip_ready, K_SECONDS(IP_TIMEOUT_S)) != 0) {
 		LOG_ERR("wifi: no IP address");
 		return -ETIMEDOUT;
 	}
+	hal_heap_log("after wifi");
 	struct wifi_iface_status st = {0};
 
 	if (net_mgmt(NET_REQUEST_WIFI_IFACE_STATUS, iface, &st, sizeof(st)) == 0) {
@@ -145,26 +218,39 @@ static volatile bool connack_ok, connack_seen;
 static volatile uint16_t acked_id, suback_id;
 static uint16_t next_id = 1;
 
-struct inmsg {
-	enum mc_in_kind kind;
-	size_t len;
-	uint8_t data[MAX_IN];
-};
-static struct inmsg queue[IN_QUEUE];
-static int q_head, q_count;
+/* Inbound messages wait in a byte ring: [kind:1][len:2][payload]. Mostly small commands, now and
+ * then a 1 KB config; a fixed array of full-size slots would waste most of it. */
+#define INBOX_BYTES 4096
+static uint8_t inbox_ring[INBOX_BYTES];
+static size_t inbox_head, inbox_used;
+
+static void ring_put(const uint8_t *d, size_t n)
+{
+	for (size_t i = 0; i < n; i++) {
+		inbox_ring[(inbox_head + inbox_used + i) % INBOX_BYTES] = d[i];
+	}
+	inbox_used += n;
+}
+
+static void ring_get(uint8_t *d, size_t n)
+{
+	for (size_t i = 0; i < n; i++) {
+		d[i] = inbox_ring[(inbox_head + i) % INBOX_BYTES];
+	}
+	inbox_head = (inbox_head + n) % INBOX_BYTES;
+	inbox_used -= n;
+}
 
 static void enqueue(enum mc_in_kind kind, const uint8_t *data, size_t len)
 {
-	if (q_count == IN_QUEUE) {
+	uint8_t hdr[3] = {(uint8_t)kind, (uint8_t)(len >> 8), (uint8_t)len};
+
+	if (inbox_used + sizeof(hdr) + len > INBOX_BYTES) {
 		LOG_WRN("inbox full, dropping a message");
 		return;
 	}
-	struct inmsg *m = &queue[(q_head + q_count) % IN_QUEUE];
-
-	m->kind = kind;
-	m->len = len;
-	memcpy(m->data, data, len);
-	q_count++;
+	ring_put(hdr, sizeof(hdr));
+	ring_put(data, len);
 }
 
 static void on_publish(const struct mqtt_evt *evt)
@@ -344,6 +430,7 @@ static int mqtt_up(const char *will, size_t will_len)
 		return err;
 	}
 	connected = true;
+	hal_heap_log("after tls connect");
 	int64_t deadline = k_uptime_get() + CONNACK_TIMEOUT_MS;
 
 	while (!connack_seen && connected && k_uptime_get() < deadline) {
@@ -384,6 +471,115 @@ static int subscribe_all(void)
 		pump(200);
 	}
 	return suback_id == list.message_id ? 0 : -ETIMEDOUT;
+}
+
+/* --- pairing support (ble.md §7.5) ----------------------------------------------------------------------- */
+
+static struct net_mgmt_event_callback list_cb;
+static K_SEM_DEFINE(list_done, 0, 1);
+static struct mc_ble_net *list_out;
+static size_t list_max, list_n;
+
+static void list_event(struct net_mgmt_event_callback *cb, uint64_t event, struct net_if *iface)
+{
+	if (event == NET_EVENT_WIFI_SCAN_RESULT) {
+		const struct wifi_scan_result *r = cb->info;
+		char ssid[MC_BLE_SSID_MAX + 1] = {0};
+
+		memcpy(ssid, r->ssid, MIN(r->ssid_length, MC_BLE_SSID_MAX));
+		if (ssid[0] == '\0') {
+			return; /* hidden network */
+		}
+		for (size_t i = 0; i < list_n; i++) { /* same name on several APs: keep the strongest */
+			if (strcmp(list_out[i].ssid, ssid) == 0) {
+				if (r->rssi > list_out[i].rssi) {
+					list_out[i].rssi = r->rssi;
+				}
+				return;
+			}
+		}
+		if (list_n < list_max) {
+			strcpy(list_out[list_n].ssid, ssid);
+			list_out[list_n].rssi = r->rssi;
+			list_out[list_n].secure = r->security != WIFI_SECURITY_TYPE_NONE;
+			list_n++;
+		}
+	} else if (event == NET_EVENT_WIFI_SCAN_DONE) {
+		k_sem_give(&list_done);
+	}
+}
+
+int hal_net_wifi_scan(struct mc_ble_net *out, size_t max)
+{
+	struct net_if *iface = net_if_get_first_wifi();
+	struct wifi_scan_params params = {0};
+
+	if (iface == NULL) {
+		return -ENODEV;
+	}
+	list_out = out;
+	list_max = max;
+	list_n = 0;
+	k_sem_reset(&list_done);
+	net_mgmt_init_event_callback(&list_cb, list_event,
+				     NET_EVENT_WIFI_SCAN_RESULT | NET_EVENT_WIFI_SCAN_DONE);
+	net_mgmt_add_event_callback(&list_cb);
+	int err = net_mgmt(NET_REQUEST_WIFI_SCAN, iface, &params, sizeof(params));
+
+	if (err == 0) {
+		k_sem_take(&list_done, K_SECONDS(10));
+	}
+	net_mgmt_del_event_callback(&list_cb);
+	if (err) {
+		return err;
+	}
+	for (size_t i = 1; i < list_n; i++) { /* strongest first */
+		struct mc_ble_net tmp = out[i];
+		size_t j = i;
+
+		while (j > 0 && out[j - 1].rssi < tmp.rssi) {
+			out[j] = out[j - 1];
+			j--;
+		}
+		out[j] = tmp;
+	}
+	return (int)list_n;
+}
+
+int hal_net_test(const struct hal_prov *p, struct mc_ble_test *out)
+{
+	struct hal_prov saved = prov;
+	int32_t rssi = 0;
+	char payload[96];
+	static const char will[] = "{\"state\":\"offline\"}";
+
+	memset(out, 0, sizeof(*out));
+	prov = *p;
+	if (wifi_up(&rssi) != 0) {
+		strcpy(out->detail, "could not join the WiFi");
+		goto done;
+	}
+	out->wifi_ok = true;
+	int err = mqtt_up(will, strlen(will));
+
+	if (err == 0) {
+		err = subscribe_all();
+	}
+	if (err != 0) {
+		snprintk(out->detail, sizeof(out->detail), "broker: error %d (address, key?)", err);
+		goto done;
+	}
+	int n = mc_enc_status_online(payload, sizeof(payload), 0);
+
+	if (n > 0 && io_publish(NULL, "status", payload, (size_t)n, true) == 0) {
+		out->mqtt_ok = true;
+	} else {
+		strcpy(out->detail, "connected, but the broker took no message");
+	}
+done:
+	io_disconnect(NULL);
+	prov = saved;
+	return 0;
 }
 
 /* --- struct mc_io ------------------------------------------------------------------------------------ */
@@ -442,12 +638,15 @@ static void io_poll(void *u, int32_t timeout_ms, mc_in_fn cb, void *cb_user)
 	int64_t end = k_uptime_get() + timeout_ms;
 
 	do {
-		while (q_count) {
-			struct inmsg *m = &queue[q_head];
+		while (inbox_used) {
+			static uint8_t msg[MAX_IN];
+			uint8_t hdr[3];
 
-			cb(cb_user, m->kind, m->data, m->len);
-			q_head = (q_head + 1) % IN_QUEUE;
-			q_count--;
+			ring_get(hdr, sizeof(hdr));
+			size_t len = ((size_t)hdr[1] << 8) | hdr[2];
+
+			ring_get(msg, len);
+			cb(cb_user, (enum mc_in_kind)hdr[0], msg, len);
 		}
 		int32_t left = (int32_t)(end - k_uptime_get());
 
@@ -455,7 +654,7 @@ static void io_poll(void *u, int32_t timeout_ms, mc_in_fn cb, void *cb_user)
 			break;
 		}
 		pump(MIN(left, 100));
-	} while (k_uptime_get() < end || q_count);
+	} while (k_uptime_get() < end || inbox_used);
 }
 
 static void io_disconnect(void *u)

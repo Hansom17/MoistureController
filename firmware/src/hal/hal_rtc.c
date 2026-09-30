@@ -5,6 +5,7 @@
 #include <zephyr/drivers/gpio.h>
 #include <zephyr/drivers/retained_mem.h>
 #include <zephyr/logging/log.h>
+#include <zephyr/logging/log_ctrl.h>
 #include <zephyr/sys/poweroff.h>
 
 LOG_MODULE_REGISTER(hal_rtc, LOG_LEVEL_INF);
@@ -20,6 +21,20 @@ void hal_rtc_load(struct mc_rtc *r)
 	if (!device_is_ready(retained) || retained_mem_size(retained) < sizeof(*r) ||
 	    retained_mem_read(retained, 0, (uint8_t *)r, sizeof(*r)) < 0) {
 		memset(r, 0, sizeof(*r)); /* invalid CRC: treated as a power loss */
+	}
+}
+
+/* A new pairing starts from scratch: an all-zero state fails its CRC, which reads as a power loss. */
+void hal_rtc_clear(void)
+{
+	static const uint8_t zeros[64];
+
+	if (!device_is_ready(retained)) {
+		return;
+	}
+	for (off_t off = 0; off < (off_t)sizeof(struct mc_rtc); off += sizeof(zeros)) {
+		retained_mem_write(retained, off, zeros,
+				   MIN(sizeof(zeros), sizeof(struct mc_rtc) - (size_t)off));
 	}
 }
 
@@ -62,5 +77,6 @@ void hal_sleep(int32_t seconds)
 	}
 	esp_sleep_enable_timer_wakeup((uint64_t)seconds * 1000000ULL);
 	LOG_INF("deep sleep for %d s", seconds);
+	log_panic(); /* deferred log lines would be lost in deep sleep */
 	sys_poweroff();
 }

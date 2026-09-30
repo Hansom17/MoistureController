@@ -138,3 +138,69 @@ bool hal_board_button_pressed(void)
 {
 	return gpio_is_ready_dt(&button) && gpio_pin_get_dt(&button) > 0;
 }
+
+/* --- LED patterns (pairing feedback) and the BOOT button hold -------------------------------------- */
+
+static enum hal_led led_pattern;
+static void led_tick(struct k_work *work);
+static K_WORK_DELAYABLE_DEFINE(led_work, led_tick);
+
+static void led_tick(struct k_work *work)
+{
+	static int phase;
+
+	switch (led_pattern) {
+	case HAL_LED_PAIRING: /* slow blink */
+		gpio_pin_set_dt(&led, (phase++ / 5) & 1);
+		k_work_reschedule(&led_work, K_MSEC(100));
+		break;
+	case HAL_LED_MAINTENANCE: /* fast blink */
+		gpio_pin_set_dt(&led, phase++ & 1);
+		k_work_reschedule(&led_work, K_MSEC(100));
+		break;
+	case HAL_LED_CONNECTED: /* solid */
+		gpio_pin_set_dt(&led, 1);
+		break;
+	default:
+		gpio_pin_set_dt(&led, 0);
+	}
+}
+
+void hal_board_led(enum hal_led pattern)
+{
+	led_pattern = pattern;
+	k_work_reschedule(&led_work, K_NO_WAIT);
+}
+
+/* Holds are measured while the button stays pressed; the LED lights at 3 s and blinks at 10 s. */
+int32_t hal_board_button_hold_ms(int32_t limit_ms)
+{
+	int64_t start = k_uptime_get();
+	int32_t held = 0;
+
+	while (hal_board_button_pressed() && held < limit_ms) {
+		k_msleep(50);
+		held = (int32_t)(k_uptime_get() - start);
+		if (held >= HAL_HOLD_FACTORY_RESET_MS) {
+			gpio_pin_toggle_dt(&led);
+		} else if (held >= HAL_HOLD_MAINTENANCE_MS) {
+			gpio_pin_set_dt(&led, 1);
+		}
+	}
+	gpio_pin_set_dt(&led, 0);
+	return held;
+}
+
+/* --- heap statistics ----------------------------------------------------------------------------- */
+
+extern struct k_heap _system_heap;
+
+void hal_heap_log(const char *where)
+{
+	struct sys_memory_stats st;
+
+	if (sys_heap_runtime_stats_get(&_system_heap.heap, &st) == 0) {
+		LOG_INF("heap %s: %u free, %u used, %u peak", where, (unsigned)st.free_bytes,
+			(unsigned)st.allocated_bytes, (unsigned)st.max_allocated_bytes);
+	}
+}

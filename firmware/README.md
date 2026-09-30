@@ -59,8 +59,35 @@ part to bring up first.
 | WiFi, SNTP, MQTT over TLS-PSK, persistent session, Last Will | written, compiles, untested |
 | Deep sleep, timer wake, retained RAM, BOOT button → service mode | written, compiles, untested |
 | DS18B20, SHT3x, float switch drivers; I2C / 1-Wire auto-detect | not started (sensors report `not_found`) |
-| BLE pairing, factory PoP partition, factory reset by button | not started (`MC_DEV_PROVISION` until then) |
+| BLE pairing: secure session, all messages, commit, factory page with the PoP | done; protocol byte-identical to the Python reference (tests), **verified on a board** (pairing, persistence, restart) |
+| BLE: 3 s / 10 s BOOT button (maintenance window, factory reset), 5-failure lockout, WiFi `test` step | written, **not yet tried on a board** |
 | OTA updates | not started |
+
+## Pairing over Bluetooth (contracts/ble.md)
+
+Once per device, at the factory bench (writes the PoP to the `factory` partition, prints the label):
+
+```bash
+firmware/tools/make_label.py --port /dev/cu.usbserial-0001 --flash
+```
+
+Flash the firmware **without** `MC_DEV_PROVISION`: an unpaired device opens the pairing window on every
+boot (10 min, LED blinks slowly) and advertises as `MC-XXXX`. Then, from a machine with Bluetooth (on macOS
+from your own Terminal app: other apps are killed by the system without a Bluetooth permission):
+
+```bash
+.venv/bin/python firmware/tools/ble_provision.py --label "MCPOP1:MC-26EA:…" --bundle bundle.json \
+    --ssid "<wifi>" --host <gateway LAN address>     # add --skip-test to commit without joining the WiFi
+.venv/bin/python firmware/tools/ble_provision.py --label "…" --scan    # WiFi networks the device sees
+```
+
+`bundle.json` is the API's reply when adding a device. The same flow is what the app's wizard will do
+(`core/src/mc_core/ble_client.py` is the reference).
+
+Bench tips learned on the first board: on a weak USB port or cable the supply dips when WiFi transmits and the
+USB serial chip drops off the bus; `CONFIG_MC_LOW_TX_POWER=y` (Bluetooth -9 dBm, WiFi 8 dBm) avoids it.
+An iPhone hotspot is only visible to the board while its Personal Hotspot screen is open (and needs
+"Maximize Compatibility": the ESP32 is 2.4 GHz only).
 
 ## First bring-up on a board
 
@@ -77,5 +104,6 @@ part to bring up first.
    - Long run (> 15 s) on an RTC pin (25, 26, 27, 32, 33, 4, 12-15): the pump stays on through sleep
      and is switched off by the wake at its end. Verify with a multimeter, not the log.
    - BOOT button held during sleep wakes the board into service mode.
-   - Battery voltage: calibrate `MC_BATT_DIVIDER_PERCENT` against a multimeter.
+   - Battery voltage (`MC_BATT_ADC_PIN`, off by default): wire a divider, set the pin and calibrate
+     `MC_BATT_DIVIDER_PERCENT` against a multimeter.
 6. Measure the current of a full cycle (WiFi connect + MQTT dominate) and set the default interval.

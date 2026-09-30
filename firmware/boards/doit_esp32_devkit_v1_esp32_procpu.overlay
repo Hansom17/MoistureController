@@ -37,3 +37,12 @@
 &adc1 {
 	status = "okay";
 };
+
+/*
+ * The last 4 KB of flash hold the factory page with the pairing PoP (ble.md §7.7). The board
+ * reserves them for core dumps, which this firmware does not use. They are outside the
+ * settings partition, so a factory reset never touches them.
+ */
+&coredump_partition {
+	label = "factory";
+};
