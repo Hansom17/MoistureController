@@ -9,6 +9,7 @@ import '../features/alerts/alerts_screen.dart';
 import '../features/dashboard/dashboard_screen.dart';
 import '../features/devices/device_detail_screen.dart';
 import '../features/devices/devices_screen.dart';
+import '../features/pairing/pairing_wizard_screen.dart';
 import '../features/plants/plant_detail_screen.dart';
 import '../features/gateway/gateway_screen.dart';
 import '../features/settings/settings_screen.dart';
@@ -58,6 +59,10 @@ final routerProvider = Provider<GoRouter>((ref) {
                 path: '/devices',
                 builder: (_, _) => const DevicesScreen(),
                 routes: [
+                  GoRoute(
+                    path: 'add', // before ':deviceId'
+                    builder: (_, _) => const PairingWizardScreen(),
+                  ),
                   GoRoute(
                     path: ':deviceId',
                     builder: (_, state) => DeviceDetailScreen(

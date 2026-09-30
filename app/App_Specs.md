@@ -32,7 +32,7 @@ Phones first; tablets and desktop browsers get a two-pane layout on wide screens
 | SSE | Own small client: `EventSource` on web, streamed `dio` response on mobile | Ticket-based (§6) |
 | Firebase | `firebase_core`, `firebase_auth`, `firebase_messaging`, `firebase_app_check` (optional) | |
 | Social login | `google_sign_in`, `sign_in_with_apple` | |
-| BLE | `flutter_blue_plus` | Mobile only |
+| BLE | `flutter_reactive_ble` | Mobile only. (`flutter_blue_plus` 2.x is not free for commercial use and needs a license declaration.) |
 | Crypto (pairing) | `cryptography` | X25519, HKDF-SHA256, HMAC-SHA256, AES-GCM |
 | QR scanning | `mobile_scanner` | PoP labels, gateway codes, invite QR codes |
 | QR display | `qr_flutter` | Invite QR |
@@ -233,7 +233,19 @@ stateDiagram-v2
 - **Secrets in memory only:** the PoP, the pairing bundle (device key) and the session keys are never persisted, logged or sent anywhere except over the encrypted BLE session; they are dropped when the wizard ends.
 - **Gateway required:** the bundle points to the gateway's LAN address (reported by the gateway, overridable on the Gateway screen); if the household has no gateway or it is offline, `POST …/devices` fails with `no_gateway` / `gateway_offline` and the wizard says so before touching the device. The phone must be on the same Wi-Fi the device should use, not necessarily online at the gateway.
 - **Re-pair** (gateway replaced or moved, `POST …/rekey`) uses the same wizard, starting at FindDevice with a new bundle.
-- Test vectors for the handshake (shared with the firmware, to be added to ble.md) are part of the app's unit tests.
+- Test vectors for the handshake (shared with the firmware and the Python reference: `contracts/ble_vectors.json`, ble.md §8) are part of the app's unit tests: the Dart session must produce the reference frames byte for byte.
+
+**Implementation** (`lib/features/pairing/`):
+
+| Part | What |
+|---|---|
+| `protocol/pairing_session.dart` | The session (X25519, HKDF, HMAC, AES-GCM with the `cryptography` package), framing, fragmentation. Pure Dart: runs in tests and on web builds. |
+| `protocol/pairing_client.dart` | The operations of ble.md §7.5 over a `PairingTransport`; `PairingDevice` is the interface the wizard uses (tests fake it). |
+| `protocol/reactive_ble_transport.dart` | The real Bluetooth transport on `flutter_reactive_ble` (BSD-3). **Not covered by unit tests**: first try on a phone. Replaces the `flutter_blue_plus` named in §1: its 2.x license requires a declaration (free only for personal / nonprofit use, commercial otherwise) and sends build-time telemetry. |
+| `pairing_controller.dart` | The wizard's state machine: create the device record, connect, scan WiFi, test, commit, wait online; unfinished pairings delete the record again. |
+| `pairing_wizard_screen.dart`, `label_scanner.dart` | The screens (QR via `mobile_scanner`, manual entry as fallback), entry point: "Add device" on the Devices screen for admins; on web it only shows a hint. |
+
+Not done yet: re-pairing an existing device (`POST …/rekey`, the controller has no entry point for it) and the "hold BOOT 3 s" hint after a search timeout is shown as a failure text, not as a live countdown.
 
 ---
 

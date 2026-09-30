@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -6,6 +7,7 @@ import '../../app/theme/app_colors.dart';
 import '../../app/theme/tokens.dart';
 import '../../core/format.dart';
 import '../../core/household_data.dart';
+import '../../core/permissions.dart';
 import '../../data/models.dart';
 import '../../ui/common.dart';
 import '../../ui/household_scope.dart';
@@ -25,6 +27,15 @@ class DevicesScreen extends StatelessWidget {
           final banner = gatewayOfflineMessage(context, household);
           return Scaffold(
             appBar: AppBar(title: Text(l.navDevices)),
+            floatingActionButton: can(household.role, AppAction.manageDevices)
+                ? FloatingActionButton.extended(
+                    icon: const Icon(Icons.add),
+                    label: Text(l.pairAddDevice),
+                    onPressed: () => kIsWeb
+                        ? showSnackBar(context, l.pairWebOnly) // no Bluetooth pairing in browsers
+                        : context.go('/devices/add'),
+                  )
+                : null,
             body: Column(
               children: [
                 ?(banner == null ? null : HouseholdBanner(message: banner)),

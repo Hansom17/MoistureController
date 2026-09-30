@@ -81,8 +81,9 @@ from your own Terminal app: other apps are killed by the system without a Blueto
 .venv/bin/python firmware/tools/ble_provision.py --label "…" --scan    # WiFi networks the device sees
 ```
 
-`bundle.json` is the API's reply when adding a device. The same flow is what the app's wizard will do
-(`core/src/mc_core/ble_client.py` is the reference).
+`bundle.json` is the API's reply when adding a device. The same flow is what the app's wizard does
+(`app/lib/features/pairing/`, in Dart; `core/src/mc_core/ble_client.py` is the Python reference). Both are
+checked against `contracts/ble_vectors.json`, like the firmware.
 
 Bench tips learned on the first board: on a weak USB port or cable the supply dips when WiFi transmits and the
 USB serial chip drops off the bus; `CONFIG_MC_LOW_TX_POWER=y` (Bluetooth -9 dBm, WiFi 8 dBm) avoids it.

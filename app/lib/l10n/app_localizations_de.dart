@@ -585,4 +585,159 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get errorReauth => 'Melde dich erneut an, um das zu tun.';
+
+  @override
+  String get pairAddDevice => 'Gerät hinzufügen';
+
+  @override
+  String get pairWebOnly =>
+      'Zum Hinzufügen eines Geräts wird Bluetooth gebraucht. Öffne die App auf dem Handy.';
+
+  @override
+  String get pairLabelTitle => 'Etikett des Geräts scannen';
+
+  @override
+  String get pairLabelBody =>
+      'Halte die Kamera auf den QR-Code auf dem Etikett des Pflanzengeräts.';
+
+  @override
+  String get pairManualToggle => 'Code von Hand eingeben';
+
+  @override
+  String get pairManualName => 'Name auf dem Etikett (MC-XXXX)';
+
+  @override
+  String get pairManualCode => 'Code (26 Zeichen)';
+
+  @override
+  String get pairLabelInvalid => 'Das ist kein MoistureController-Etikett.';
+
+  @override
+  String get pairContinue => 'Weiter';
+
+  @override
+  String get pairNameTitle => 'Gib dem Gerät einen Namen';
+
+  @override
+  String get pairNameHint => 'Küchenfenster';
+
+  @override
+  String get pairStart => 'Kopplung starten';
+
+  @override
+  String get pairCreating => 'Gerät wird deinem Haushalt hinzugefügt …';
+
+  @override
+  String pairFinding(String name) {
+    return 'Suche $name …';
+  }
+
+  @override
+  String get pairHandshake => 'Sichere Verbindung wird aufgebaut …';
+
+  @override
+  String get pairScanning => 'Suche WLAN-Netze …';
+
+  @override
+  String get pairWifiTitle => 'WLAN für das Gerät wählen';
+
+  @override
+  String get pairWifiBody =>
+      'Es muss das Netz sein, in dem dein Gateway hängt.';
+
+  @override
+  String get pairSsidLabel => 'Netzwerkname';
+
+  @override
+  String get pairPasswordLabel => 'WLAN-Passwort';
+
+  @override
+  String get pairConnect => 'Verbinden und testen';
+
+  @override
+  String get pairTestingTitle => 'Verbindung wird getestet …';
+
+  @override
+  String get pairTestingBody =>
+      'Das Gerät meldet sich im WLAN an und kontaktiert dein Gateway. Das dauert bis zu 40 Sekunden.';
+
+  @override
+  String get pairTestWifiFailed =>
+      'Das Gerät konnte dem WLAN nicht beitreten. Prüfe Name und Passwort.';
+
+  @override
+  String pairTestMqttFailed(String detail) {
+    return 'Das Gerät war im WLAN, konnte das Gateway aber nicht erreichen ($detail).';
+  }
+
+  @override
+  String get pairFinishing => 'Fast fertig …';
+
+  @override
+  String get pairWaitingOnline => 'Warte darauf, dass sich das Gerät meldet …';
+
+  @override
+  String get pairDoneTitle => 'Gerät hinzugefügt';
+
+  @override
+  String pairDoneBody(String name) {
+    return '$name ist verbunden.';
+  }
+
+  @override
+  String get pairDoneSlow =>
+      'Das Gerät wurde hinzugefügt, hat sich aber noch nicht gemeldet. Es sollte in ein paar Minuten online erscheinen.';
+
+  @override
+  String get pairOpenDevice => 'Gerät öffnen';
+
+  @override
+  String get pairFailNoGateway =>
+      'Füge diesem Haushalt zuerst ein Gateway hinzu (Einstellungen → Gateway).';
+
+  @override
+  String get pairFailGatewayOffline =>
+      'Das Gateway ist offline. Bring es zuerst online.';
+
+  @override
+  String get pairFailNotFound =>
+      'Kein Gerät gefunden. Ein neues Gerät meldet sich von selbst; ein bereits gekoppeltes braucht 3 Sekunden gedrückte BOOT-Taste.';
+
+  @override
+  String get pairFailWrongCode =>
+      'Falsches Gerät oder falscher Code. Das Gerät wurde wieder entfernt.';
+
+  @override
+  String get pairFailConnection => 'Die Verbindung zum Gerät ist abgebrochen.';
+
+  @override
+  String get pairFailBluetoothOff =>
+      'Bluetooth ist aus. Schalte es ein und versuche es erneut.';
+
+  @override
+  String get pairFailBluetoothDenied =>
+      'Die App braucht die Erlaubnis, Bluetooth zu nutzen. Erlaube sie in den Systemeinstellungen.';
+
+  @override
+  String get pairFailUnsupported =>
+      'Dieses Gerät kann nicht per Bluetooth koppeln. Nutze die Mobil-App.';
+
+  @override
+  String get pairFailOther => 'Etwas ist schiefgelaufen.';
+
+  @override
+  String get pairTryAgain => 'Erneut versuchen';
+
+  @override
+  String get pairClose => 'Schließen';
+
+  @override
+  String get pairCancelTitle => 'Kopplung abbrechen?';
+
+  @override
+  String get pairCancelBody =>
+      'Das Gerät wird wieder aus deinem Haushalt entfernt.';
+
+  @override
+  String get pairKeepGoing => 'Weitermachen';
 }

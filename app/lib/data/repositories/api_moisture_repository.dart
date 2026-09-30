@@ -253,6 +253,40 @@ class ApiMoistureRepository implements MoistureRepository {
     return [for (final (i, d) in list.indexed) _device(d, configs[i] as Map)];
   }
 
+  PairingBundle _bundle(Map b) {
+    final mqtt = b['mqtt'] as Map;
+    return PairingBundle(
+      deviceId: b['device_id'] as String,
+      host: mqtt['host'] as String,
+      port: mqtt['port'] as int,
+      psk: mqtt['psk'] as String,
+    );
+  }
+
+  @override
+  Future<NewDevice> createDevice(String householdId, String name) async {
+    final r =
+        await _send('POST', '/households/$householdId/devices', {'name': name})
+            as Map;
+    final d = r['device'] as Map;
+    // a fresh device has no reported config yet: the desired one has the slots
+    return NewDevice(
+      _device(d, {'desired': null, 'reported': null}),
+      _bundle(r['bundle'] as Map),
+    );
+  }
+
+  @override
+  Future<PairingBundle> rekeyDevice(String householdId, String deviceId) async =>
+      _bundle(
+        await _send('POST', '/households/$householdId/devices/$deviceId/rekey')
+            as Map,
+      );
+
+  @override
+  Future<void> deleteDevice(String householdId, String deviceId) =>
+      _send('DELETE', '/households/$householdId/devices/$deviceId');
+
   Device _device(Map d, Map config) {
     final created = _dt(d['created_at'])!;
     final next = _dt(d['next_expected_at']);

@@ -50,6 +50,22 @@ class HouseholdActions {
     );
   }
 
+  Future<NewDevice> createDevice(String householdId, String name) async {
+    final created = await _ref
+        .read(repositoryProvider)
+        .createDevice(householdId, name);
+    _ref.invalidate(devicesProvider(householdId));
+    return created;
+  }
+
+  Future<PairingBundle> rekeyDevice(String householdId, String deviceId) =>
+      _ref.read(repositoryProvider).rekeyDevice(householdId, deviceId);
+
+  Future<void> deleteDevice(String householdId, String deviceId) async {
+    await _ref.read(repositoryProvider).deleteDevice(householdId, deviceId);
+    _ref.invalidate(devicesProvider(householdId));
+  }
+
   Future<void> deviceAction(
     String householdId,
     String deviceId,

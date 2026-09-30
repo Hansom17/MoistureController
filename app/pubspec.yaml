@@ -43,6 +43,9 @@ dependencies:
     sdk: flutter
   dio: ^5.11.1
   web: ^1.1.1
+  cryptography: ^2.9.0
+  mobile_scanner: ^7.4.2
+  flutter_reactive_ble: ^5.5.0
 
 dev_dependencies:
   flutter_test:

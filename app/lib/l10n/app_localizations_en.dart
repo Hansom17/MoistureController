@@ -582,4 +582,158 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get errorReauth => 'Sign in again to do this.';
+
+  @override
+  String get pairAddDevice => 'Add device';
+
+  @override
+  String get pairWebOnly =>
+      'Adding a device needs Bluetooth. Open the app on your phone.';
+
+  @override
+  String get pairLabelTitle => 'Scan the device label';
+
+  @override
+  String get pairLabelBody =>
+      'Hold the camera over the QR code on the label of the plant device.';
+
+  @override
+  String get pairManualToggle => 'Enter the code by hand';
+
+  @override
+  String get pairManualName => 'Name on the label (MC-XXXX)';
+
+  @override
+  String get pairManualCode => 'Code (26 characters)';
+
+  @override
+  String get pairLabelInvalid => 'That is not a MoistureController label.';
+
+  @override
+  String get pairContinue => 'Continue';
+
+  @override
+  String get pairNameTitle => 'Name your device';
+
+  @override
+  String get pairNameHint => 'Kitchen window';
+
+  @override
+  String get pairStart => 'Start pairing';
+
+  @override
+  String get pairCreating => 'Adding the device to your household …';
+
+  @override
+  String pairFinding(String name) {
+    return 'Looking for $name …';
+  }
+
+  @override
+  String get pairHandshake => 'Connecting securely …';
+
+  @override
+  String get pairScanning => 'Looking for WiFi networks …';
+
+  @override
+  String get pairWifiTitle => 'Choose the WiFi for the device';
+
+  @override
+  String get pairWifiBody => 'It must be the network your gateway is on.';
+
+  @override
+  String get pairSsidLabel => 'Network name';
+
+  @override
+  String get pairPasswordLabel => 'WiFi password';
+
+  @override
+  String get pairConnect => 'Connect and test';
+
+  @override
+  String get pairTestingTitle => 'Testing the connection …';
+
+  @override
+  String get pairTestingBody =>
+      'The device joins the WiFi and contacts your gateway. This takes up to 40 seconds.';
+
+  @override
+  String get pairTestWifiFailed =>
+      'The device could not join the WiFi. Check the name and the password.';
+
+  @override
+  String pairTestMqttFailed(String detail) {
+    return 'The device joined the WiFi but could not reach the gateway ($detail).';
+  }
+
+  @override
+  String get pairFinishing => 'Finishing up …';
+
+  @override
+  String get pairWaitingOnline => 'Waiting for the device to report in …';
+
+  @override
+  String get pairDoneTitle => 'Device added';
+
+  @override
+  String pairDoneBody(String name) {
+    return '$name is connected.';
+  }
+
+  @override
+  String get pairDoneSlow =>
+      'The device was added but has not reported in yet. It should show up online within a few minutes.';
+
+  @override
+  String get pairOpenDevice => 'Open device';
+
+  @override
+  String get pairFailNoGateway =>
+      'Add a gateway to this household first (Settings → Gateway).';
+
+  @override
+  String get pairFailGatewayOffline =>
+      'The gateway is offline. Bring it online first.';
+
+  @override
+  String get pairFailNotFound =>
+      'No device found. A new device advertises by itself; a paired one needs the BOOT button held for 3 seconds.';
+
+  @override
+  String get pairFailWrongCode =>
+      'Wrong device or wrong code. The device was removed again.';
+
+  @override
+  String get pairFailConnection => 'The connection to the device was lost.';
+
+  @override
+  String get pairFailBluetoothOff =>
+      'Bluetooth is off. Turn it on and try again.';
+
+  @override
+  String get pairFailBluetoothDenied =>
+      'The app needs permission to use Bluetooth. Allow it in the system settings.';
+
+  @override
+  String get pairFailUnsupported =>
+      'This device cannot pair over Bluetooth. Use the mobile app.';
+
+  @override
+  String get pairFailOther => 'Something went wrong.';
+
+  @override
+  String get pairTryAgain => 'Try again';
+
+  @override
+  String get pairClose => 'Close';
+
+  @override
+  String get pairCancelTitle => 'Cancel pairing?';
+
+  @override
+  String get pairCancelBody =>
+      'The device is removed from your household again.';
+
+  @override
+  String get pairKeepGoing => 'Keep going';
 }

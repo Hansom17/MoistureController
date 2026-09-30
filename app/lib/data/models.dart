@@ -169,6 +169,34 @@ class Device {
   );
 }
 
+/// What the API hands out to pair a device (contracts/ble.md §6): the device identity and how it
+/// reaches the gateway. Contains the device key: keep it in memory only, never log or store it.
+class PairingBundle {
+  const PairingBundle({
+    required this.deviceId,
+    required this.host,
+    required this.port,
+    required this.psk,
+  });
+
+  final String deviceId;
+
+  /// The gateway's address on the household LAN.
+  final String host;
+  final int port;
+
+  /// 64 hex characters.
+  final String psk;
+}
+
+/// A device record that was just created, with its pairing bundle.
+class NewDevice {
+  const NewDevice(this.device, this.bundle);
+
+  final Device device;
+  final PairingBundle bundle;
+}
+
 class Slot {
   const Slot({
     required this.index,

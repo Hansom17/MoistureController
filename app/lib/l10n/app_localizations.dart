@@ -1093,6 +1093,276 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Sign in again to do this.'**
   String get errorReauth;
+
+  /// No description provided for @pairAddDevice.
+  ///
+  /// In en, this message translates to:
+  /// **'Add device'**
+  String get pairAddDevice;
+
+  /// No description provided for @pairWebOnly.
+  ///
+  /// In en, this message translates to:
+  /// **'Adding a device needs Bluetooth. Open the app on your phone.'**
+  String get pairWebOnly;
+
+  /// No description provided for @pairLabelTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Scan the device label'**
+  String get pairLabelTitle;
+
+  /// No description provided for @pairLabelBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Hold the camera over the QR code on the label of the plant device.'**
+  String get pairLabelBody;
+
+  /// No description provided for @pairManualToggle.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter the code by hand'**
+  String get pairManualToggle;
+
+  /// No description provided for @pairManualName.
+  ///
+  /// In en, this message translates to:
+  /// **'Name on the label (MC-XXXX)'**
+  String get pairManualName;
+
+  /// No description provided for @pairManualCode.
+  ///
+  /// In en, this message translates to:
+  /// **'Code (26 characters)'**
+  String get pairManualCode;
+
+  /// No description provided for @pairLabelInvalid.
+  ///
+  /// In en, this message translates to:
+  /// **'That is not a MoistureController label.'**
+  String get pairLabelInvalid;
+
+  /// No description provided for @pairContinue.
+  ///
+  /// In en, this message translates to:
+  /// **'Continue'**
+  String get pairContinue;
+
+  /// No description provided for @pairNameTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Name your device'**
+  String get pairNameTitle;
+
+  /// No description provided for @pairNameHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Kitchen window'**
+  String get pairNameHint;
+
+  /// No description provided for @pairStart.
+  ///
+  /// In en, this message translates to:
+  /// **'Start pairing'**
+  String get pairStart;
+
+  /// No description provided for @pairCreating.
+  ///
+  /// In en, this message translates to:
+  /// **'Adding the device to your household …'**
+  String get pairCreating;
+
+  /// No description provided for @pairFinding.
+  ///
+  /// In en, this message translates to:
+  /// **'Looking for {name} …'**
+  String pairFinding(String name);
+
+  /// No description provided for @pairHandshake.
+  ///
+  /// In en, this message translates to:
+  /// **'Connecting securely …'**
+  String get pairHandshake;
+
+  /// No description provided for @pairScanning.
+  ///
+  /// In en, this message translates to:
+  /// **'Looking for WiFi networks …'**
+  String get pairScanning;
+
+  /// No description provided for @pairWifiTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose the WiFi for the device'**
+  String get pairWifiTitle;
+
+  /// No description provided for @pairWifiBody.
+  ///
+  /// In en, this message translates to:
+  /// **'It must be the network your gateway is on.'**
+  String get pairWifiBody;
+
+  /// No description provided for @pairSsidLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Network name'**
+  String get pairSsidLabel;
+
+  /// No description provided for @pairPasswordLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'WiFi password'**
+  String get pairPasswordLabel;
+
+  /// No description provided for @pairConnect.
+  ///
+  /// In en, this message translates to:
+  /// **'Connect and test'**
+  String get pairConnect;
+
+  /// No description provided for @pairTestingTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Testing the connection …'**
+  String get pairTestingTitle;
+
+  /// No description provided for @pairTestingBody.
+  ///
+  /// In en, this message translates to:
+  /// **'The device joins the WiFi and contacts your gateway. This takes up to 40 seconds.'**
+  String get pairTestingBody;
+
+  /// No description provided for @pairTestWifiFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'The device could not join the WiFi. Check the name and the password.'**
+  String get pairTestWifiFailed;
+
+  /// No description provided for @pairTestMqttFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'The device joined the WiFi but could not reach the gateway ({detail}).'**
+  String pairTestMqttFailed(String detail);
+
+  /// No description provided for @pairFinishing.
+  ///
+  /// In en, this message translates to:
+  /// **'Finishing up …'**
+  String get pairFinishing;
+
+  /// No description provided for @pairWaitingOnline.
+  ///
+  /// In en, this message translates to:
+  /// **'Waiting for the device to report in …'**
+  String get pairWaitingOnline;
+
+  /// No description provided for @pairDoneTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Device added'**
+  String get pairDoneTitle;
+
+  /// No description provided for @pairDoneBody.
+  ///
+  /// In en, this message translates to:
+  /// **'{name} is connected.'**
+  String pairDoneBody(String name);
+
+  /// No description provided for @pairDoneSlow.
+  ///
+  /// In en, this message translates to:
+  /// **'The device was added but has not reported in yet. It should show up online within a few minutes.'**
+  String get pairDoneSlow;
+
+  /// No description provided for @pairOpenDevice.
+  ///
+  /// In en, this message translates to:
+  /// **'Open device'**
+  String get pairOpenDevice;
+
+  /// No description provided for @pairFailNoGateway.
+  ///
+  /// In en, this message translates to:
+  /// **'Add a gateway to this household first (Settings → Gateway).'**
+  String get pairFailNoGateway;
+
+  /// No description provided for @pairFailGatewayOffline.
+  ///
+  /// In en, this message translates to:
+  /// **'The gateway is offline. Bring it online first.'**
+  String get pairFailGatewayOffline;
+
+  /// No description provided for @pairFailNotFound.
+  ///
+  /// In en, this message translates to:
+  /// **'No device found. A new device advertises by itself; a paired one needs the BOOT button held for 3 seconds.'**
+  String get pairFailNotFound;
+
+  /// No description provided for @pairFailWrongCode.
+  ///
+  /// In en, this message translates to:
+  /// **'Wrong device or wrong code. The device was removed again.'**
+  String get pairFailWrongCode;
+
+  /// No description provided for @pairFailConnection.
+  ///
+  /// In en, this message translates to:
+  /// **'The connection to the device was lost.'**
+  String get pairFailConnection;
+
+  /// No description provided for @pairFailBluetoothOff.
+  ///
+  /// In en, this message translates to:
+  /// **'Bluetooth is off. Turn it on and try again.'**
+  String get pairFailBluetoothOff;
+
+  /// No description provided for @pairFailBluetoothDenied.
+  ///
+  /// In en, this message translates to:
+  /// **'The app needs permission to use Bluetooth. Allow it in the system settings.'**
+  String get pairFailBluetoothDenied;
+
+  /// No description provided for @pairFailUnsupported.
+  ///
+  /// In en, this message translates to:
+  /// **'This device cannot pair over Bluetooth. Use the mobile app.'**
+  String get pairFailUnsupported;
+
+  /// No description provided for @pairFailOther.
+  ///
+  /// In en, this message translates to:
+  /// **'Something went wrong.'**
+  String get pairFailOther;
+
+  /// No description provided for @pairTryAgain.
+  ///
+  /// In en, this message translates to:
+  /// **'Try again'**
+  String get pairTryAgain;
+
+  /// No description provided for @pairClose.
+  ///
+  /// In en, this message translates to:
+  /// **'Close'**
+  String get pairClose;
+
+  /// No description provided for @pairCancelTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Cancel pairing?'**
+  String get pairCancelTitle;
+
+  /// No description provided for @pairCancelBody.
+  ///
+  /// In en, this message translates to:
+  /// **'The device is removed from your household again.'**
+  String get pairCancelBody;
+
+  /// No description provided for @pairKeepGoing.
+  ///
+  /// In en, this message translates to:
+  /// **'Keep going'**
+  String get pairKeepGoing;
 }
 
 class _AppLocalizationsDelegate

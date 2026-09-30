@@ -66,5 +66,9 @@
 		<string>UIInterfaceOrientationLandscapeLeft</string>
 		<string>UIInterfaceOrientationLandscapeRight</string>
 	</array>
+	<key>NSBluetoothAlwaysUsageDescription</key>
+	<string>Bluetooth is used to set up a new plant device: it receives the WiFi name and the connection to your gateway.</string>
+	<key>NSCameraUsageDescription</key>
+	<string>The camera scans the QR code on the label of a new plant device.</string>
 </dict>
 </plist>

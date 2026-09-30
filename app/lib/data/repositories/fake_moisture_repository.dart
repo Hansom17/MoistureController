@@ -171,6 +171,80 @@ class FakeMoistureRepository implements MoistureRepository {
   Future<List<Device>> devices(String householdId) =>
       _delay(() => List.of(_devices[householdId]!));
 
+  var _newDevices = 0;
+
+  @override
+  Future<NewDevice> createDevice(String householdId, String name) => _delay(() {
+    _requireRole(householdId, Role.admin);
+    final gateway = _gateways[householdId];
+    if (gateway == null) {
+      throw const ApiProblem(ApiProblem.noGateway, status: 409);
+    }
+    if (!gateway.online) {
+      throw const ApiProblem(ApiProblem.gatewayOffline, status: 409);
+    }
+    final n = ++_newDevices;
+    final now = _clock();
+    final device = Device(
+      id: 'mc-new${n.toString().padLeft(12, '0')}',
+      name: name,
+      board: 'doit_esp32_devkit_v1',
+      firmware: '—',
+      batteryPercent: 0,
+      rssi: 0,
+      state: DeviceState.offline,
+      lastSeen: now,
+      nextExpectedAt: now,
+      wakeIntervalS: 600,
+      configSync: ConfigSync.pending,
+      configRev: 0,
+      slots: const [],
+    );
+    _devices[householdId] = [...?_devices[householdId], device];
+    _emit(householdId, const LiveEvent(LiveEventKind.device));
+    return NewDevice(device, _bundleFor(device.id, gateway));
+  });
+
+  PairingBundle _bundleFor(String deviceId, GatewayInfo gateway) => PairingBundle(
+    deviceId: deviceId,
+    host: gateway.lanHostOverride ?? gateway.lanHost ?? '192.168.1.20',
+    port: gateway.lanPort,
+    psk: 'ab' * 32,
+  );
+
+  @override
+  Future<PairingBundle> rekeyDevice(String householdId, String deviceId) =>
+      _delay(() {
+        _requireRole(householdId, Role.admin);
+        final gateway = _gateways[householdId];
+        if (gateway == null) {
+          throw const ApiProblem(ApiProblem.noGateway, status: 409);
+        }
+        return _bundleFor(deviceId, gateway);
+      });
+
+  @override
+  Future<void> deleteDevice(String householdId, String deviceId) => _delay(() {
+    _requireRole(householdId, Role.admin);
+    _devices[householdId] = [
+      for (final d in _devices[householdId]!)
+        if (d.id != deviceId) d,
+    ];
+    _emit(householdId, const LiveEvent(LiveEventKind.device));
+  });
+
+  /// Test helper: a paired device connects for the first time.
+  void simulateDeviceOnline(String householdId, String deviceId) {
+    _devices[householdId] = [
+      for (final d in _devices[householdId]!)
+        if (d.id == deviceId)
+          d.copyWith(state: DeviceState.online, lastSeen: _clock())
+        else
+          d,
+    ];
+    _emit(householdId, const LiveEvent(LiveEventKind.device));
+  }
+
   @override
   Future<void> deviceAction(
     String householdId,

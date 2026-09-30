@@ -408,5 +408,71 @@
   "errorInvalidCode": "That code isn't valid or has expired. The gateway shows a new one.",
   "errorGatewayExists": "This household already has a gateway.",
   "errorNoGateway": "Add a gateway to this household first (Settings → Gateway).",
-  "errorReauth": "Sign in again to do this."
+  "errorReauth": "Sign in again to do this.",
+  "pairAddDevice": "Add device",
+  "pairWebOnly": "Adding a device needs Bluetooth. Open the app on your phone.",
+  "pairLabelTitle": "Scan the device label",
+  "pairLabelBody": "Hold the camera over the QR code on the label of the plant device.",
+  "pairManualToggle": "Enter the code by hand",
+  "pairManualName": "Name on the label (MC-XXXX)",
+  "pairManualCode": "Code (26 characters)",
+  "pairLabelInvalid": "That is not a MoistureController label.",
+  "pairContinue": "Continue",
+  "pairNameTitle": "Name your device",
+  "pairNameHint": "Kitchen window",
+  "pairStart": "Start pairing",
+  "pairCreating": "Adding the device to your household …",
+  "pairFinding": "Looking for {name} …",
+  "@pairFinding": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "pairHandshake": "Connecting securely …",
+  "pairScanning": "Looking for WiFi networks …",
+  "pairWifiTitle": "Choose the WiFi for the device",
+  "pairWifiBody": "It must be the network your gateway is on.",
+  "pairSsidLabel": "Network name",
+  "pairPasswordLabel": "WiFi password",
+  "pairConnect": "Connect and test",
+  "pairTestingTitle": "Testing the connection …",
+  "pairTestingBody": "The device joins the WiFi and contacts your gateway. This takes up to 40 seconds.",
+  "pairTestWifiFailed": "The device could not join the WiFi. Check the name and the password.",
+  "pairTestMqttFailed": "The device joined the WiFi but could not reach the gateway ({detail}).",
+  "@pairTestMqttFailed": {
+    "placeholders": {
+      "detail": {
+        "type": "String"
+      }
+    }
+  },
+  "pairFinishing": "Finishing up …",
+  "pairWaitingOnline": "Waiting for the device to report in …",
+  "pairDoneTitle": "Device added",
+  "pairDoneBody": "{name} is connected.",
+  "@pairDoneBody": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "pairDoneSlow": "The device was added but has not reported in yet. It should show up online within a few minutes.",
+  "pairOpenDevice": "Open device",
+  "pairFailNoGateway": "Add a gateway to this household first (Settings → Gateway).",
+  "pairFailGatewayOffline": "The gateway is offline. Bring it online first.",
+  "pairFailNotFound": "No device found. A new device advertises by itself; a paired one needs the BOOT button held for 3 seconds.",
+  "pairFailWrongCode": "Wrong device or wrong code. The device was removed again.",
+  "pairFailConnection": "The connection to the device was lost.",
+  "pairFailBluetoothOff": "Bluetooth is off. Turn it on and try again.",
+  "pairFailBluetoothDenied": "The app needs permission to use Bluetooth. Allow it in the system settings.",
+  "pairFailUnsupported": "This device cannot pair over Bluetooth. Use the mobile app.",
+  "pairFailOther": "Something went wrong.",
+  "pairTryAgain": "Try again",
+  "pairClose": "Close",
+  "pairCancelTitle": "Cancel pairing?",
+  "pairCancelBody": "The device is removed from your household again.",
+  "pairKeepGoing": "Keep going"
 }

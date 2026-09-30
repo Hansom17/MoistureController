@@ -24,6 +24,16 @@ abstract interface class MoistureRepository {
   Future<void> deleteRule(String householdId, Rule rule);
 
   Future<List<Device>> devices(String householdId);
+
+  /// Adds a device record and returns its pairing bundle. Needs an online gateway
+  /// (`no_gateway` / `gateway_offline` otherwise).
+  Future<NewDevice> createDevice(String householdId, String name);
+
+  /// A new key for an existing device (re-pairing after a gateway change).
+  Future<PairingBundle> rekeyDevice(String householdId, String deviceId);
+
+  /// Removes the record: pairing was aborted.
+  Future<void> deleteDevice(String householdId, String deviceId);
   Future<void> deviceAction(
     String householdId,
     String deviceId,
