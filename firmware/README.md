@@ -46,9 +46,13 @@ west flash -d /tmp/mc-fw-tests/app-wifi
 
 ## Status
 
-Written and unit-tested, **never run on a board**. The full image with WiFi builds and links (2026-09-30: 655 KB
-flash = 16 %, main RAM 66 %, 0 warnings; BLE will add to that). `src/hal/` is unverified on hardware: it is the
-part to bring up first.
+Written and unit-tested; the network path is **verified on a board** (2026-10-02: WiFi join, DHCP, TLS-PSK MQTT
+connect, a wake cycle published, deep sleep entered; the API shows the device `sleeping`). The full image with WiFi
+and BLE builds and links; static data RAM is at 98 %, so there is little room left. The rest of `src/hal/` (ADC, pump
+GPIO, timer wake) is still unverified on hardware.
+
+Bring-up notes: the bench signal is marginal (about -70 dBm), so the WiFi join retries 3 times. mbedTLS has its own
+heap (`MBEDTLS_HEAP_SIZE`); without it the TLS context failed with `-ENOMEM`.
 
 | Area | State |
 |---|---|
@@ -56,8 +60,9 @@ part to bring up first.
 | Moisture sensor (ADC, calibration), pump with safety limits | done; ADC/GPIO code untested on hardware |
 | Commands: expiry, duplicates, cancel, long runs through deep sleep | done, tested |
 | Telemetry buffer (6 cycles), pending acks, events | done, tested |
-| WiFi, SNTP, MQTT over TLS-PSK, persistent session, Last Will | written, compiles, untested |
-| Deep sleep, timer wake, retained RAM, BOOT button → service mode | written, compiles, untested |
+| WiFi, MQTT over TLS-PSK, persistent session | done; **verified on a board** (join, TLS-PSK connect, telemetry reaches the API) |
+| SNTP, Last Will, retained commands/acks round trip | written, compiles, not yet checked on a board |
+| Deep sleep | entered on a board; timer wake, retained RAM, BOOT button → service mode not yet checked |
 | DS18B20, SHT3x, float switch drivers; I2C / 1-Wire auto-detect | not started (sensors report `not_found`) |
 | BLE pairing: secure session, all messages, commit, factory page with the PoP | done; protocol byte-identical to the Python reference (tests), **verified on a board** (pairing, persistence, restart) |
 | BLE: 3 s / 10 s BOOT button (maintenance window, factory reset), 5-failure lockout, WiFi `test` step | written, **not yet tried on a board** |
@@ -65,11 +70,20 @@ part to bring up first.
 
 ## Pairing over Bluetooth (contracts/ble.md)
 
-Once per device, at the factory bench (writes the PoP to the `factory` partition, prints the label):
+Once per device, at the factory bench. `make_label.py` keeps every device in one CSV
+(`firmware/factory/devices.csv`: BLE name, Bluetooth MAC, PoP, label text; **git-ignored, it holds the secret
+PoPs**) and draws the QR code of the label (`firmware/factory/labels/MC-XXXX.png`):
 
 ```bash
-firmware/tools/make_label.py --port /dev/cu.usbserial-0001 --flash
+firmware/tools/make_label.py new   --port /dev/cu.usbserial-0001   # PoP, CSV row, QR image, page
+firmware/tools/make_label.py flash --port /dev/cu.usbserial-0001   # write that device's page to the board
+firmware/tools/make_label.py new --port … --flash                  # both in one go
+firmware/tools/make_label.py list                                  # what was made, what was flashed
 ```
+
+The flash step asks the board for its Bluetooth MAC and looks the PoP up in the CSV, so re-flashing or
+replacing a board never loses its label. QR images come from the `segno` package if installed, otherwise on
+macOS from `tools/qr_png.swift` (no packages). Print the PNG on the label.
 
 Flash the firmware **without** `MC_DEV_PROVISION`: an unpaired device opens the pairing window on every
 boot (10 min, LED blinks slowly) and advertises as `MC-XXXX`. Then, from a machine with Bluetooth (on macOS
