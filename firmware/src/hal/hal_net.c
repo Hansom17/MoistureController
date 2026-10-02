@@ -23,7 +23,8 @@
 
 LOG_MODULE_REGISTER(hal_net, LOG_LEVEL_INF);
 
-#define WIFI_TIMEOUT_S 25
+#define WIFI_TIMEOUT_S 20
+#define WIFI_ATTEMPTS  3
 #define IP_TIMEOUT_S 15
 #define CONNACK_TIMEOUT_MS 10000
 #define ACK_TIMEOUT_MS 5000
@@ -40,6 +41,7 @@ static void io_disconnect(void *u);
 /* --- WiFi ------------------------------------------------------------------------------------ */
 
 static struct net_mgmt_event_callback net_cb;
+static struct net_mgmt_event_callback ip_cb;
 static K_SEM_DEFINE(wifi_done, 0, 1);
 static K_SEM_DEFINE(ip_ready, 0, 1);
 static volatile int wifi_status = -1;
@@ -124,10 +126,14 @@ static int wifi_up(int32_t *rssi)
 	k_sem_reset(&wifi_done);
 	k_sem_reset(&ip_ready);
 	wifi_status = -1;
+	net_mgmt_del_event_callback(&net_cb);
+	net_mgmt_del_event_callback(&ip_cb);
+	/* One callback per layer: a mask mixing L2 (WiFi) and L3 (IPv4) events never matches. */
 	net_mgmt_init_event_callback(&net_cb, net_event,
-				     NET_EVENT_WIFI_CONNECT_RESULT | NET_EVENT_WIFI_DISCONNECT_RESULT |
-				     NET_EVENT_IPV4_ADDR_ADD);
+				     NET_EVENT_WIFI_CONNECT_RESULT | NET_EVENT_WIFI_DISCONNECT_RESULT);
 	net_mgmt_add_event_callback(&net_cb);
+	net_mgmt_init_event_callback(&ip_cb, net_event, NET_EVENT_IPV4_ADDR_ADD);
+	net_mgmt_add_event_callback(&ip_cb);
 
 	struct wifi_connect_req_params p = {
 		.ssid = (const uint8_t *)prov.ssid,
@@ -142,14 +148,28 @@ static int wifi_up(int32_t *rssi)
 #ifdef CONFIG_MC_LOW_TX_POWER
 	LOG_INF("wifi: transmit power 8 dBm (set: %d)", (int)esp_wifi_set_max_tx_power(32));
 #endif
-	int err = net_mgmt(NET_REQUEST_WIFI_CONNECT, iface, &p, sizeof(p));
+	/* The link at the bench is marginal and an association attempt fails now and then: retry. */
+	bool joined = false;
 
-	LOG_INF("wifi: connect request to '%s' returned %d", prov.ssid, err);
-	if (err) {
-		LOG_ERR("wifi connect request failed: %d", err);
-		return err;
+	for (int attempt = 1; attempt <= WIFI_ATTEMPTS && !joined; attempt++) {
+		k_sem_reset(&wifi_done);
+		wifi_status = -1;
+		int err = net_mgmt(NET_REQUEST_WIFI_CONNECT, iface, &p, sizeof(p));
+
+		LOG_INF("wifi: connect request %d/%d to '%s' returned %d", attempt, WIFI_ATTEMPTS,
+			prov.ssid, err);
+		if (err) {
+			LOG_ERR("wifi connect request failed: %d", err);
+			return err;
+		}
+		joined = k_sem_take(&wifi_done, K_SECONDS(WIFI_TIMEOUT_S)) == 0 && wifi_status == 0;
+		if (!joined) {
+			LOG_WRN("wifi: attempt %d failed (status %d)", attempt, wifi_status);
+			net_mgmt(NET_REQUEST_WIFI_DISCONNECT, iface, NULL, 0);
+			k_sleep(K_SECONDS(1));
+		}
 	}
-	if (k_sem_take(&wifi_done, K_SECONDS(WIFI_TIMEOUT_S)) != 0 || wifi_status != 0) {
+	if (!joined) {
 		LOG_ERR("wifi: no association (status %d)", wifi_status);
 #ifdef CONFIG_MC_WIFI_DIAG
 		wifi_diag(iface);
