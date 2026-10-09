@@ -134,3 +134,14 @@ async def test_plant_delete_disables_rules(rig):
     await rig.api.request("plant_delete", {"plant_id": plant["id"]})
     assert rig.api.state["state/plants"] == []
     assert rig.api.state["state/rules"][0]["enabled"] is False
+
+
+async def test_hub_announces_itself_again_after_the_broker_connection_returns(rig):
+    await rig.hub_t.kill()                               # the broker publishes the last will: offline
+    await rig.api.settle()
+    assert rig.api.state["status/hub"]["state"] == "offline"
+    await rig.hub_t.connect()                            # the transport reconnects ...
+    await rig.hub.on_reconnect()                         # ... and calls this
+    await rig.api.settle()
+    assert rig.api.state["status/hub"]["state"] == "online"
+    assert rig.api.state["state/devices"] == [] and "state/plants" in rig.api.state

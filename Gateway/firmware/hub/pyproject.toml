@@ -4,7 +4,7 @@ version = "0.1.0"
 description = "MoistureController hub: devices, commands, rules and alerts behind MQTT"
 requires-python = ">=3.12"
 dependencies = [
-  "sqlalchemy>=2.0",
+  "sqlalchemy[asyncio]>=2.0",
   "aiosqlite",
   "aiomqtt>=2.0",
   "alembic",

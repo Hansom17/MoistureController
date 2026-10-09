@@ -52,6 +52,8 @@ class MqttTransport:
         self._client = None
         self._task: asyncio.Task | None = None
         self._ready = asyncio.Event()
+        self.on_reconnect: list[Callable[[], Awaitable[None]]] = []   # run after every reconnect (not the first connect)
+        self._connected_before = False
 
     async def connect(self) -> None:
         self._task = asyncio.create_task(self._run())
@@ -74,7 +76,11 @@ class MqttTransport:
                     self._client = client
                     for flt, _ in self.subs:
                         await client.subscribe(flt, qos=1)
+                    reconnected, self._connected_before = self._connected_before, True
                     self._ready.set()
+                    if reconnected:
+                        for cb in self.on_reconnect:
+                            asyncio.create_task(self._safe_cb(cb))
                     async for msg in client.messages:
                         for flt, handler in list(self.subs):
                             if topic_matches(flt, str(msg.topic)):
@@ -86,6 +92,13 @@ class MqttTransport:
                 self._client = None
                 self._ready.clear()
                 await asyncio.sleep(3)
+
+    @staticmethod
+    async def _safe_cb(cb) -> None:
+        try:
+            await cb()
+        except Exception:
+            log.exception("reconnect callback failed")
 
     @staticmethod
     async def _safe(handler: Handler, topic: str, payload: bytes) -> None:

@@ -24,8 +24,14 @@ async def run(settings: Settings) -> None:
     transport = MqttTransport(settings.mqtt_host, settings.mqtt_port, settings.mqtt_user, settings.mqtt_password,
                               will=will, client_id=f"mc-{settings.instance}", ca=settings.mqtt_ca)
     app = create_app(settings, transport, make_sessionmaker(engine), engine=engine)
+    online = json.dumps({"state": "online"}).encode()
+
+    async def announce() -> None:
+        await transport.publish(status_topic, online, retain=True)
+
+    transport.on_reconnect.append(announce)
     await transport.connect()
-    await transport.publish(status_topic, json.dumps({"state": "online"}).encode(), retain=True)
+    await announce()
     server = uvicorn.Server(uvicorn.Config(app, host=settings.bind, port=settings.port, log_level="info"))
     await server.serve()
     await transport.publish(status_topic, json.dumps({"state": "offline"}).encode(), retain=True)

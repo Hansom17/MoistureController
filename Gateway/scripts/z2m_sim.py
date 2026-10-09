@@ -73,7 +73,17 @@ class Sim:
             await asyncio.sleep(self.report_interval)
             for m in list(self.modules.values()):
                 m.moisture = {k: max(0.0, v - random.uniform(0.2, 0.8)) for k, v in m.moisture.items()}
-                await self.report(m)
+                try:
+                    await self.report(m)
+                except ConnectionError:
+                    break                                    # the broker is away; try again next round
+
+    async def announce(self) -> None:
+        """After a broker restart: the retained state is back or lost, say it again."""
+        await self.t.publish(f"{self.base}/bridge/state", b'{"state":"online"}', retain=True)
+        await self._devices()
+        for m in self.modules.values():
+            await self._availability(m, "online")
 
     def _spawn(self, coro) -> None:
         t = asyncio.get_running_loop().create_task(coro)
@@ -259,6 +269,7 @@ async def main() -> None:
     t = MqttTransport(a.host, a.port, a.user, a.password, client_id="z2m-sim")
     sim = Sim(t, a.modules, a.pending, a.speed, a.report_interval, fail_interview=a.fail_interview,
               reject_config=a.reject_config)
+    t.on_reconnect.append(sim.announce)
     await t.connect()
     await sim.run()
 

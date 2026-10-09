@@ -53,6 +53,11 @@ class Hub:
         await self.t.subscribe(self.topics.device_state, self._on_device)
         await self.t.subscribe(self.topics.device_availability, self._on_device)
 
+    async def on_reconnect(self) -> None:
+        """The broker connection came back (a restart of Mosquitto loses the last will's state): say so again."""
+        await self.pub.status("online")
+        await self.snapshots.publish(NAMES)
+
     async def stop(self) -> None:
         await self.pub.status("offline")
 
