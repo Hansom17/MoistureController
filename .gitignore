@@ -20,3 +20,8 @@ dev-bundle.json
 PlantModule/firmware/dev.conf
 PlantModule/scripts/factory/
 PlantModule/hardware/.history/
+
+# Python
+__pycache__/
+*.pyc
+.pytest_cache/

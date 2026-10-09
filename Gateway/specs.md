@@ -125,7 +125,7 @@ and the answer arrives on `reply_to`:
 
 | Rule | Behaviour |
 |---|---|
-| **Idempotency** | `id` is the idempotency key. `hub` stores the answer of every request for 10 minutes (table `requests`); a repeated `id` returns the stored answer and executes nothing. `api` may therefore retry once on a timeout. |
+| **Idempotency** | `id` is the idempotency key. `hub` stores the answer of every successful request for 10 minutes (table `requests`, written in the same transaction as the change); a repeated `id` returns the stored answer and executes nothing. Failed requests changed nothing and are not stored, so a retry is evaluated again. `api` may therefore retry once on a timeout. |
 | **Deadline** | `hub` ignores a request whose `deadline` has passed (default 10 s after sending), so a late-delivered request is never executed after the user was told it failed. |
 | **Ordering** | `hub` processes requests for the same device or plant one after another, in arrival order; others in parallel. |
 | **Errors** | `error.type` is the stable problem type of the REST API (`busy`, `device_not_ready`, `safety_limit`, `slot_not_actuator`, `conflict`, `not_found`, `validation`, …); `api` maps it to RFC 9457 `problem+json` with the status. Unknown requests → `unknown_kind`. |
@@ -237,13 +237,13 @@ erDiagram
 |---|---|---|
 | `settings` | `key`, `value` | Installation: `name`, `timezone`, `battery_low_mv`, notifier configuration (Telegram token write-only), schema version |
 | `requests` | `id`, `kind`, `answer`, `ts` | Idempotency store for 3.3 (kept 10 minutes) |
-| `devices` | `id` (`dev-…`), `ieee` (unique), `model`, `name`, `fw`, `board`, `status`, `last_seen_at`, `report_interval_s`, `voltage_mv`, `link_quality`, `last_seq`, `boot_id`, `desired_rev`, `desired_config`, `reported_rev`, `reported_config`, `rejected_rev`, `config_error`, `sensor_error_streak`, `created_at`, `deleted_at` | `status` ∈ `joining` (joined, interviewing, configuring), `join_failed`, `unsupported`, `ready` (waiting for the first report), `online`, `late`, `offline`, `safe_mode` |
+| `devices` | `id` (`dev-…`), `ieee` (unique), `model`, `name`, `fw`, `board`, `status`, `last_seen_at`, `report_interval_s`, `voltage_mv`, `link_quality`, `last_seq`, `boot_id`, `last_event_n`, `last_ack_n`, `safe_reason`, `slots` (latest reading per slot), `diagnostics`, `updated_at`, `desired_rev`, `desired_config`, `reported_rev`, `reported_config`, `rejected_rev`, `config_error`, `sensor_error_streak`, `created_at`, `deleted_at` | `status` ∈ `joining` (joined, interviewing, configuring), `join_failed`, `unsupported`, `ready` (waiting for the first report), `online`, `late`, `offline`, `safe_mode` |
 | `config_revisions` | `device_id`, `rev`, `kind`, `body`, `result`, `error`, `created_at`, `created_by` | Full history |
 | `plants` | `id`, `name`, `notes`, `sensor_device_id`, `sensor_slot`, `pump_device_id`, `pump_slot`, `archived_at` | |
 | `readings` | `id` (integer), `device_id`, `slot`, `plant_id`, `type`, `value`, `raw`, `error`, `ts`, `seq` | Indexes (`plant_id`, `ts`), (`device_id`, `slot`, `ts`) |
 | `health_reports`, `device_events` | per report / per event | Battery, link quality; events such as `low_battery`, `sensor_fault`, `safety_stop` |
 | `commands` | `id`, `zb_id` (32-bit id used on the Zigbee side), `device_id`, `plant_id`, `action`, `args`, `status`, `reason`, `source` (`manual`/`rule`), `created_by`, `rule_id`, `request_id`, `created_at`, `exp`, `sent_at`, `delivered_at`, `finished_at`, `ends_at`, `cancel_of` | `sent_at` = handed to Zigbee2MQTT; `request_id` unique |
-| `rules` | `id`, `plant_id`, `enabled`, `threshold`, `water_s`, `cooldown_s`, `max_per_day`, `quiet_from`, `quiet_to`, `notify_channels`, `notify_on`, `created_by`, `updated_at` | |
+| `rules` | `id`, `plant_id`, `enabled`, `threshold`, `water_s`, `cooldown_s`, `max_per_day`, `quiet_from`, `quiet_to`, `notify_channels`, `notify_on`, `created_by`, `updated_at`, `deleted_at` | A deleted rule keeps its row for the execution history |
 | `rule_executions` | `id`, `rule_id`, `plant_id`, `ts`, `reading_ref`, `decision`, `skip_reason`, `command_id` | Written by the hub's own rule evaluation |
 | `alerts` | `id`, `kind`, `subject_type`, `subject_id`, `subject_name`, `severity`, `opened_at`, `resolved_at`, `acked_by`, `acked_at`, `detail` | One open alert per (`kind`, `subject`) |
 
@@ -657,7 +657,7 @@ There is no shared Python package: `mc_hub` and `mc_api` depend only on the cont
 
 ## 18. Status and open points
 
-Status: only this specification exists; the split into `api` and `hub` (section 3) is the current design. The previous implementation (WiFi/MQTT gateway and a separate FastAPI server) was removed; it is in git history at commit `eb97b07` and is the reference for the logic listed in 19. The coordinator side was brought up once (7.6).
+Status: the split into `api` and `hub` (section 3) is the current design. `hub` slice 1 is implemented in `firmware/hub` (database and migration, in-memory and real MQTT transports, request handler with idempotency and deadlines, events, snapshots, Zigbee2MQTT adapter, device reconcile, ingest, alerts, installation/plant/rule/alert/device-name requests, 29 tests). Not yet built: commands, sender, config sync, join control, rule evaluation, status jobs, Telegram, export/backup, queries, and the whole `api` service. The previous implementation (WiFi/MQTT gateway and a separate FastAPI server) was removed; it is in git history at commit `eb97b07` and is the reference for the logic listed in 19. The coordinator side was brought up once (7.6).
 
 Open points:
 - Zigbee2MQTT behaviour with the custom device (items marked *verify* in 7): publication of transient `cmd_ack`/`event` objects, `install_code/add` payload, `device/interview` and `device/configure` requests, reporting configuration for custom-cluster attributes, whether reporting configuration survives a module reset.
