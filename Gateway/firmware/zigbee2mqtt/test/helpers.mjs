@@ -73,6 +73,7 @@ export function recordingEndpoint() {
     calls,
     write: async (cluster, attributes, options) => calls.push({op: 'write', cluster, attributes, options}),
     command: async (cluster, command, payload, options) => calls.push({op: 'command', cluster, command, payload, options}),
+    read: async (cluster, attributes, options) => calls.push({op: 'read', cluster, attributes, options}),
     bind: async (cluster, target) => calls.push({op: 'bind', cluster, target}),
     configureReporting: async (cluster, items, options) => calls.push({op: 'configureReporting', cluster, items, options}),
   };

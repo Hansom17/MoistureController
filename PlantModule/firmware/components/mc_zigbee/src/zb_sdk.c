@@ -522,9 +522,11 @@ void mc_zb_report_now(void)
         post_bool(MC_EV_ZB_REPORT_RESULT, false);
         return;
     }
-    static const uint16_t attrs[] = {MC_ATTR_SEQ,         MC_ATTR_SLOT_0, MC_ATTR_SLOT_1,    MC_ATTR_SLOT_2,
-                                     MC_ATTR_SLOT_3,      MC_ATTR_SLOT_4, MC_ATTR_SLOT_5,    MC_ATTR_STATUS,
-                                     MC_ATTR_FAST_MODE,   MC_ATTR_CFG_REV, MC_ATTR_CFG_RESULT, MC_ATTR_CFG_ERROR};
+    /* Zigbee2MQTT publishes its accumulated state after every attribute, and the hub takes a new `seq` as "a new
+     * reading": `seq` goes last, so the state that carries it already holds the new slots and status. */
+    static const uint16_t attrs[] = {MC_ATTR_SLOT_0,  MC_ATTR_SLOT_1,   MC_ATTR_SLOT_2,     MC_ATTR_SLOT_3,
+                                     MC_ATTR_SLOT_4,  MC_ATTR_SLOT_5,   MC_ATTR_STATUS,     MC_ATTR_FAST_MODE,
+                                     MC_ATTR_CFG_REV, MC_ATTR_CFG_RESULT, MC_ATTR_CFG_ERROR, MC_ATTR_SEQ};
     bool ok = true;
     for (size_t i = 0; i < sizeof attrs / sizeof attrs[0]; i++) {
         ok &= report_attr(MC_CLUSTER_ID, attrs[i], MANUF) == ESP_OK;

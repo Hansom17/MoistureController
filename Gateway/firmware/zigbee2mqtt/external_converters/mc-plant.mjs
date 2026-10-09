@@ -177,6 +177,8 @@ async function configure(device, coordinatorEndpoint) {
     await endpoint.configureReporting(CLUSTER, custom.slice(i, i + REPORT_CHUNK), OPTS);
   }
   if (power) await endpoint.configureReporting('genPowerCfg', [power]);
+  // the read-only identity of the interface is not reportable: read it once so the hub learns the board
+  await endpoint.read(CLUSTER, ['board', 'interface_version', 'config_schema'], OPTS);
 }
 
 export default {

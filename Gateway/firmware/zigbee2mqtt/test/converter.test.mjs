@@ -203,6 +203,8 @@ test('configure binds the clusters and sets the reporting of the interface', asy
   assert.ok(!configured.some((n) => n.startsWith('slot_')), 'slot readings are sent by the module, the stack cannot report octet strings');
   assert.deepEqual(customCalls.flatMap((c) => c.items).find((i) => i.attribute === 'status'), {attribute: 'status', minimumReportInterval: 1, maximumReportInterval: 600, reportableChange: 0});
   assert.ok(customCalls.every((c) => c.options.manufacturerCode === MANUFACTURER_CODE));
+  const read = ep.calls.find((c) => c.op === 'read');
+  assert.deepEqual(read.attributes, ['board', 'interface_version', 'config_schema'], 'the board is read once: it is not reportable');
   const power = ep.calls.find((c) => c.op === 'configureReporting' && c.cluster === 'genPowerCfg');
   assert.deepEqual(power.items[0], {attribute: 'batteryVoltage', minimumReportInterval: 60, maximumReportInterval: 600, reportableChange: 1});
 });
