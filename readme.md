@@ -1,33 +1,22 @@
 # MoistureController
 
-Monitor the soil moisture of plants with small battery-powered ESP32 devices, see it in an app, and water manually or by rule — also when the internet is down.
+Monitor the soil moisture of plants with small battery-powered Zigbee devices, see it in a web app, and water manually or by rule. Everything runs locally on one box at home, at no cost.
 
 | Folder | What it is |
 |---|---|
-| [`PlantModule/`](PlantModule/) | The plant device: Zephyr firmware, KiCad carrier board, label/provisioning scripts |
-| [`Gateway/`](Gateway/) | At home: Mosquitto + gateway service (adapters, local rules, offline buffer) |
-| [`Server/`](Server/) | Previous central API (being folded into the Gateway hub) |
-| [`App/`](App/) | Flutter app (web + mobile) |
-| [`Shared/core/`](Shared/core/) | Python package `mc_core` used by Gateway and Server: contract models, rules engine, command checks |
-| [`scripts/`](scripts/) | `dev-start.sh` / `dev-stop.sh`: the whole system on one machine |
+| [`PlantModule/`](PlantModule/) | The plant device: ESP32-C6 Zigbee end device (firmware to be written) and its KiCad carrier board |
+| [`Gateway/`](Gateway/) | The box at home: Zigbee coordinator, Zigbee2MQTT, Mosquitto and the hub service with the API and the web app hosting (to be written) |
+| [`App/`](App/) | Flutter app: the web UI served by the Gateway, later also a mobile app |
 
-Each product folder has a `specs.md` (design) and a `readme.md` (build, run, test). The system-level architecture, flows and decisions are in [`PROJECT.md`](PROJECT.md).
+Each folder has a `specs.md` (design) and a `readme.md`. The system design, flows and decisions are in [`PROJECT.md`](PROJECT.md).
 
-## Try it on one machine
+## State
 
-Needs Docker, Python 3.13 and Flutter.
+Only the specifications, the carrier board and the Flutter app exist. The hub, the Zigbee firmware and the Zigbee2MQTT converter are still to be written; the plan and order of work are in `PROJECT.md` §9. The previous WiFi/MQTT implementation is in git history at commit `eb97b07`.
 
-```bash
-scripts/dev-start.sh        # API + PostgreSQL, gateway + Mosquitto, web app on :8420 (no device simulator yet)
-scripts/dev-stop.sh --wipe  # stop and delete the dev data
-```
-
-## Tests
+## What runs today
 
 ```bash
-cd Shared/core && ../../.venv/bin/python -m pytest
-cd Server && ../.venv/bin/python -m pytest
-cd Gateway/firmware && ../../.venv/bin/python -m pytest
+cd App && flutter run -d chrome -t lib/main_dev.dart   # the app with in-memory demo data
 cd App && flutter test
-PlantModule/scripts/test.py        # firmware core unit tests on QEMU (needs the Zephyr workspace)
 ```

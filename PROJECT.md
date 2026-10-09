@@ -8,7 +8,7 @@ The top-level document: **what the parts are, what each is responsible for, and 
 | **Gateway** | `Gateway/` | The box at home: Zigbee coordinator, Zigbee2MQTT, Mosquitto (internal) and our hub service (rules, API, database, web app hosting) |
 | **App** | `App/` | Flutter: runs as web app served by the Gateway; later also as Android/iOS app |
 
-> **Status of this document:** it describes the **target design** after the redesign (all local, Zigbee, one box). The repository still contains the previous design (WiFi/MQTT devices, a separate `Server/`, BLE pairing, Firebase); section 9 lists what is reused and what goes away.
+> **Status:** this document is the **design**. The repository currently holds the specs, the carrier board and the Flutter app; the hub, the Zigbee firmware and the Zigbee2MQTT converter are still to be written. The previous WiFi/MQTT implementation is in git history at commit `eb97b07`.
 
 ---
 
@@ -348,33 +348,31 @@ MoistureController/
 ├── PROJECT.md              ← this file
 ├── readme.md
 ├── PlantModule/            ← firmware/ (ESP-IDF) · hardware/ (KiCad) · scripts/ · specs.md · readme.md
-├── Gateway/                ← hub service, compose (Zigbee2MQTT, Mosquitto, hub), converter, mc_core · specs.md · readme.md
-├── App/                    ← Flutter (web, later mobile) · specs.md · readme.md
-└── scripts/                ← dev tooling (whole system on one machine)
+├── Gateway/                ← hub service, compose (Zigbee2MQTT, Mosquitto, hub), converter, mc_core · scripts/ · specs.md · readme.md
+└── App/                    ← Flutter (web, later mobile) · specs.md · readme.md
 ```
 
 The interfaces are described in the spec of the component that serves them: the custom Zigbee cluster in `PlantModule/specs.md`, the REST/SSE API and the Zigbee2MQTT message handling in `Gateway/specs.md`.
 
 ---
 
-## 9. From the previous design to this one
+## 9. Status and plan
 
-| Previous | Now |
+| Product | State |
 |---|---|
-| `firmware/` Zephyr, WiFi + MQTT TLS-PSK | `PlantModule/firmware/` ESP-IDF + `esp-zigbee-sdk`. The portable logic (`src/core`: config and pin rules, command handling, wake cycle) is reused; the hardware layer is rewritten. |
-| BLE pairing, PoP label, factory partition | Zigbee join with permit-join (+ install codes). All BLE code, `mc_core.ble` and the BLE contract are removed. |
-| `gateway/` (Mosquitto, outbox, WebSocket uplink, rules) and `api/` (FastAPI, PostgreSQL, Firebase) | One `Gateway/` hub service. The rules engine, command checks, config validation and the API routes and services are reused; the uplink, outbox, downlink queue, gateway enrollment, multi-household support and Firebase are removed. PostgreSQL is replaced by SQLite. |
-| `broker/` TLS-PSK Mosquitto | Mosquitto internal only, plain; Zigbee2MQTT in front of it. |
-| `core/` shared by gateway and API | `mc_core` used by the hub only (still a separate package). |
-| Flutter app: native + web, Firebase login, BLE wizard, mDNS discovery, FCM | Flutter web served by the gateway, own login with device tokens. The dashboard, plant detail, rules, devices and alerts screens are reused; the BLE wizard, Firebase code and FCM plans are removed; mDNS discovery is kept for the later mobile app. |
+| **PlantModule** | Carrier board designed (KiCad, not fabricated). No firmware yet. |
+| **Gateway** | Specified. No code yet. |
+| **App** | Flutter app exists against the previous API (dashboard, plant detail, rules, devices, alerts, gateway screen, connection handling); it has to be adapted to the hub API. |
+
+The previous implementation (WiFi/MQTT firmware, gateway service, central FastAPI server, BLE pairing) was removed; what can be reused from it is listed in `Gateway/specs.md` §19 and `PlantModule/specs.md` §11.
 
 Planned order of work:
 
-1. Rewrite the specs for this design (this file first, then Gateway, PlantModule, App).
-2. Prove the radio side on the real board: a minimal ESP32-C6 sleepy end device that joins, reports moisture and receives a command, with Zigbee2MQTT and an external converter. Measure sleep current and the awake window.
-3. Fold the Server code into the hub: SQLite, local login with device tokens, command queue driven by device check-ins, Zigbee2MQTT ingest.
-4. Adapt the app to the hub API and remove Firebase and BLE.
-5. Later: Telegram, HTTPS and remote access, mobile builds.
+1. Prove the radio side on the real board: a minimal ESP32-C6 sleepy end device that joins, reports moisture and receives a command, with Zigbee2MQTT and an external converter. Measure sleep current, the awake window and rejoin time.
+2. Write the hub: SQLite, local login with device tokens, command queue driven by device check-ins, Zigbee2MQTT ingest, REST + SSE API, hosting of the web build.
+3. Adapt the app to the hub API.
+4. Write the real firmware on ESP-IDF and the Zigbee2MQTT converter.
+5. Later: Telegram, HTTPS and remote access, mobile builds, OTA.
 
 ---
 
@@ -398,8 +396,6 @@ Planned order of work:
 | D14 | Commands | **Expiry + best-effort cancel** | Every command has `id` + `exp`; the device drops expired ones. |
 | D15 | Safety | **Hard pump limits on the device and again in the hub** | The device is the final authority. |
 | D16 | Remote access | **Not now.** Later a VPN or tunnel in front of the same web port, with HTTPS | Nothing in this design may depend on it. |
-
-IDs in older documents and code comments (D1–D39) refer to the previous design and are retired.
 
 ### Still open
 

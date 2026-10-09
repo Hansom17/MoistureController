@@ -4,8 +4,6 @@ The app is the only user interface of the system. It is a **Flutter web app serv
 
 This file has two parts: **Part A** the app, **Part B** its design system. Build and run: [`readme.md`](readme.md).
 
-> **Redesign note.** This spec replaces the previous app spec (Firebase login, several households, BLE pairing, FCM push, native-first). The app code still contains those parts; §14 lists what is adapted and what is removed. Sections marked *planned* are not built.
-
 ---
 
 # Part A — App
@@ -228,11 +226,12 @@ The app shows alerts in the Alerts screen and as a badge; with the page open the
 | `lib/main.dart` (to become the hub entry point; today `main_local.dart`) | The real hub: same-origin API on web, `API_URL` for development | The product |
 | mobile entry (later) | The hub found through mDNS (§6.4) | Android/iOS app |
 
-**Build and serve:** `flutter build web --release` produces `App/build/web`, which the hub serves (`MC_WEB_DIR`); the dev stack (`scripts/dev-start.sh`) does this already. The build must be self-contained (§2).
+**Build and serve:** `flutter build web --release` produces `App/build/web`, which the hub serves (`MC_WEB_DIR`); a dev stack that builds and serves it together with the hub is planned. The build must be self-contained (§2).
 
 **Migration from the current code:**
 
-- **Remove:** `features/pairing/` (BLE wizard, label scanner, `protocol/`), the `flutter_reactive_ble`, `mobile_scanner` and `cryptography` dependencies, BLE tests and vectors usage, the household switcher and household scoping, all Firebase and FCM plans, the `local` flavor naming.
+- **Removed already:** the BLE pairing wizard, label scanner and protocol code, the `flutter_reactive_ble`, `mobile_scanner` and `cryptography` dependencies, BLE tests and permissions.
+- **Remove:** the household switcher and household scoping, the `local` flavor naming.
 - **Adapt:** `ApiMoistureRepository` to the new API (no `/households/{h}` prefix, token auth, `/stream` without a household), models (no households, memberships), the Gateway screen (Zigbee2MQTT status), device screens (join flow, awake window), permissions to the new role endpoint.
 - **Add:** Setup, Login, Join, Users & invites, My devices, Installation screens; the "Add device" join screen; a build that does not use a CDN.
 - **Keep:** dashboard, plant detail, rules, alerts, charts, design system, SSE client, connection banner and state handling, mDNS discovery (for mobile later), localization.
@@ -265,7 +264,7 @@ App/
 |---|---|
 | Unit / widget (exist) | Fake repository, API repository (HTTP mocked), permissions, theme, gateway screen, discovery (kept for mobile). |
 | To adapt / add | Token handling and `401` flows (login redirect, reauth dialog), setup and invite flows, join-window screen with SSE events, config editor with the awake window, role-based widget tests (viewer sees no water button), SSE reconnect/resync, golden tests for `lib/ui/` (`alchemist`). |
-| Integration (manual) | `scripts/dev-start.sh`: the app against the real hub with the Zigbee2MQTT simulator. An automated browser test is planned. |
+| Integration (manual) | The app against the real hub with a Zigbee2MQTT simulator (dev stack planned). An automated browser test is planned. |
 | On hardware | Joining and configuring a real PlantModule from the web app. |
 
 ## 17. Open points

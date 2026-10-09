@@ -7,13 +7,13 @@ Flutter client (Android, iOS, web). Spec and design system: [specs.md](specs.md)
 ```bash
 flutter run -t lib/main_dev.dart          # device/simulator
 flutter run -d chrome -t lib/main_dev.dart
-flutter run -t lib/main_local.dart --dart-define=API_URL=http://<host>:8000 --dart-define=DEV_UID=<uid>   # real API on the LAN
+flutter run -t lib/main_local.dart --dart-define=API_URL=http://<host>:8000 --dart-define=DEV_UID=<uid>   # real API (the hub, once it exists)
 flutter test
 ```
 
 `main_dev.dart` uses `FakeMoistureRepository` — an in-memory backend with two households, sample plants, devices and alerts. Watering goes queued → delivered → running → done over a few seconds with live events, like a sleeping device. Settings → Demo switches your role per household to try the role-aware UI.
 
-`main_local.dart` talks to a real API (`ApiMoistureRepository`, hand-written Dio) with dev tokens and finds the server through mDNS: start the stack (`docker compose -f Server/docker-compose.yml --env-file Server/.env.dev up`, bound to `0.0.0.0` in `.env.dev`) and `python Server/scripts/advertise_mdns.py` on the host. `API_URL` is only the first address to try; the Settings → Server screen switches servers.
+`main_local.dart` talks to a real API (`ApiMoistureRepository`, hand-written Dio) with dev tokens and can find the server through mDNS. It was written against the previous API; there is no server to run it against until the hub exists, and it has to be adapted to the hub API (see `specs.md` §14).
 
 ## Theme
 

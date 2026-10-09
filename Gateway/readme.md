@@ -1,25 +1,13 @@
 # Gateway
 
-The household's box at home: Mosquitto for the ESP32 devices on the LAN, plus the gateway service that runs rules locally and talks to the Server over one outbound WebSocket. Design: [`specs.md`](specs.md) (includes the broker and the device ↔ gateway MQTT interface).
+The box at home that runs the whole system: Zigbee coordinator with Zigbee2MQTT, an internal Mosquitto, and the hub service (rules, command queue, SQLite, REST + SSE API, hosting of the Flutter web build). Design: [`specs.md`](specs.md).
 
-```
-firmware/   gateway service (src/mc_gateway, tests), Dockerfile, docker-compose.yml, broker/ (Mosquitto image + config)
-hardware/   empty for now
-scripts/    make-secrets.sh
-```
+**State:** specification only; no code yet. The target layout is in `specs.md` §15.3 (`firmware/` for the hub service and compose files, `scripts/`, `hardware/`). The previous gateway and server implementation is in git history at commit `eb97b07`; `specs.md` §19 lists what to take from it.
 
-## Run
+## Planned run
 
 ```bash
-Gateway/scripts/make-secrets.sh
-cp Gateway/firmware/.env.example Gateway/firmware/.env     # set MC_API_URL and MC_LAN_HOST
-docker compose -f Gateway/firmware/docker-compose.yml up -d --build
-docker compose -f Gateway/firmware/docker-compose.yml logs -f gateway    # shows the enrollment code
-docker compose -f Gateway/firmware/docker-compose.yml exec gateway mc-gateway status
+docker compose up -d      # zigbee2mqtt, mosquitto, hub
 ```
 
-## Test
-
-```bash
-cd Gateway/firmware && ../../.venv/bin/python -m pytest
-```
+The first start prints a one-time setup code in the hub's log; open `http://<gateway>/` and create the owner account.

@@ -6,8 +6,6 @@ Where it fits: the device talks only to the Gateway's Zigbee coordinator (`Gatew
 
 Folder: `firmware/` (ESP-IDF project), `hardware/` (KiCad carrier), `scripts/` (labels with install codes, firmware tests, build checks). Build and test commands: [`readme.md`](readme.md).
 
-> **Redesign note.** This spec replaces the Zephyr/WiFi/MQTT/BLE firmware spec. The portable firmware logic (`firmware/src/core`: config and pin rules, command handling, moisture conversion, wake cycle, retained state) is reused; the hardware layer, networking and pairing are replaced. Part A §11 lists the migration. Anything marked **verify** must be confirmed on the real board before it is relied on.
-
 ---
 
 # Part A — Firmware
@@ -48,7 +46,7 @@ A fixed table of slots (6) is the single source of truth for what is connected w
 - Each module type is a small driver registered in a static table: `probe`, `init`, `read` (sensors), `write` (actuators such as the pump).
 - Validation of a desired config (pin legality, duplicates, pump on an output-capable LP pin, limits) runs on the device as the final authority. The Python mirror (`mc_core.pins`) lets the Gateway reject bad configs earlier.
 
-**Drivers.** Implemented in the old firmware and to be ported: `moisture_*` (analog, capacitive/resistive) and the GPIO pump. Not implemented, report `not_found` plus one `sensor_fault` event: DS18B20, SHT3x, `water_level_float`. I2C/1-Wire auto-detect stays a later feature (analog presence only; pumps are always configured manually).
+**Drivers.** To build first: `moisture_*` (analog, capacitive/resistive) and the GPIO pump (an implementation for the previous firmware is in git history, see 11). Later, until then reported `not_found` plus one `sensor_fault` event: DS18B20, SHT3x, `water_level_float`. I2C/1-Wire auto-detect stays a later feature (analog presence only; pumps are always configured manually).
 
 **Configuration path.** The slot table lives in NVS and survives reboot and deep sleep. The Gateway sends a new configuration as attribute writes plus a commit command (Part B §4 and §5); the device validates, applies atomically, persists and reports the revision it runs.
 
@@ -137,14 +135,14 @@ On the carrier board the button is not on a wake-capable pin (Part C); until it 
 - Outputs come up off after any restart.
 - Sensor errors (`no_signal`, `out_of_range`, `not_found`) are reported, never turned into a value.
 
-## 11. Code layout and migration
+## 11. Code layout (target)
 
 ```
 firmware/
 ├── CMakeLists.txt · sdkconfig.defaults · partitions.csv
 ├── main/                  app_main: boot → cycle → sleep
 ├── components/
-│   ├── mc_core/           portable logic, reused from the old firmware: config + pin rules, commands, moisture conversion, retained state, the wake cycle (mc_cycle)
+│   ├── mc_core/           portable logic: config + pin rules, commands, moisture conversion, retained state, the wake cycle (mc_cycle)
 │   ├── mc_hal/            ESP32-C6: ADC, pump GPIO + pin hold, NVS, RTC retained state, deep sleep, button, LED, battery
 │   ├── mc_zigbee/         esp-zigbee-sdk: network join/rejoin, endpoint and clusters, reports, command handling, OTA later
 │   └── mc_drivers/        module drivers (moisture, pump, later more)
@@ -154,15 +152,12 @@ scripts/                   make_label.py (install codes), build and test helpers
 hardware/                  carrier board (Part C)
 ```
 
-- The wake cycle depends only on a small I/O interface (sensors, pump, radio, clock, storage), as before, so the exact sequence runs in unit tests against fakes. The old Zephyr (ztest, QEMU) tests need a new host: build `mc_core` for the host and run it with Unity (ESP-IDF supports host builds). **Decision pending.**
-- **Reused:** `mc_config`, `mc_cmd`, `mc_cycle`, moisture conversion, pin rules, retained-state logic.
-- **Replaced:** `hal_net` (WiFi + MQTT TLS-PSK) → `mc_zigbee`; JSON payload encoding → attribute encoding (Part B); settings backend (Zephyr) → NVS; SNTP and wall-clock handling → TTL-based deadlines.
-- **Removed:** `mc_ble`, `hal_ble`, the BLE pairing contract and vectors, the PoP factory page, TLS-PSK and WiFi configuration, `dev.conf` WiFi values.
-- **Old firmware status** (WiFi, TLS-PSK MQTT and a wake cycle verified on a classic ESP32 board on 2026-10-02) no longer applies to this target.
+- The wake cycle depends only on a small I/O interface (sensors, pump, radio, clock, storage), so the exact sequence runs in unit tests against fakes. The host-test framework for `mc_core` (for example Unity on an ESP-IDF host build) is **pending**.
+- The previous firmware (Zephyr, WiFi + MQTT, BLE pairing) was removed; it is in git history at `eb97b07`. Its portable core (`PlantModule/firmware/src/core`: `mc_config`, `mc_cmd`, `mc_cycle`, `mc_sensor`, `mc_pins`, `mc_rtc`, and their ztest suites) is the reference for `mc_core`; its hardware layer is a reference for `mc_hal`.
 
 ## 12. Status and open points
 
-Status: nothing of the Zigbee firmware is built. The portable logic and its tests exist in the old firmware.
+Status: only this specification and the carrier board design (Part C) exist. No firmware is in the repository yet.
 
 Open points (to settle in the prototype, step 2 of the plan in `PROJECT.md` §9):
 - Does `esp-zigbee-sdk` on the C6 give a **deep-sleeping sleepy end device with fast rejoin**, and what are the sleep current and the energy per wake?
@@ -230,7 +225,7 @@ Reported back (read-only, reported after each commit and at each wake):
 |---|---|---|---|
 | 0x0030 | `cfg_rev` | uint16 | Revision the device runs |
 | 0x0031 | `cfg_result` | uint8 | 0 ok, 1 rejected |
-| 0x0032 | `cfg_error` | uint8 + uint8 | Error code (as in the old config contract: `pin_invalid`, `pin_conflict`, `out_of_range`, …) and the slot it applies to |
+| 0x0032 | `cfg_error` | uint8 + uint8 | Error code (as in the previous config contract (git history, see 11): `pin_invalid`, `pin_conflict`, `out_of_range`, …) and the slot it applies to |
 
 ## 5. Cluster commands
 
