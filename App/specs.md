@@ -181,8 +181,8 @@ Component library and palette: Part B.
 
 ## 10. Slot configuration editor
 
-- Loads `GET /devices/{d}/config` (desired, reported, sync state, limits) and the board description `GET /meta/boards/{board}` (allowed pins per module type, reserved pins; served by the hub from `mc_core.pins`, so the app never duplicates pin rules).
-- Per slot: module picker, pin picker filtered to valid pins not used by another slot, module options (calibration dry/wet, `active_high`, `max_run_s` ≤ hard limit, `min_pause_s`).
+- Loads `GET /devices/{d}/config` (desired, reported, sync state, limits) and the board description `GET /meta/boards/{board}` (the logical ports of the device's PCB revision with the roles each supports, e.g. analog sensor or pump with deep-sleep hold; served by the hub from the board files of the PlantModule, so the app never duplicates board knowledge).
+- Per slot: module picker, port picker (P1…Pn) filtered to ports that exist on this board, support the module and are not used by another slot, module options (calibration dry/wet, `active_high`, `max_run_s` ≤ hard limit, `min_pause_s`).
 - Device-level fields: `wake_interval_s` (60–86400 s, default 600) and `awake_s` (2–60 s, default 5). The old "0 = never sleep" no longer exists; the 5-minute commissioning window after joining replaces it (`PlantModule/specs.md` Part A §6.4). The editor also shows when the change will take effect ("at the next check-in, about 14:32").
 - Save = `PUT …/config` with `base_rev`; validation errors (422) show on the affected slot.
 - **Planned:** the calibration wizard (capture *dry* and *wet* with `sensor_sample` while the device is in its commissioning window, review, save as a new revision). It needs the firmware command and a hub endpoint.

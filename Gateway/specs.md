@@ -178,7 +178,7 @@ Base `/api/v1`, JSON, ISO 8601 UTC timestamps, errors as RFC 9457 problem+json w
 | **Alerts** | `GET /alerts` (viewer), `POST /alerts/{a}/ack` (member) |
 | **Live** | `POST /events/ticket`, `GET /stream?ticket=` (viewer; SSE) |
 | **Data** | `POST /export` (owner, reauth), `POST /backup` (admin) |
-| **Board** | `GET /meta/boards/{board}` (pin rules from `mc_core.pins`, used by the slot editor) |
+| **Board** | `GET /meta/boards/{board}` (the board description of that PCB revision: logical ports, roles, wake/hold capability, battery divider; the files come from `PlantModule/firmware/boards/` and are copied into the hub image; used by the slot editor) |
 
 The OpenAPI document is generated from the code; committing it as `api.yaml` and generating the Dart client from it is planned, until then the app keeps its hand-written Dio client.
 
@@ -319,7 +319,7 @@ The device must therefore stay awake for a short window after each report (its `
 
 ## 10. Config sync
 
-- `PUT /devices/{d}/config` with `base_rev` (409 on mismatch); validation by `mc_core.pins` → 422 with the contract's codes.
+- `PUT /devices/{d}/config` with `base_rev` (409 on mismatch); validation by `mc_core.pins` against the device's board description (ports, roles, limits) → 422 with the contract's codes.
 - Valid → `rev + 1`, stored in `config_revisions` and `devices.desired_config`; the sender transmits it at the next check-in.
 - The device's `config_state` (reported revision and configuration, or a rejection with the reason) is stored; `sync_state` is `in_sync`, `pending` or `rejected` (+ `config_rejected` alert).
 - Changes to actuator limits or the wake interval in the **reported** configuration update the data the rules and command checks use (no extra sync needed, the hub reads them directly).

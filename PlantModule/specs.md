@@ -20,16 +20,35 @@ Folder: `firmware/` (ESP-IDF project), `hardware/` (KiCad carrier), `scripts/` (
 
 ## 2. Hardware target
 
-**ESP32-C6** (RISC-V, 2.4 GHz WiFi 6 / BLE 5 / 802.15.4). Only the 802.15.4 radio is used; WiFi and BLE stay off. Final hardware is the carrier board in Part C (Waveshare ESP32-C6-Zero module); before the carrier exists, firmware is developed on an **ESP32-C6-DevKitC-1** (pin differences are handled by a board description).
+**ESP32-C6** (RISC-V, 2.4 GHz WiFi 6 / BLE 5 / 802.15.4). Only the 802.15.4 radio is used; WiFi and BLE stay off. Final hardware is the carrier board in Part C (Waveshare ESP32-C6-Zero module), whose first revision (`carrier-v1`) exists and is the first development target. An ESP32-C6-DevKitC-1 board description (`devkitc-1`) is kept for bench work.
 
 | Aspect | Notes |
 |---|---|
 | ADC | Only ADC1 (GPIO0–6); there is **no ADC2/WiFi conflict** any more, so sensors can be read at any time in the cycle. |
 | Deep-sleep wake and pin hold | Low-power (LP) pins GPIO0–7 can wake the chip and **hold their output state through deep sleep**; a pump that must keep running across sleep has to sit on one of them (carrier ports 1–4 are GPIO1–4). |
-| Strapping pins | GPIO8, 9, 15 and the USB pins are not used for modules. |
+| Strapping pins | GPIO8, 9, 15 and the USB pins are not used for modules. GPIO4 and GPIO5 are also strapping pins on the C6 (**verify** against the datasheet); on the carrier they carry port 4 and the battery sense. |
 | Console | USB-Serial-JTAG. |
 
-The carrier's pin map is in Part C. The firmware reads it from a board description (`firmware/boards/`), and the same description is served to the web app (`GET /meta/boards/{board}`) so the slot editor offers only valid pins.
+### 2.1 Board revisions and the board description
+
+The carrier board will change between revisions, so no pin number is hard-coded in the application. Everything that depends on the PCB is in a **board description**, one file per revision (`firmware/boards/<name>.json`, for example `carrier-v1`, `devkitc-1`):
+
+| Field | Meaning |
+|---|---|
+| `name`, `hw_version` | Board name (`carrier-v1`) and numeric hardware version, reported to the Gateway |
+| `ports` | Logical ports `P1…Pn`: for each the GPIO, the ADC channel, whether it is a low-power pin that can **hold** an output through deep sleep, and which roles it supports (analog sensor, digital in, digital out/pump) |
+| `i2c` | SDA/SCL GPIOs and whether the pull-ups can be switched |
+| `battery` | Sense GPIO, ADC channel, divider ratio (carrier v1: 2.0) |
+| `led`, `button` | GPIO, polarity, and for the button whether it can **wake** the chip from deep sleep (carrier v1: no) |
+| `sensor_power` | Optional switched sensor supply: GPIO, polarity, settle time in ms; absent when the sensors are powered permanently (carrier v1) |
+| `reserved` | Pins the application must not use (strapping, console, flash) |
+| `allow_raw_gpio` | Whether slots may name raw GPIOs (true on dev kits, false on the carrier) |
+
+- **One source:** the JSON files are the single source. The firmware build turns them into a C table; the Gateway ships the same files and serves them as `GET /meta/boards/{board}`, so the slot editor offers only ports and roles that exist on that board.
+- **Which board am I:** the board name is stored in the `factory` partition next to the install code (§9), written at flashing time by the label tool. One firmware image therefore supports every revision, and the board of an already built v1 needs no hardware change. If the partition has no board entry, the firmware falls back to a build-time default (`CONFIG_MC_DEFAULT_BOARD`). From a later revision on, an ID resistor on a spare GPIO can be read as a second source and checked against the partition.
+- **Reporting:** the device reports the board name and hardware version (Basic cluster `HWVersion` and the custom status), the Gateway looks up the matching description.
+- **Sensor power:** if the board description has a `sensor_power` entry, the firmware switches the sensor supply on, waits the settle time, reads, and switches it off again around every read. Without the entry sensors are assumed to be powered permanently, and the spec's battery estimates must account for their current (Part C, limitations).
+- **Unknown board:** a name the firmware does not know is a fatal configuration error reported on the console; the device does not drive any output.
 
 ## 3. Software stack
 
@@ -40,11 +59,11 @@ The carrier's pin map is in Part C. The firmware reads it from a board descripti
 
 ## 4. Module slots
 
-A fixed table of slots (6) is the single source of truth for what is connected where. Each slot: `{module type, pin, options}`.
+A fixed table of slots (6) is the single source of truth for what is connected where. Each slot: `{module type, port, options}`. A slot refers to a **logical port** of the board (`P1…Pn`, I2C) from the board description (§2.1), never to a raw GPIO number, so a stored configuration keeps working when a new PCB revision wires the port to a different pin. Boards with `allow_raw_gpio` (dev kits) also accept raw GPIOs.
 
-- At runtime the firmware configures GPIO and ADC from the slot table (IDF GPIO/ADC drivers); nothing is bound to a pin at compile time.
+- At runtime the firmware resolves each slot's port through the board description and configures GPIO and ADC (IDF GPIO/ADC drivers); nothing is bound to a pin at compile time.
 - Each module type is a small driver registered in a static table: `probe`, `init`, `read` (sensors), `write` (actuators such as the pump).
-- Validation of a desired config (pin legality, duplicates, pump on an output-capable LP pin, limits) runs on the device as the final authority. The Python mirror (`mc_core.pins`) lets the Gateway reject bad configs earlier.
+- Validation of a desired config (port exists on this board and supports the module's role, duplicates, pump on a hold-capable port when a long run is requested, limits) runs on the device as the final authority. The Python mirror (`mc_core.pins`) lets the Gateway reject bad configs earlier.
 
 **Drivers.** To build first: `moisture_*` (analog, capacitive/resistive) and the GPIO pump (an implementation for the previous firmware is in git history, see 11). Later, until then reported `not_found` plus one `sensor_fault` event: DS18B20, SHT3x, `water_level_float`. I2C/1-Wire auto-detect stays a later feature (analog presence only; pumps are always configured manually).
 
@@ -123,8 +142,8 @@ On the carrier board the button is not on a wake-capable pin (Part C); until it 
 
 ## 9. Install code and labels
 
-- Each device has an **install code** (Zigbee install code: 128-bit code plus CRC16, shown as 36 hex characters) generated at flashing time and stored in the `factory` partition, never erased by factory reset.
-- `scripts/make_label.py` generates it, writes the factory page, and prints a label with a QR code of the form `MCIC1:<model>:<install-code>`. The CSV of devices (`scripts/factory/devices.csv`) holds the secrets and is git-ignored.
+- Each device has an **install code** (Zigbee install code: 128-bit code plus CRC16, shown as 36 hex characters) generated at flashing time and stored in the `factory` partition together with the **board name** (§2.1) and a serial number, never erased by factory reset.
+- `scripts/make_label.py --board carrier-v1` generates it, writes the factory page (install code, board, serial), and prints a label with a QR code of the form `MCIC1:<model>:<install-code>`. The CSV of devices (`scripts/factory/devices.csv`) holds the secrets and is git-ignored.
 - The Gateway registers the code with Zigbee2MQTT before the device joins; the coordinator then accepts only a device that proves it knows the code, which keeps a neighbour from joining while the network is open.
 - Without an install code the device joins with the default (well-known) link key while permit-join is open. This is acceptable for development, not for a deployed household.
 
@@ -155,20 +174,35 @@ hardware/                  carrier board (Part C)
 - The wake cycle depends only on a small I/O interface (sensors, pump, radio, clock, storage), so the exact sequence runs in unit tests against fakes. The host-test framework for `mc_core` (for example Unity on an ESP-IDF host build) is **pending**.
 - The previous firmware (Zephyr, WiFi + MQTT, BLE pairing) was removed; it is in git history at `eb97b07`. Its portable core (`PlantModule/firmware/src/core`: `mc_config`, `mc_cmd`, `mc_cycle`, `mc_sensor`, `mc_pins`, `mc_rtc`, and their ztest suites) is the reference for `mc_core`; its hardware layer is a reference for `mc_hal`.
 
-## 12. Status and open points
+## 12. Status, prototype plan and open points
 
-Status: only this specification and the carrier board design (Part C) exist. No firmware is in the repository yet.
+Status: this specification and the **carrier board v1** (built, in hand, untested) exist. No firmware is in the repository yet.
 
-Open points (to settle in the prototype, step 2 of the plan in `PROJECT.md` §9):
+### 12.1 Prototype 1 (on carrier v1, with a Zigbee coordinator and Zigbee2MQTT)
+
+Goal: answer the open Zigbee and power questions on the real board before the real firmware is written.
+
+1. Minimal ESP-IDF + `esp-zigbee-sdk` image (sleepy end device, board `carrier-v1` hard-coded): join, report a dummy value, deep sleep on a timer, rejoin fast.
+2. Measure on the carrier: deep-sleep current with no sensor, with a sensor on a port, and with the battery divider; energy per wake (rejoin + report + awake window).
+3. Awake window: how many sequential Zigbee2MQTT writes and one command round trip fit in it; which poll interval is needed.
+4. Pump pin hold: a port output holds its level through deep sleep, and the wake at the end of a run switches it off.
+5. ADC: read a real moisture sensor and the battery through the divider; fix the divider ratio and sensor ranges.
+6. Button: confirm GPIO21 cannot wake from deep sleep; test a wire from the button to GPIO0 (TP1) as the v1 workaround.
+7. Range: join and report through a wall; check the antenna placement on the carrier.
+8. Record the results in this spec (sleep current, energy per wake, awake window, poll interval) and fix the Part B IDs.
+
+### 12.2 Open points
+
 - Does `esp-zigbee-sdk` on the C6 give a **deep-sleeping sleepy end device with fast rejoin**, and what are the sleep current and the energy per wake?
 - Length of the awake window and poll interval needed for the Gateway to deliver several messages reliably.
+- Sensor supply on v1 (permanently powered): battery life with the sensors you use, and whether a mod wire from a spare GPIO is worth it; the switched supply is a v2 item (Part C).
 - Whether the first moisture slot can also appear as the standard soil-moisture cluster.
 - Final cluster layout (Part B) and the Zigbee2MQTT converter; manufacturer code.
 - Host-test framework for `mc_core`.
-- Pump on an LP pin and pin-hold behaviour across deep sleep on the C6.
-- Button on a wake-capable pin (carrier revision).
+- Strapping behaviour of GPIO4/GPIO5 with sensors attached.
 - I2C/1-Wire auto-detect and more drivers; Zigbee OTA.
 - Reading buffer size in RTC memory.
+- A Zigbee coordinator stick and its firmware version for the prototype.
 
 ---
 
@@ -217,7 +251,7 @@ Attributes are written with Write Attributes; nothing becomes active until the c
 | 0x0001 | `wake_interval_s` | uint32 | 60–86400 |
 | 0x0002 | `awake_s` | uint16 | 2–60 |
 | 0x0003 | `batt_low_mv` | uint16 | Low-battery threshold |
-| 0x0010 + n | `slot_cfg_n` (n = 0…5) | octet string (≤ 24) | `module` uint8 (0 empty, 1 moisture, 2 pump, …) · `pin` uint8 · `flags` uint8 · parameters by module: moisture `cal_dry` uint16, `cal_wet` uint16, `samples` uint8; pump `max_run_s` uint16, `min_pause_s` uint16 (bit 0 of `flags`: active high) |
+| 0x0010 + n | `slot_cfg_n` (n = 0…5) | octet string (≤ 24) | `module` uint8 (0 empty, 1 moisture, 2 pump, …) · `port` uint8 (0 = P1 … 5 = P6; `0x80 + n` = raw GPIO n on boards that allow it) · `flags` uint8 · parameters by module: moisture `cal_dry` uint16, `cal_wet` uint16, `samples` uint8; pump `max_run_s` uint16, `min_pause_s` uint16 (bit 0 of `flags`: active high) |
 
 Reported back (read-only, reported after each commit and at each wake):
 
@@ -225,7 +259,7 @@ Reported back (read-only, reported after each commit and at each wake):
 |---|---|---|---|
 | 0x0030 | `cfg_rev` | uint16 | Revision the device runs |
 | 0x0031 | `cfg_result` | uint8 | 0 ok, 1 rejected |
-| 0x0032 | `cfg_error` | uint8 + uint8 | Error code (as in the previous config contract (git history, see 11): `pin_invalid`, `pin_conflict`, `out_of_range`, …) and the slot it applies to |
+| 0x0032 | `cfg_error` | uint8 + uint8 | Error code (as in the previous config contract (git history, see 11): `port_invalid`, `port_conflict`, `out_of_range`, …) and the slot it applies to |
 
 ## 5. Cluster commands
 
@@ -335,4 +369,17 @@ kicad-cli pcb drc --refill-zones --save-board carrier.kicad_pcb                 
 - PCB: no DRC errors or unconnected nets, passes schematic parity. Silkscreen-over-copper notes remain on the solder jumpers and mounting holes.
 - **The routing is an autorouted baseline**: tidy and review it in KiCad (long diagonals, vias, pour stitching) before ordering.
 - The module footprint comes from the dimension drawing on Waveshare's wiki (18.00 × 23.50 mm, 2.54 mm pitch, first pad 1.59 mm from the USB end); compare against a real module or the 3D files before ordering. The pad length is a soldering choice.
-- Nothing is fabricated yet; sensors, connectors and ADC readings are untested.
+- Revision **v1** is fabricated and in hand; it has not been tested yet (sensors, connectors, ADC readings, sleep current, range).
+
+## Known limitations of v1 and wishlist for the next revision
+
+| Topic | v1 | Next revision |
+|---|---|---|
+| Sensor supply | Pin 1 of every port is the always-on 3V3, so sensors draw current during deep sleep and limit battery life | A switched sensor rail (load switch on a GPIO) so sensors are powered only around a read; the board description then gains a `sensor_power` entry |
+| Button | On GPIO21, which cannot wake the chip from deep sleep | On GPIO0 (low-power pin); until then the commissioning window after power-up is the way to reconfigure |
+| Board ID | None; the board name is stored in the factory partition by the label tool | An ID resistor divider on a spare GPIO read at boot |
+| Battery divider | 330k/330k permanently connected (about 5 µA at 3.7 V) | Optional switch or higher resistance |
+| Strapping pins | Port 4 (GPIO4) and the battery sense (GPIO5) are strapping pins on the C6 (**verify**) | Move to non-strapping low-power pins if the check shows a problem |
+| Pump | Ports carry SIG and GND only; an external driver module is needed | Optional on-board MOSFET driver for one port |
+| Battery connector | Raw cell and charger come in through J7 | Dedicated battery connector and charger/protection |
+| Antenna | Keep-out around the module's antenna not verified | Verified in the range test (prototype step 7) |
