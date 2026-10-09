@@ -47,6 +47,7 @@ bool mc_hal_factory_read(mc_factory_t *out)
 
 static uint8_t reset_reason(void)
 {
+    ESP_LOGI(TAG, "raw reset reason %d", (int)esp_reset_reason());
     switch (esp_reset_reason()) {
     case ESP_RST_POWERON:
         return MC_BOOT_REASON_POWER_ON;

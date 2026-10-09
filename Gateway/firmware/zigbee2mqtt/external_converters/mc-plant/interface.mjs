@@ -704,19 +704,6 @@ export default {
   "reporting": [
     {
       "attributes": [
-        "slot_0",
-        "slot_1",
-        "slot_2",
-        "slot_3",
-        "slot_4",
-        "slot_5"
-      ],
-      "min_s": 5,
-      "max_s": 300,
-      "change": "0.5 %"
-    },
-    {
-      "attributes": [
         "power_config.batteryVoltage"
       ],
       "min_s": 60,

@@ -128,7 +128,7 @@ static void finish_sample(mc_core_t *c, mc_actions_t *out)
     }
     mc_act(out, MC_ACT_UPDATE_ATTRS);
     mc_arm(out, MC_TIMER_SAMPLE, 0, interval_ms(c));
-    if (c->fast && c->link_up) {
+    if (c->link_up) { /* every sample is sent: the slot attributes are octet strings, which the stack cannot report by itself */
         mc_act(out, MC_ACT_REPORT_NOW);
         c->sn = MC_SN_REPORTING;
         mc_arm(out, MC_TIMER_REPORT, 0, MC_REPORT_TIMEOUT_MS);

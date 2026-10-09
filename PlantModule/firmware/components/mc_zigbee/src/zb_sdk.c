@@ -152,7 +152,10 @@ static void register_endpoint(void)
 
     esp_zb_power_config_cluster_cfg_t power_cfg = {0};
     esp_zb_attribute_list_t *power = esp_zb_power_config_cluster_create(&power_cfg);
-    ESP_ERROR_CHECK(esp_zb_power_config_cluster_add_attr(power, ESP_ZB_ZCL_ATTR_POWER_CONFIG_BATTERY_VOLTAGE_ID, &store.batt_100mv));
+    /* added by hand: the helper creates it without the reporting flag, which Zigbee2MQTT's configure needs */
+    ESP_ERROR_CHECK(esp_zb_cluster_add_attr(power, ESP_ZB_ZCL_CLUSTER_ID_POWER_CONFIG, ESP_ZB_ZCL_ATTR_POWER_CONFIG_BATTERY_VOLTAGE_ID,
+                                            ESP_ZB_ZCL_ATTR_TYPE_U8,
+                                            ESP_ZB_ZCL_ATTR_ACCESS_READ_ONLY | ESP_ZB_ZCL_ATTR_ACCESS_REPORTING, &store.batt_100mv));
     ESP_ERROR_CHECK(esp_zb_cluster_list_add_power_config_cluster(list, power, SRV));
 
     ESP_ERROR_CHECK(esp_zb_cluster_list_add_custom_cluster(list, custom_cluster(), SRV));
@@ -282,7 +285,7 @@ static void poll_configured(uint8_t unused)
                                            .cluster_id = MC_CLUSTER_ID,
                                            .cluster_role = SRV,
                                            .manuf_code = MANUF,
-                                           .attr_id = MC_ATTR_SLOT_0};
+                                           .attr_id = MC_ATTR_STATUS};
     esp_zb_zcl_reporting_info_t *r = esp_zb_zcl_find_reporting_info(loc);
     if (r != NULL && r->u.send_info.max_interval != 0) {
         join_seen_configured = true;
@@ -311,6 +314,7 @@ void esp_zb_app_signal_handler(esp_zb_app_signal_t *signal_struct)
     uint32_t *p = signal_struct->p_app_signal;
     esp_err_t status = signal_struct->esp_err_status;
     esp_zb_app_signal_type_t type = *p;
+    ESP_LOGI(TAG, "signal %s (0x%x): %s", esp_zb_zdo_signal_to_string(type), (unsigned)type, esp_err_to_name(status));
     switch (type) {
     case ESP_ZB_ZDO_SIGNAL_SKIP_STARTUP:
         start_commissioning(ESP_ZB_BDB_MODE_INITIALIZATION);
@@ -323,6 +327,14 @@ void esp_zb_app_signal_handler(esp_zb_app_signal_t *signal_struct)
             mc_event_t ev = {.kind = MC_EV_ZB_STACK_READY};
             ev.u.joined = joined;
             post(&ev);
+        } else if (type == ESP_ZB_BDB_SIGNAL_DEVICE_REBOOT && !esp_zb_bdb_is_factory_new()) {
+            /* The network was restored from flash but the parent did not answer (coordinator off or away): the
+             * module is joined without a link, which is the rejoin back-off of the core, not a start failure. */
+            ESP_LOGW(TAG, "network restored, parent not reachable");
+            mc_event_t ev = {.kind = MC_EV_ZB_STACK_READY};
+            ev.u.joined = true;
+            post(&ev);
+            post_simple(MC_EV_ZB_PARENT_LOST);
         } else {
             ESP_LOGE(TAG, "stack start failed: %s", esp_err_to_name(status));
         }
@@ -359,7 +371,6 @@ void esp_zb_app_signal_handler(esp_zb_app_signal_t *signal_struct)
         break;
     }
     default:
-        ESP_LOGD(TAG, "signal %s (0x%x) %s", esp_zb_zdo_signal_to_string(type), (unsigned)type, esp_err_to_name(status));
         break;
     }
 }
@@ -388,6 +399,7 @@ static void zb_task(void *arg)
     esp_zb_core_action_handler_register(core_action);
     esp_zb_set_primary_network_channel_set(ESP_ZB_TRANSCEIVER_ALL_CHANNELS_MASK);
     ESP_ERROR_CHECK(esp_zb_start(false));
+    esp_zb_set_tx_power(CONFIG_MC_ZB_TX_POWER);
     esp_zb_stack_main_loop();
 }
 

@@ -89,13 +89,29 @@ const commandConverter = (c) => ({
   },
 });
 
+const WRITE_BYTES = 48;
+
 /** `config`: the writable attributes (staged on the module), then `commit_config(rev)` applies them. */
 const tzConfig = {
   key: ['config'],
   convertSet: async (entity, key, value) => {
     const rev = value.rev;
     if (!Number.isInteger(rev) || rev < 0 || rev > 65535) throw new Error(`config.rev must be 0..65535, got ${rev}`);
-    await entity.write(CLUSTER, codec.encodeConfig(value), OPTS);
+    // A frame carries ~80 bytes without fragmentation (the module does not answer fragmented writes), and the
+    // whole configuration is ~86: write it in groups of at most WRITE_BYTES, then commit.
+    let group = {};
+    let size = 0;
+    for (const [name, v] of Object.entries(codec.encodeConfig(value))) {
+      const bytes = 3 + (typeof v === 'number' ? 2 : v.length + 1);
+      if (size + bytes > WRITE_BYTES && size > 0) {
+        await entity.write(CLUSTER, group, OPTS);
+        group = {};
+        size = 0;
+      }
+      group[name] = v;
+      size += bytes;
+    }
+    if (size > 0) await entity.write(CLUSTER, group, OPTS);
     await entity.command(CLUSTER, 'commitConfig', {rev}, OPTS);
   },
 };
@@ -148,12 +164,18 @@ export function reportingPlan() {
   return {custom, power};
 }
 
+const REPORT_CHUNK = 6;
+
 async function configure(device, coordinatorEndpoint) {
   const endpoint = device.getEndpoint(I.identity.endpoint);
   await endpoint.bind(CLUSTER, coordinatorEndpoint);
   await endpoint.bind('genPowerCfg', coordinatorEndpoint);
   const {custom, power} = reportingPlan();
-  await endpoint.configureReporting(CLUSTER, custom, OPTS);
+  // One frame holds at most ~80 bytes of payload (a configure-reporting record is 8 bytes), so send a few at a time
+  // ("MESSAGE_TOO_LONG" when all 21 went in one command).
+  for (let i = 0; i < custom.length; i += REPORT_CHUNK) {
+    await endpoint.configureReporting(CLUSTER, custom.slice(i, i + REPORT_CHUNK), OPTS);
+  }
   if (power) await endpoint.configureReporting('genPowerCfg', [power]);
 }
 

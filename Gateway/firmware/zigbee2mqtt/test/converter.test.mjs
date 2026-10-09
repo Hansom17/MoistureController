@@ -121,11 +121,16 @@ async function runSet(payload) {
 
 test('config: the writable attributes first, then commit_config with the revision', async () => {
   const calls = await runSet(HUB_SET.config);
-  assert.equal(calls.length, 2);
-  const [write, commit] = calls;
-  assert.equal(write.op, 'write');
-  assert.equal(write.cluster, 'mcPlant');
-  assert.deepEqual(write.options, {manufacturerCode: MANUFACTURER_CODE});
+  const commit = calls[calls.length - 1];
+  const writes = calls.slice(0, -1);
+  assert.ok(writes.length >= 2, 'the configuration does not fit in one frame');
+  for (const w of writes) {
+    assert.equal(w.op, 'write');
+    assert.equal(w.cluster, 'mcPlant');
+    assert.deepEqual(w.options, {manufacturerCode: MANUFACTURER_CODE});
+    assert.ok(Object.keys(w.attributes).length <= 6, 'a write stays small');
+  }
+  const write = {attributes: Object.assign({}, ...writes.map((w) => w.attributes))};
   assert.deepEqual(Object.keys(write.attributes), [
     'report_interval_s', 'fast_report_interval_s', 'fast_report_hold_s', 'batt_low_mv',
     'slot_cfg_0', 'slot_cfg_1', 'slot_cfg_2', 'slot_cfg_3', 'slot_cfg_4', 'slot_cfg_5',
@@ -188,14 +193,16 @@ test('configure binds the clusters and sets the reporting of the interface', asy
   await definition.configure(device, coordinator, definition);
   const binds = ep.calls.filter((c) => c.op === 'bind').map((c) => c.cluster);
   assert.deepEqual(binds, ['mcPlant', 'genPowerCfg']);
-  const custom = ep.calls.find((c) => c.op === 'configureReporting' && c.cluster === 'mcPlant');
-  const configured = custom.items.map((i) => i.attribute);
-  for (const name of ['slot_0', 'slot_5', 'status', 'cfg_rev', 'cfg_error', 'uptime_s', 'free_heap']) {
+  const customCalls = ep.calls.filter((c) => c.op === 'configureReporting' && c.cluster === 'mcPlant');
+  assert.ok(customCalls.every((c) => c.items.length <= 6), 'a configure command must fit in one frame');
+  const configured = customCalls.flatMap((c) => c.items.map((i) => i.attribute));
+  for (const name of ['status', 'cfg_rev', 'cfg_error', 'uptime_s', 'free_heap']) {
     assert.ok(configured.includes(name), `${name} is reported`);
     assert.ok(clusterDefinition.attributes[name], `${name} exists in the cluster`);
   }
-  assert.deepEqual(custom.items.find((i) => i.attribute === 'slot_0'), {attribute: 'slot_0', minimumReportInterval: 5, maximumReportInterval: 300, reportableChange: 0});
-  assert.deepEqual(custom.options, {manufacturerCode: MANUFACTURER_CODE});
+  assert.ok(!configured.some((n) => n.startsWith('slot_')), 'slot readings are sent by the module, the stack cannot report octet strings');
+  assert.deepEqual(customCalls.flatMap((c) => c.items).find((i) => i.attribute === 'status'), {attribute: 'status', minimumReportInterval: 1, maximumReportInterval: 600, reportableChange: 0});
+  assert.ok(customCalls.every((c) => c.options.manufacturerCode === MANUFACTURER_CODE));
   const power = ep.calls.find((c) => c.op === 'configureReporting' && c.cluster === 'genPowerCfg');
   assert.deepEqual(power.items[0], {attribute: 'batteryVoltage', minimumReportInterval: 60, maximumReportInterval: 600, reportableChange: 1});
 });

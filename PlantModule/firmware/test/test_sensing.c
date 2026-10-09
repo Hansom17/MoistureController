@@ -32,6 +32,8 @@ static void test_the_first_sample_comes_one_second_after_start_and_reads_the_moi
     TEST_ASSERT_EQUAL_INT(1, S.read_slot_calls);
     TEST_ASSERT_EQUAL_INT(MC_SN_SAMPLING, S.core.sn);
     sim_advance(&S, 30);
+    TEST_ASSERT_EQUAL_INT_MESSAGE(MC_SN_REPORTING, S.core.sn, "every sample is sent");
+    sim_send(&S, ev_bool(MC_EV_ZB_REPORT_RESULT, true));
     TEST_ASSERT_EQUAL_INT(MC_SN_IDLE, S.core.sn);
     TEST_ASSERT_EQUAL_UINT16(1, S.attrs.seq);
     TEST_ASSERT_EQUAL_UINT8(MC_MODULE_MOISTURE, S.attrs.readings[0].type);
@@ -42,7 +44,7 @@ static void test_the_first_sample_comes_one_second_after_start_and_reads_the_moi
     TEST_ASSERT_EQUAL_UINT8(MC_MODULE_PUMP, S.attrs.readings[2].type);
     TEST_ASSERT_EQUAL_INT16(0, S.attrs.readings[2].value);
     TEST_ASSERT_EQUAL_UINT8(MC_MODULE_EMPTY, S.attrs.readings[1].type);
-    TEST_ASSERT_EQUAL_INT_MESSAGE(0, S.reports, "normal mode: the reporting engine sends, no explicit report");
+    TEST_ASSERT_EQUAL_INT_MESSAGE(1, S.reports, "the sample is reported explicitly in normal mode too");
 }
 
 static void test_samples_repeat_at_the_report_interval_and_seq_counts(void)
@@ -114,7 +116,7 @@ static void test_a_slot_that_does_not_answer_times_out_after_500_ms(void)
     sim_advance(&S, 499);
     TEST_ASSERT_EQUAL_INT(MC_SN_SAMPLING, S.core.sn);
     sim_advance(&S, 2);
-    TEST_ASSERT_EQUAL_INT(MC_SN_IDLE, S.core.sn);
+    TEST_ASSERT_EQUAL_INT(MC_SN_REPORTING, S.core.sn);
     TEST_ASSERT_EQUAL_UINT8(MC_SENSOR_ERROR_HW_ERROR, S.attrs.readings[0].error);
     TEST_ASSERT_EQUAL_UINT16(1, S.attrs.seq);
 }
@@ -151,7 +153,7 @@ static void test_a_sample_never_takes_longer_than_two_seconds(void)
     sim_advance(&S, 1999);
     TEST_ASSERT_EQUAL_INT(MC_SN_SAMPLING, S.core.sn);
     sim_advance(&S, 2);
-    TEST_ASSERT_EQUAL_INT_MESSAGE(MC_SN_IDLE, S.core.sn, "cut off by the 2 s window");
+    TEST_ASSERT_EQUAL_INT_MESSAGE(MC_SN_REPORTING, S.core.sn, "cut off by the 2 s window, then reported");
     TEST_ASSERT_EQUAL_INT_MESSAGE(4, S.read_slot_calls, "four slots were tried, the rest were skipped");
     for (int i = 0; i < 6; i++) {
         TEST_ASSERT_EQUAL_UINT8(MC_SENSOR_ERROR_HW_ERROR, S.attrs.readings[i].error);

@@ -149,8 +149,9 @@ enums:
   event_code:   {1: boot, 2: low_battery, 3: sensor_fault, 4: sensor_ok, 5: safety_stop, 6: safe_mode, 7: config_rejected}
   cfg_error:    {1: port_invalid, 2: port_conflict, 3: out_of_range, 4: busy, 5: stale_rev, 6: schema_unknown, 7: role_unsupported}
 
-reporting:                             # set by Zigbee2MQTT during configure
-  - {attributes: [slot_0, slot_1, slot_2, slot_3, slot_4, slot_5], min_s: 5,  max_s: 300, change: "0.5 %"}
+reporting:                             # set by Zigbee2MQTT during configure. The slot_n attributes (octet strings) are NOT
+                                       # listed: the stack refuses a reporting configuration for them, so the module sends
+                                       # them itself after every sample (and on every change of the outputs).
   - {attributes: [power_config.batteryVoltage],                     min_s: 60, max_s: 600, change: "50 mV"}
   - {attributes: [status, fast_mode, safe_reason, cfg_rev, cfg_result, cfg_error], min_s: 1, max_s: 600, change: any}
   - {attributes: [uptime_s, boot_reason, reset_count, rejoin_count, last_error, free_heap],  min_s: 10, max_s: 600, change: any}
