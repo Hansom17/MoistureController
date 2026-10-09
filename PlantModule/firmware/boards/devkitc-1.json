@@ -1,0 +1,17 @@
+{
+  "schema": 1,
+  "name": "devkitc-1",
+  "hw_version": 0,
+  "allow_raw_gpio": true,
+  "ports": [
+    {"id": "P1", "gpio": 1, "adc": "ADC1_CH0", "roles": ["moisture", "pump"]},
+    {"id": "P2", "gpio": 2, "adc": "ADC1_CH1", "roles": ["moisture", "pump"]},
+    {"id": "P3", "gpio": 3, "adc": "ADC1_CH2", "roles": ["moisture", "pump"]},
+    {"id": "P4", "gpio": 4, "adc": "ADC1_CH3", "roles": ["moisture", "pump"]},
+    {"id": "P5", "gpio": 6, "adc": "ADC1_CH5", "roles": ["moisture", "pump"]},
+    {"id": "P6", "gpio": 7, "roles": ["pump"]}
+  ],
+  "i2c": {"sda": 18, "scl": 19, "switchable_pullups": false},
+  "led": {"gpio": 8, "active_high": true},
+  "button": {"gpio": 9, "active_low": true}
+}

@@ -330,7 +330,9 @@ hardware/                  carrier board (Part C)
 
 ## 17. Status, prototype plan and open points
 
-Status: this specification, `interface.yaml` and the **carrier board v1** (built, in hand, untested) exist. No firmware is in the repository yet.
+Status: this specification, `interface.yaml` and the **carrier board v1** (built, in hand, untested) exist. The portable core `mc_core` (`firmware/components/mc_core`: lifecycle, sensing and fast mode, pump and command machine, configuration transaction, factory partition parser, generated board table and interface header) is implemented with 100 host tests (basics, lifecycle, sensing, commands, configuration, random-event invariants), built with `-Werror` and ASan/UBSan. Not yet written: the ESP-IDF HAL and Zigbee components.
+
+Run the host tests with `scripts/test_host.sh` (checks the generated files, builds and runs; no ESP-IDF needed). The core enforces a hard pump ceiling of 300 s per run (`MC_PUMP_HARD_MAX_S`), so the hub and app limits for `max_run_s` must stay at or below 300.
 
 ### 17.1 Prototype 1 (on carrier v1, with the coordinator and Zigbee2MQTT)
 
