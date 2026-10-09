@@ -1,0 +1,161 @@
+# Zigbee interface of the PlantModule: the single source for the firmware (C header), the
+# Zigbee2MQTT external converter and the hub models. Human-readable view: PlantModule/specs.md
+# Part B. Status: design proposal; IDs are provisional until the first prototype has run.
+#
+# Conventions
+#   - integers are little endian as in ZCL; "fx100" = signed 16-bit fixed point, value x 100
+#   - mqtt: the key the converter publishes in zigbee2mqtt/<dev-id> (readable keys for the hub)
+#   - access: r = read-only, rw = writable (staged until commit_config), report = reportable
+
+interface:
+  name: moisturecontroller-plant
+  version: {major: 1, minor: 0}      # interface_version attribute = (major << 8) | minor
+  config_schema: 1
+
+identity:
+  manufacturer: MoistureController
+  model: MC-PLANT
+  endpoint: 1
+  profile: HA                         # Home Automation
+  role: end_device_rx_on_when_idle
+
+standard_clusters:
+  basic:                              # 0x0000
+    id: 0x0000
+    attributes: [manufacturerName, modelID, swBuildId, hwVersion]
+  power_config:                       # 0x0001
+    id: 0x0001
+    attributes:
+      - {id: 0x0020, name: batteryVoltage, unit: "100 mV", mqtt: voltage_mv}   # informational on external power
+  identify:
+    id: 0x0003
+
+custom_cluster:
+  id: 0xFC11
+  manufacturer_code: TBD              # a test code is used in development
+
+  attributes:
+    # --- telemetry (device -> gateway) ---
+    - {id: 0x0100, name: seq,             type: uint16, access: [r, report], mqtt: seq,        note: "sample counter; a repeated value means no new reading"}
+    - {id: 0x0101, name: boot_id,         type: uint16, access: [r, report], mqtt: boot_id}
+    - {id: 0x0110, name: slot_0,          type: octet8, access: [r, report], mqtt: slot0,      layout: slot_reading}
+    - {id: 0x0111, name: slot_1,          type: octet8, access: [r, report], mqtt: slot1,      layout: slot_reading}
+    - {id: 0x0112, name: slot_2,          type: octet8, access: [r, report], mqtt: slot2,      layout: slot_reading}
+    - {id: 0x0113, name: slot_3,          type: octet8, access: [r, report], mqtt: slot3,      layout: slot_reading}
+    - {id: 0x0114, name: slot_4,          type: octet8, access: [r, report], mqtt: slot4,      layout: slot_reading}
+    - {id: 0x0115, name: slot_5,          type: octet8, access: [r, report], mqtt: slot5,      layout: slot_reading}
+    - {id: 0x0120, name: status,          type: enum8,  access: [r, report], mqtt: status,     enum: status}
+    - {id: 0x0121, name: fast_mode,       type: uint8,  access: [r, report], mqtt: fast_mode}
+    - {id: 0x0122, name: safe_reason,     type: enum8,  access: [r, report], mqtt: safe_reason, enum: safe_reason}
+    - {id: 0x0130, name: uptime_s,        type: uint32, access: [r, report], mqtt: uptime_s}
+    - {id: 0x0131, name: boot_reason,     type: enum8,  access: [r, report], mqtt: boot_reason, enum: boot_reason}
+    - {id: 0x0132, name: reset_count,     type: uint16, access: [r, report], mqtt: reset_count}
+    - {id: 0x0133, name: rejoin_count,    type: uint16, access: [r, report], mqtt: rejoin_count}
+    - {id: 0x0134, name: last_error,      type: uint16, access: [r, report], mqtt: last_error}
+    - {id: 0x0135, name: free_heap,       type: uint32, access: [r, report], mqtt: free_heap}
+    - {id: 0x0136, name: interface_version, type: uint16, access: [r],       mqtt: interface}
+    - {id: 0x0137, name: config_schema,   type: uint8,  access: [r],         mqtt: config_schema}
+    - {id: 0x0140, name: board,           type: char16, access: [r],         mqtt: board}
+
+    # --- configuration state (device -> gateway) ---
+    - {id: 0x0030, name: cfg_rev,         type: uint16, access: [r, report], mqtt: cfg_rev}
+    - {id: 0x0031, name: cfg_result,      type: enum8,  access: [r, report], mqtt: cfg_result, enum: cfg_result}
+    - {id: 0x0032, name: cfg_error,       type: uint16, access: [r, report], mqtt: cfg_error,  note: "high byte code, low byte slot"}
+
+    # --- configuration (gateway -> device); staged until commit_config ---
+    - {id: 0x0001, name: report_interval_s,      type: uint16, access: [rw], range: [10, 3600], default: 300}
+    - {id: 0x0002, name: fast_report_interval_s, type: uint16, access: [rw], range: [10, 300],   default: 30}
+    - {id: 0x0003, name: fast_report_hold_s,     type: uint16, access: [rw], range: [0, 1800],   default: 120}
+    - {id: 0x0004, name: batt_low_mv,            type: uint16, access: [rw], default: 3500}
+    - {id: 0x0010, name: slot_cfg_0, type: octet24, access: [rw], layout: slot_config}
+    - {id: 0x0011, name: slot_cfg_1, type: octet24, access: [rw], layout: slot_config}
+    - {id: 0x0012, name: slot_cfg_2, type: octet24, access: [rw], layout: slot_config}
+    - {id: 0x0013, name: slot_cfg_3, type: octet24, access: [rw], layout: slot_config}
+    - {id: 0x0014, name: slot_cfg_4, type: octet24, access: [rw], layout: slot_config}
+    - {id: 0x0015, name: slot_cfg_5, type: octet24, access: [rw], layout: slot_config}
+
+  commands_in:                         # gateway -> device
+    - id: 0x00
+      name: commit_config
+      fields: [{name: rev, type: uint16}]
+      mqtt_set: config                 # toZigbee: writes the staged attributes, then sends this command
+    - id: 0x01
+      name: pump_run
+      fields: [{name: cmd_id, type: uint32}, {name: slot, type: uint8}, {name: seconds, type: uint16}, {name: ttl_s, type: uint16}]
+      mqtt_set: pump_run
+    - id: 0x02
+      name: pump_stop
+      fields: [{name: cmd_id, type: uint32}, {name: slot, type: uint8}]
+      mqtt_set: pump_stop
+    - id: 0x03
+      name: cancel
+      fields: [{name: cmd_id, type: uint32}, {name: target, type: uint32}]
+      mqtt_set: cancel
+    - id: 0x04
+      name: device_action
+      fields: [{name: cmd_id, type: uint32}, {name: action, type: enum8, enum: device_action}, {name: arg, type: uint16}]
+      mqtt_set: device_action
+    - id: 0x05
+      name: sensor_sample
+      status: planned
+      fields: [{name: cmd_id, type: uint32}, {name: slot, type: uint8}, {name: samples, type: uint8}]
+      mqtt_set: sensor_sample
+
+  commands_out:                        # device -> gateway
+    - id: 0x00
+      name: cmd_ack
+      fields:
+        - {name: n, type: uint16, note: "module counter, to tell a repeated publication from a new ack"}
+        - {name: cmd_id, type: uint32}
+        - {name: state, type: enum8, enum: ack_state}
+        - {name: reason, type: enum8, enum: reason}
+        - {name: ends_in_s, type: uint16}
+        - {name: result, type: octet6, optional: true, note: "sensor_sample: median, min, max (uint16 each)"}
+      mqtt: cmd_ack                    # transient object in the state payload
+    - id: 0x01
+      name: event
+      fields:
+        - {name: n, type: uint16}
+        - {name: code, type: enum8, enum: event_code}
+        - {name: slot, type: uint8}
+        - {name: arg, type: uint16}
+      mqtt: event
+
+layouts:
+  slot_reading:                        # attribute slot_n, 8 bytes
+    - {name: type,    type: uint8, enum: module}
+    - {name: error,   type: uint8, enum: sensor_error}
+    - {name: value,   type: int16, unit: "% x 100 (0x8000 = unknown)"}
+    - {name: raw,     type: uint16}
+    - {name: cfg_rev, type: uint16}
+  slot_config:                         # attribute slot_cfg_n, at most 24 bytes
+    - {name: module, type: uint8, enum: module}
+    - {name: port,   type: uint8, note: "0 = P1 ... 5 = P6; 0x80 + n = raw GPIO n on boards that allow it"}
+    - {name: flags,  type: uint8, note: "bit 0: active high (pump)"}
+    - params:
+        moisture: [{name: cal_dry, type: uint16}, {name: cal_wet, type: uint16}, {name: samples, type: uint8}]
+        pump:     [{name: max_run_s, type: uint16}, {name: min_pause_s, type: uint16}]
+
+enums:
+  module:       {0: empty, 1: moisture, 2: pump}
+  sensor_error: {0: ok, 1: no_signal, 2: out_of_range, 3: not_found, 4: hw_error}
+  status:       {0: operational, 1: interviewing, 2: safe_mode}
+  safe_reason:  {0: none, 1: factory_invalid, 2: board_unknown, 3: crash_loop}
+  boot_reason:  {0: power_on, 1: software, 2: panic, 3: watchdog, 4: brownout, 5: other}
+  cfg_result:   {0: ok, 1: rejected}
+  ack_state:    {0: running, 1: done, 2: failed, 3: rejected, 4: cancelled}
+  reason:       {0: none, 1: expired, 2: busy, 3: limit, 4: min_pause, 5: slot_not_actuator, 6: slot_not_sensor, 7: hw_error}
+  device_action: {1: identify, 2: reboot, 3: clear_safe_mode}
+  event_code:   {1: boot, 2: low_battery, 3: sensor_fault, 4: sensor_ok, 5: safety_stop, 6: safe_mode, 7: config_rejected}
+  cfg_error:    {1: port_invalid, 2: port_conflict, 3: out_of_range, 4: busy, 5: stale_rev, 6: schema_unknown, 7: role_unsupported}
+
+reporting:                             # set by Zigbee2MQTT during configure
+  - {attributes: [slot_0, slot_1, slot_2, slot_3, slot_4, slot_5], min_s: 5,  max_s: 300, change: "0.5 %"}
+  - {attributes: [power_config.batteryVoltage],                     min_s: 60, max_s: 600, change: "50 mV"}
+  - {attributes: [status, fast_mode, safe_reason, cfg_rev, cfg_result, cfg_error], min_s: 1, max_s: 600, change: any}
+  - {attributes: [uptime_s, boot_reason, reset_count, rejoin_count, last_error, free_heap],  min_s: 10, max_s: 600, change: any}
+
+mqtt:                                  # shapes: Gateway/specs.md "Message paths"
+  state_topic: "zigbee2mqtt/{dev-id}"
+  set_topic: "zigbee2mqtt/{dev-id}/set"
+  slot_keys: [type, value, raw, error]  # published as slot<N>_<key>

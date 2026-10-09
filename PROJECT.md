@@ -65,11 +65,11 @@ flowchart LR
 ### Core architectural rules
 
 1. **One box, one trust boundary.** Devices talk only to the coordinator; apps talk only to the hub's API; nothing else is exposed. The database is reachable only by the hub service.
-2. **Devices are asleep most of the time.** Every interaction is **asynchronous**: the hub records an intent and sends it when the device next checks in. "Pending until the device wakes" is a normal state in the API and the UI.
+2. **Every interaction with a device is asynchronous.** The hub records an intent and sends it when the device can receive it: at once while the device is online, later if it is offline. "Pending" is a normal state in the API and the UI. Today the module is always awake; sleepy low-power devices are possible later and use the same model.
 3. **The hub is the source of truth for intent; the device for reality.** The hub stores *desired* state (config, commands, rules); the device reports *actual* state (readings, running config, command results). The app shows both, and where they differ.
 4. **Rules run on the hub**, next to the data. Watering does not depend on any browser being open or on the internet.
 5. **The device stays dumb and safe.** It measures, reports, executes commands and enforces hard safety limits locally. The hub checks commands again before sending them.
-6. **Zigbee handles the radio side.** Joining, network keys, routing and delivery belong to Zigbee and Zigbee2MQTT. We add only what Zigbee has no standard for (custom settings, a command queue for sleeping devices).
+6. **Zigbee handles the radio side.** Joining, network keys, routing and delivery belong to Zigbee and Zigbee2MQTT. We add only what Zigbee has no standard for (custom settings, a command queue for devices that are offline).
 7. **Extensible by design.** Other Zigbee devices known to Zigbee2MQTT can appear as further device types; the hub works on normalized readings and commands, not on one device model.
 
 ---
@@ -131,7 +131,8 @@ sequenceDiagram
     Z-->>H: device joined (IEEE address, model)
     H-->>A: new device appears, awaiting name
     A->>H: name it, assign plants, configure slots
-    H->>Z: write config attributes (sent when the device checks in)
+    Z->>D: interview, then configure (bindings + reporting)
+    H->>Z: send the initial configuration
 ```
 
 - **Install codes:** a per-device code printed on the label lets the coordinator accept only that device while the network is open. It plays the role the proof-of-possession code played before.
@@ -168,8 +169,8 @@ Each product has its own `specs.md` (design) and `readme.md` (build, run, test).
 
 ESP32-C6 firmware on **ESP-IDF with `esp-zigbee-sdk`**, plus the carrier board (KiCad) and scripts.
 
-- A **sleepy Zigbee end device**: wakes on a timer, reads all configured sensor slots, reports to the coordinator, stays awake for a short window so queued commands can arrive, then deep-sleeps.
-- Standard Zigbee clusters where they exist (soil moisture, temperature, battery, on/off with timed off for the pump); a manufacturer-specific cluster for what has no standard (slot configuration, calibration, safety limits, wake interval).
+- An **always-awake Zigbee end device** (receiver on): samples all configured sensor slots every 5 minutes (every 30 s while watering), reports to the coordinator, and executes commands as they arrive. It is written as explicit state machines. Low power (deep sleep) comes later.
+- Standard Zigbee clusters where they exist (soil moisture, temperature, battery, on/off with timed off for the pump); a manufacturer-specific cluster for what has no standard (slot configuration, calibration, safety limits, report intervals).
 - Enforces local safety limits independent of what the hub says.
 - No WiFi, no MQTT, no Bluetooth pairing and no TLS keys on the device.
 
@@ -181,14 +182,14 @@ One box (Raspberry Pi 4/5, a mini PC or any 64-bit Linux with Docker, plus a Zig
 |---|---|
 | **Zigbee coordinator + Zigbee2MQTT** | Runs the Zigbee network, joins and talks to devices, publishes their messages on MQTT. Needs one external converter that describes the PlantModule's custom cluster. |
 | **Mosquitto** | Internal broker between Zigbee2MQTT and the hub service; not reachable from outside the box. |
-| **Hub service** (Python) | Ingest and normalization; SQLite history; device and plant records; the **command queue** (commands are sent right after a device checks in); local **rules**; alerts; users, tokens and invites; REST API and SSE live updates; serves the Flutter web build. |
+| **Hub service** (Python) | Ingest and normalization; SQLite history; device and plant records; the **command queue** (sent at once while a device is online, held while it is offline); local **rules**; alerts; users, tokens and invites; REST API and SSE live updates; serves the Flutter web build. |
 | **Shared code** (`mc_core`) | Contract models, rules engine, command checks, config validation; part of the hub, kept as a package so it stays testable. |
 
 ### 4.3 App — `App/`
 
 **Flutter**, one codebase: the web build is served by the gateway today, Android/iOS builds come later.
 
-- Login, dashboard, plant detail (history, water now, rules), device detail (slots, health, wake interval), alerts, users and invites, "add device" (opens the join window), gateway status.
+- Login, dashboard, plant detail (history, water now, rules), device detail (slots, health, report interval), alerts, users and invites, "add device" (opens the join window), gateway status.
 - Clearly shows **pending** actions ("device expected ~14:32").
 - Talks only to the hub's REST/SSE API on its own origin.
 
@@ -221,22 +222,25 @@ erDiagram
 
 ## 6. Key flows
 
-### 6.1 Device wake cycle (summary)
+### 6.1 Device run loop (summary)
+
+Full detail in `PlantModule/specs.md` Part A §6 and §7.
 
 ```mermaid
 flowchart TD
-    A([Deep sleep]) -->|RTC timer| B[Wake up]
-    B --> C[Read all sensor slots]
-    C --> D[Rejoin / poll the parent,<br/>report readings + health]
-    D --> E[Stay awake for the check-in window]
-    E --> F{Command or config<br/>from the hub?}
-    F -->|yes| G[Validate, apply safety limits, execute]
-    G --> H[Report result / config state]
-    H --> F
-    F -->|no| I{Pump still running?}
-    I -->|yes| J[Hold pump output,<br/>wake early to switch off]
-    I -->|no| K[Schedule next wake]
+    A([Operational]) -->|every 300 s,<br/>30 s while watering| B[Sample all sensor slots]
+    B --> C[Convert, update attributes]
+    C --> D[Report to the coordinator]
+    D --> A
+    A -->|command from the hub| E[Validate, apply safety limits]
+    E -->|rejected| F[Acknowledge with reason]
+    E -->|ok| G[Run the pump for a bounded time]
+    G --> H[Acknowledge running, then done]
+    H --> A
+    A -->|config writes + commit| I[Validate, apply atomically, persist]
+    I --> J[Report the configuration it runs]
     J --> A
+    A -->|link lost| K[Rejoin with back-off, bounded runs continue]
     K --> A
 ```
 
@@ -258,25 +262,25 @@ sequenceDiagram
 
 ### 6.3 Manual watering
 
-The app gets an answer **immediately** ("queued"); the result arrives when the device next checks in. A Zigbee coordinator holds messages for sleepy devices only for seconds, so **the hub keeps the queue itself** and sends pending commands the moment the device reports.
+The app gets an answer **immediately** ("queued"); the result arrives within moments when the device is online. If the device is offline the command stays queued until it returns or its time to live ends, and the app shows "queued, device offline".
 
 ```mermaid
 sequenceDiagram
     participant App as Web app
     participant Hub as Hub service
     participant Z as Zigbee2MQTT
-    participant Dev as Device (asleep)
+    participant Dev as Device
 
     App->>Hub: POST water {seconds: 10}
-    Hub->>Hub: role ≥ member, limits, store command (id, exp)
+    Hub->>Hub: role ≥ member, limits, store command (id, ttl)
     Hub-->>App: 202 queued
-    Note over Dev: … timer wake …
-    Dev->>Z: report
-    Z->>Hub: report received
-    Hub->>Z: send pending command
-    Z->>Dev: command (device is in its awake window)
-    Dev->>Z: result (running / done)
-    Z->>Hub: result
+    Hub->>Z: pump_run (device online: sent at once)
+    Z->>Dev: cluster command
+    Dev->>Z: cmd_ack running (ends in 10 s)
+    Z->>Hub: state with cmd_ack
+    Hub-->>App: live update: running
+    Dev->>Z: cmd_ack done
+    Z->>Hub: state with cmd_ack
     Hub-->>App: live update: done
 ```
 
@@ -286,7 +290,7 @@ sequenceDiagram
 stateDiagram-v2
     [*] --> Queued: created in the app or by a rule
     Queued --> Delivered: device confirmed
-    Queued --> Expired: device did not check in before the deadline
+    Queued --> Expired: device did not come back before the ttl
     Queued --> Cancelled: user cancels (best effort)
     Delivered --> Done: result = ok
     Delivered --> Failed: result = error / rejected by safety limit
@@ -316,7 +320,7 @@ flowchart TD
 
 ### 6.6 Changing a device's configuration
 
-The app saves the **desired** configuration (revision + 1, validated against the pin rules). The hub writes it to the device's configuration attributes the next time the device checks in; the device validates, applies, persists and reports the configuration it runs. The app shows *Pending (rev 8)* until the reported revision matches, or *Rejected* with the device's reason.
+The app saves the **desired** configuration (revision + 1, validated against the pin rules). The hub sends it to the device at once (or when the device returns): the converter writes the configuration attributes and sends `commit_config`; the device validates, applies atomically, persists and reports the configuration it runs. The app shows *Pending (rev 8)* until the reported revision matches, or *Rejected* with the device's reason.
 
 ### 6.7 Adding a new device
 
@@ -330,8 +334,8 @@ See 3.5: open the join window, the device joins, name it, assign plants, configu
 |---|---|
 | **Security** | One service for people (the hub's web port); everything else is internal to the box. Passwords and tokens hashed. Zigbee network key plus install codes on the radio side. HTTPS and rate limiting come with remote access. |
 | **Time** | The hub stamps every message with its own receive time; the device sends only relative information unless the Zigbee Time cluster is used. The gateway needs NTP. |
-| **Offline detection** | The hub knows each device's wake interval and marks it *late* or *offline*; link quality and the last check-in are shown. |
-| **Power** | Zigbee sleepy end devices use far less energy than WiFi. Every device feature is judged by what it adds to the awake window. |
+| **Offline detection** | The hub marks a device *late* after 3 missed reports and *offline* when Zigbee2MQTT's availability check fails; link quality and the last report are shown. |
+| **Power** | The module is externally powered for now. Low power (sleepy end device, deep sleep, switched sensor supply) is a planned later step and is parked in `PlantModule/specs.md` Part A §18; the design keeps the hooks for it. |
 | **Safety** | Hard maximum pump duration and minimum pause, enforced on the device and again in the hub. |
 | **Data** | SQLite on the gateway. History stays local; the owner can export. Backup is copying the database file (documented, automatable later). |
 | **Notifications** | In-app alert list now; a Telegram bot later; web push needs HTTPS and comes with remote access. A notifier interface in the hub keeps channels pluggable. |
@@ -368,8 +372,8 @@ The previous implementation (WiFi/MQTT firmware, gateway service, central FastAP
 
 Planned order of work:
 
-1. Prove the radio side on the real board: a minimal ESP32-C6 sleepy end device that joins, reports moisture and receives a command, with Zigbee2MQTT and an external converter. Measure sleep current, the awake window and rejoin time.
-2. Write the hub: SQLite, local login with device tokens, command queue driven by device check-ins, Zigbee2MQTT ingest, REST + SSE API, hosting of the web build.
+1. Prove the radio side on the real board (carrier v1 with the SONOFF Dongle Plus MG24 coordinator, already brought up with Zigbee2MQTT 2.14.2): a minimal ESP32-C6 always-listening end device that joins, is interviewed and configured by Zigbee2MQTT, reports moisture and executes a command. The checklist is in `PlantModule/specs.md` Part A §17.1.
+2. Write the hub: SQLite, local login with device tokens, command queue (online/offline), Zigbee2MQTT ingest, REST + SSE API, hosting of the web build.
 3. Adapt the app to the hub API.
 4. Write the real firmware on ESP-IDF and the Zigbee2MQTT converter.
 5. Later: Telegram, HTTPS and remote access, mobile builds, OTA.
@@ -381,10 +385,10 @@ Planned order of work:
 | # | Topic | Decision | Consequences |
 |---|---|---|---|
 | D1 | Scope | **All local, free, one box at home.** No cloud services, no accounts with providers. | Remote access, push and mobile builds are later additions. |
-| D2 | Radio | **Zigbee**, ESP32-C6 as sleepy end device, **`esp-zigbee-sdk` on ESP-IDF** | Firmware moves from Zephyr to ESP-IDF; no WiFi/MQTT/TLS on the device. |
-| D3 | Zigbee side of the gateway | **Zigbee2MQTT** with a Zigbee USB coordinator and one external converter for the PlantModule | Standard clusters where possible; a custom cluster for slots, calibration, limits and wake interval. |
+| D2 | Radio | **Zigbee**, ESP32-C6 as end device with the receiver on (low power later), **`esp-zigbee-sdk` on ESP-IDF** | Firmware moves from Zephyr to ESP-IDF; no WiFi/MQTT/TLS on the device. Going to a sleepy end device later is a configuration change, not a new role. |
+| D3 | Zigbee side of the gateway | **Zigbee2MQTT** with a Zigbee USB coordinator and one external converter for the PlantModule | Standard clusters where possible; a custom cluster for slots, calibration, limits and report intervals. |
 | D4 | Hub | **One Python service** (rules, command queue, API, SSE, hosting of the web build) with **SQLite** | PostgreSQL, the WebSocket uplink and the separate Server are dropped. |
-| D5 | Sleepy-device commands | **The hub keeps the queue and sends pending commands right after a device checks in** | The device must stay awake for a short window after reporting. |
+| D5 | Commands to devices | **The hub sends at once while the device is online and queues while it is offline** (until the ttl ends) | A sleepy low-power mode later adds a check-in sender (`Gateway/specs.md` 9.4). |
 | D6 | Rules | **Evaluated in the hub**, next to the data | No dependency on any browser or the internet. |
 | D7 | Login | **Username + password on the gateway; per-device (per-browser) tokens**, hashed at rest, revocable | Plain HTTP on the LAN until remote access brings HTTPS. |
 | D8 | Roles | **Owner / Admin / Member / Viewer**, one household per gateway | Matrix in 3.2. |
@@ -396,13 +400,16 @@ Planned order of work:
 | D14 | Commands | **Expiry + best-effort cancel** | Every command has `id` + `exp`; the device drops expired ones. |
 | D15 | Safety | **Hard pump limits on the device and again in the hub** | The device is the final authority. |
 | D16 | Remote access | **Not now.** Later a VPN or tunnel in front of the same web port, with HTTPS | Nothing in this design may depend on it. |
+| D17 | Zigbee interface definition | **One machine-readable file** (`PlantModule/interface.yaml`) is the source for the firmware header, the Zigbee2MQTT converter and the hub models | The spec describes it; generators are future work. |
+| D18 | Reporting | **Zigbee2MQTT configures bindings and attribute reporting during the join**; the module adds explicit reports every 30 s while watering | The module only answers the configure step; reports are tied to the module's own sampling. |
+| D19 | Firmware structure | **Explicit state machines** (lifecycle, sensing/report, command, configuration) in a portable core, tested on the host with Unity | Every state has a timeout; a safe mode covers invalid factory data, an unknown board and crash loops. |
+| D20 | Install code | **Required for deployed devices**, optional with a development flag | The hub registers the code before opening the join window. |
 
 ### Still open
 
-- **Zigbee coordinator stick:** which model (e.g. Sonoff ZBDongle-E or -P), and whether its firmware is supported by the chosen Zigbee2MQTT version.
-- **`esp-zigbee-sdk` on the ESP32-C6:** sleep current, polling behaviour of the sleepy end device, and the length of the awake window; to verify in step 2 of the plan.
-- **Custom cluster vs. standard clusters only:** how much configuration really needs a manufacturer-specific cluster.
-- **Time on the device:** whether it needs the Zigbee Time cluster.
-- **Buffering on the device:** how many readings a device keeps if the hub is unreachable (RTC memory is small).
+- **`esp-zigbee-sdk` on the ESP32-C6:** end device with the receiver on, reporting configuration kept across a reset, reporting for custom-cluster attributes; to verify in the first prototype.
+- **Custom cluster vs. standard clusters only:** how much configuration really needs a manufacturer-specific cluster, and whether the first moisture slot also appears as the standard soil-moisture cluster.
+- **Zigbee2MQTT with the custom device:** publication of transient acknowledgements/events, install-code registration, repeated interview/configure requests (`Gateway/specs.md` §7).
 - **Data retention** on the gateway: keep raw readings forever, or downsample after N months.
 - **Backup** of the SQLite file and the Zigbee network settings (losing the coordinator's network data forces re-joining every device).
+- **Low power later:** everything parked in `PlantModule/specs.md` Part A §18.

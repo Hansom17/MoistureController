@@ -101,11 +101,11 @@ flowchart TD
 | **Setup** | Setup code from the gateway's log, installation name, timezone, owner username + password | — | new |
 | **Login** | Username + password, "this device's name"; token stored on success | — | new |
 | **Join (invite)** | Preview (role, installation name), username + password | — | new |
-| **Dashboard** | Plant cards: current moisture, trend, reading age, battery, device state (online / sleeping / late / offline), pending commands. Banner "gateway can't reach Zigbee" when the hub reports it; empty state "add a device first" | viewer | built, adapt |
+| **Dashboard** | Plant cards: current moisture, trend, reading age, battery, device state (online / late / offline / safe mode), pending commands. Banner "gateway can't reach Zigbee" when the hub reports it; empty state "add a device first" | viewer | built, adapt |
 | **Plant detail** | Chart (24 h / 7 d / 30 d / 1 y), **Water now** (seconds picker within the pump's limits), command history, rules list + editor, rule executions ("why did / didn't it water?") | water, rules: member | built, adapt |
 | **Devices** | List with status, battery, link quality, firmware, config sync state | viewer | built, adapt |
 | **Add device** | Opens the join window (`POST /devices/join`) with an optional install code field and a countdown; the new device appears live and is named and configured right there | admin | new (replaces the BLE wizard) |
-| **Device detail** | Slot editor (§10), wake interval and awake window, health chart, events, identify / service mode / reboot, remove | identify: member; rest: admin | built, adapt |
+| **Device detail** | Slot editor (§10), report intervals, health chart, diagnostics (uptime, boot reason, resets, rejoins, last error, firmware and interface version), events, identify / reboot / clear safe mode, remove | identify: member; rest: admin | built, adapt |
 | **Alerts** | Open and closed alerts, acknowledge | ack: member | built, adapt |
 | **Users & invites** | Users with roles; change role / remove; create invite → link + QR (copy, share); open invites with revoke | admin (admins: owner) | planned |
 | **My devices** | The user's tokens (name, created, last used); revoke; change password | — | planned |
@@ -159,12 +159,12 @@ The web app is opened at the gateway's address, so it needs no discovery (`http:
 
 ## 7. Asynchronous device actions in the UI
 
-Devices sleep; nothing happens instantly. The UI makes that explicit:
+Commands and configuration reach the module through the hub and Zigbee, so the result is not instant. The UI makes the in-between states explicit:
 
-- **Water now:** the command appears immediately as *Queued* with "device expected ~14:32" (from `next_expected_at`) and updates live: *Delivered / Running until … / Done / Failed (reason) / Expired / Cancelled*. A queued command can be cancelled ("best effort, may already have run").
-- **Config changes:** the device shows *Pending (rev 8)* until it reports. *Rejected* shows the device's error (e.g. "GPIO 1 cannot drive this module") with a button to revert the form to the reported config.
+- **Water now:** the command appears immediately as *Queued*; with the device online it moves within a second or two to *Running until …* and *Done* (live updates). If the device is offline the command stays *Queued — device offline* until it returns or its time to live ends (*Expired*). States: *Queued / Running / Done / Failed (reason) / Expired / Cancelled*. A queued or running command can be cancelled or stopped ("best effort, may already have run").
+- **Config changes:** the device shows *Pending (rev 8)* until it reports the revision it runs. *Rejected* shows the module's error (for example "port P3 cannot drive this module") with a button to revert the form to the reported config.
 - **Zigbee/gateway trouble:** a banner on all screens ("Zigbee is not running — data and commands are paused"); devices are not marked offline meanwhile.
-- **Late / offline devices:** a status chip with "last seen 2 h ago" and the link quality.
+- **Late / offline / safe mode devices:** a status chip with "last seen 2 h ago" and the link quality; a device in safe mode shows the reason and a "clear safe mode" action for admins.
 
 ## 8. Role-aware UI
 
@@ -181,11 +181,11 @@ Component library and palette: Part B.
 
 ## 10. Slot configuration editor
 
-- Loads `GET /devices/{d}/config` (desired, reported, sync state, limits) and the board description `GET /meta/boards/{board}` (the logical ports of the device's PCB revision with the roles each supports, e.g. analog sensor or pump with deep-sleep hold; served by the hub from the board files of the PlantModule, so the app never duplicates board knowledge).
+- Loads `GET /devices/{d}/config` (desired, reported, sync state, limits) and the board description `GET /meta/boards/{board}` (the logical ports of the device's PCB revision with the roles each supports, e.g. analog sensor or pump; served by the hub from the board files of the PlantModule, so the app never duplicates board knowledge).
 - Per slot: module picker, port picker (P1…Pn) filtered to ports that exist on this board, support the module and are not used by another slot, module options (calibration dry/wet, `active_high`, `max_run_s` ≤ hard limit, `min_pause_s`).
-- Device-level fields: `wake_interval_s` (60–86400 s, default 600) and `awake_s` (2–60 s, default 5). The old "0 = never sleep" no longer exists; the 5-minute commissioning window after joining replaces it (`PlantModule/specs.md` Part A §6.4). The editor also shows when the change will take effect ("at the next check-in, about 14:32").
+- Device-level fields: `report_interval_s` (10–3600 s, default 300), `fast_report_interval_s` (10–300 s, default 30, used while watering) and `fast_report_hold_s` (0–1800 s, default 120). The editor shows that a change is applied as soon as the device confirms it ("pending until the device reports the new revision").
 - Save = `PUT …/config` with `base_rev`; validation errors (422) show on the affected slot.
-- **Planned:** the calibration wizard (capture *dry* and *wet* with `sensor_sample` while the device is in its commissioning window, review, save as a new revision). It needs the firmware command and a hub endpoint.
+- **Planned:** the calibration wizard (capture *dry* and *wet* with `sensor_sample`, review, save as a new revision). It needs the firmware command and a hub endpoint.
 
 ## 11. Adding a device (Zigbee join)
 
@@ -195,17 +195,23 @@ Replaces the BLE pairing wizard; nothing is paired from the phone and no secret 
 stateDiagram-v2
     [*] --> Idle: "Add device"
     Idle --> Open: POST /devices/join (optional install code)
-    Open --> Joined: SSE device new (countdown running)
+    Open --> Joined: SSE device joined (countdown running)
     Open --> Expired: window ended, nothing joined
     Expired --> Idle: try again
-    Joined --> Naming: name, assign plants
-    Naming --> Configuring: slot editor
-    Configuring --> [*]: PUT config → pending → in sync
+    Joined --> Interviewing: hub reports interviewing
+    Interviewing --> Configuring: interview ok
+    Interviewing --> Failed: interview failed after 2 retries
+    Configuring --> Ready: configure ok, first report received
+    Configuring --> Failed: configure failed after 2 retries
+    Failed --> Idle: remove and retry
+    Ready --> Naming: name, assign plants
+    Naming --> Slots: slot editor
+    Slots --> [*]: PUT config → pending → in sync
 ```
 
-- The page explains what to do on the device ("hold the button for 3 s, or power it up") and shows a countdown of the join window (default 2 minutes, `DELETE /devices/join` closes it early).
-- With an install code the admin types or pastes the code from the label first; the label's QR can be scanned later (a camera scanner is not needed in the web app).
-- A device that fails its interview is shown with the hub's error; the admin can remove it and try again.
+- The page explains what to do on the device ("power it up, or hold the button for 3 s") and shows a countdown of the join window (default 2 minutes, `DELETE /devices/join` closes it early).
+- With an install code the admin types or pastes the code from the label first; the label's QR can be scanned later (a camera scanner is not needed in the web app). Deployed modules need their install code.
+- The step list shows **joined → interviewing → configuring → ready** with the hub's error text on failure. A device with an unknown model is listed as *unsupported* and can be removed.
 - Only admins can open the window. The Zigbee network is open to joining only while the window is open.
 
 ## 12. Users, invites and sessions
@@ -232,7 +238,7 @@ The app shows alerts in the Alerts screen and as a badge; with the page open the
 
 - **Removed already:** the BLE pairing wizard, label scanner and protocol code, the `flutter_reactive_ble`, `mobile_scanner` and `cryptography` dependencies, BLE tests and permissions.
 - **Remove:** the household switcher and household scoping, the `local` flavor naming.
-- **Adapt:** `ApiMoistureRepository` to the new API (no `/households/{h}` prefix, token auth, `/stream` without a household), models (no households, memberships), the Gateway screen (Zigbee2MQTT status), device screens (join flow, awake window), permissions to the new role endpoint.
+- **Adapt:** `ApiMoistureRepository` to the new API (no `/households/{h}` prefix, token auth, `/stream` without a household), models (no households, memberships), the Gateway screen (Zigbee2MQTT status), device screens (join flow, report intervals), permissions to the new role endpoint.
 - **Add:** Setup, Login, Join, Users & invites, My devices, Installation screens; the "Add device" join screen; a build that does not use a CDN.
 - **Keep:** dashboard, plant detail, rules, alerts, charts, design system, SSE client, connection banner and state handling, mDNS discovery (for mobile later), localization.
 
@@ -263,7 +269,7 @@ App/
 | Level | What |
 |---|---|
 | Unit / widget (exist) | Fake repository, API repository (HTTP mocked), permissions, theme, gateway screen, discovery (kept for mobile). |
-| To adapt / add | Token handling and `401` flows (login redirect, reauth dialog), setup and invite flows, join-window screen with SSE events, config editor with the awake window, role-based widget tests (viewer sees no water button), SSE reconnect/resync, golden tests for `lib/ui/` (`alchemist`). |
+| To adapt / add | Token handling and `401` flows (login redirect, reauth dialog), setup and invite flows, join-window screen with SSE events, config editor with the report intervals, join screen steps and failures, role-based widget tests (viewer sees no water button), SSE reconnect/resync, golden tests for `lib/ui/` (`alchemist`). |
 | Integration (manual) | The app against the real hub with a Zigbee2MQTT simulator (dev stack planned). An automated browser test is planned. |
 | On hardware | Joining and configuring a real PlantModule from the web app. |
 
@@ -272,7 +278,7 @@ App/
 - The build and serve setup of Flutter web without a CDN (**verify** flags; also check `go_router` URL strategy when served from the hub root).
 - Generated API client from the hub's OpenAPI.
 - Which parts of the Gateway status screen the hub can fill (Zigbee2MQTT state, coordinator info).
-- Calibration wizard and the `sensor_sample` flow; display of the awake window and "device expected" times.
+- Calibration wizard and the `sensor_sample` flow; display of diagnostics and safe mode.
 - Telegram settings UI and message format.
 - Mobile app: secure token storage, discovery on real networks, the Android `MulticastLock`.
 - Offline cache of the last loaded data, if it turns out to be useful.
@@ -358,7 +364,7 @@ Every status is shown as **icon + label + colour** (chip), never colour alone.
 | Status | Light | Dark | Icon | Used for |
 |---|---|---|---|---|
 | `ok` | `#27692B` | `#81C784` | `check_circle` | Device online, command done, gateway in sync |
-| `sleeping` | `#505D6B` | `#AAB6C2` | `bedtime` | Device sleeping as expected (normal state, deliberately calm) |
+| `sleeping` | `#505D6B` | `#AAB6C2` | `bedtime` | Reserved for sleepy low-power devices (later); not used while modules are always awake |
 | `pending` | `#0F5AAE` | `#9CC3F5` | `schedule` | Queued / delivered / running commands, config pending |
 | `warning` | `#8A5100` | `#FFB95C` | `warning` | Device late, low battery, gateway offline banner |
 | `error` | = `colorScheme.error` | = `colorScheme.error` | `error` | Device offline, command failed / expired, config rejected |
