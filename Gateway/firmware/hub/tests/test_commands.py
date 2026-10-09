@@ -278,3 +278,20 @@ async def test_commands_are_not_sent_while_zigbee_is_down(rig):
     await rig.z2m.t.publish("zigbee2mqtt/bridge/state", b'{"state":"online"}', retain=True)
     await rig.api.settle()
     assert "pump_run" in sent(rig, dev)[-1]
+
+
+def test_pump_limits_match_the_firmware_ceiling():
+    import pytest
+    from mc_hub.services import commands, config_sync, domain
+    from mc_hub.errors import HubError
+    assert commands.HARD_LIMIT_S == 300 and domain.MAX_WATER_S == 300
+    board = {"name": "carrier-v1", "ports": [{"id": "P3", "roles": ["moisture", "pump"]}]}
+
+    def slot(**kw):
+        return {"slots": [{"slot": 2, "module": "pump", "port": "P3", **kw}]}
+
+    config_sync.validate(slot(max_run_s=300, min_pause_s=65535), board)
+    with pytest.raises(HubError):
+        config_sync.validate(slot(max_run_s=301), board)
+    with pytest.raises(HubError):
+        config_sync.validate(slot(min_pause_s=65536), board)

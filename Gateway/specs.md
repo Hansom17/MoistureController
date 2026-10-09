@@ -718,5 +718,5 @@ Rules that hold whatever the encoding:
 - Every command has an id and a time to live; the module drops expired ones and never executes an id twice.
 - A configuration carries a revision number; the module reports the revision it runs.
 - Unknown fields are ignored; unknown enum values reject only that message.
-- The module never trusts the hub for safety: hard limits live in the firmware.
+- The module never trusts the hub for safety: hard limits live in the firmware. The hub uses the same ceiling: a pump run (`water`, rule `water_s`, slot `max_run_s`) is at most 300 s, `min_pause_s` at most 65535 s (u16 on the wire).
 - The hub tolerates a different minor interface version and refuses a different major version (the device is shown as `unsupported`).

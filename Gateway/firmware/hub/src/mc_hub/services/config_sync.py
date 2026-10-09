@@ -54,8 +54,8 @@ def validate(body: dict, board: dict) -> dict:
                 raise HubError("validation", detail=f"slot {n}: cal_dry and cal_wet must differ")
             out["samples"] = _int(sl.get("samples", 16), f"slot {n} samples", 1, 64)
         else:
-            out["max_run_s"] = _int(sl.get("max_run_s", 60), f"slot {n} max_run_s", 1, 600)
-            out["min_pause_s"] = _int(sl.get("min_pause_s", 600), f"slot {n} min_pause_s", 0, 86400)
+            out["max_run_s"] = _int(sl.get("max_run_s", 60), f"slot {n} max_run_s", 1, 300)
+            out["min_pause_s"] = _int(sl.get("min_pause_s", 600), f"slot {n} min_pause_s", 0, 65535)
             out["active_high"] = bool(sl.get("active_high", True))
         slots.append(out)
     cfg["slots"] = sorted(slots, key=lambda x: x["slot"])

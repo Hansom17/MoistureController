@@ -12,7 +12,7 @@ from . import alerts
 from .views import alert_view, device_view, plant_view, rule_view
 
 HHMM = re.compile(r"^([01]\d|2[0-3]):[0-5]\d$")
-MAX_WATER_S = 600     # hub hard limit; the module enforces its own max_run_s as well
+MAX_WATER_S = 300     # hub hard limit; the module enforces its own max_run_s as well
 SLOTS = range(0, 6)
 
 

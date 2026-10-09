@@ -12,7 +12,7 @@ from .effects import Effects
 from .views import alert_view
 
 DEFAULT_TTL_S = 900
-HARD_LIMIT_S = 600           # no pump run longer than this, whatever the device says
+HARD_LIMIT_S = 300           # no pump run longer than this, whatever the device says
 OPEN = ("queued", "delivered", "cancelling")
 PUMP_ACTIONS = ("pump.run", "pump.stop")
 NOT_NEW = ("ready", "online", "late", "offline", "safe_mode")

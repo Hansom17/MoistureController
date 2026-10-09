@@ -184,7 +184,7 @@ Component library and palette: Part B.
 ## 10. Slot configuration editor
 
 - Loads `GET /devices/{d}/config` (desired, reported, sync state, limits) and the board description `GET /meta/boards/{board}` (the logical ports of the device's PCB revision with the roles each supports, e.g. analog sensor or pump; served by the hub from the board files of the PlantModule, so the app never duplicates board knowledge).
-- Per slot: module picker, port picker (P1…Pn) filtered to ports that exist on this board, support the module and are not used by another slot, module options (calibration dry/wet, `active_high`, `max_run_s` ≤ hard limit, `min_pause_s`).
+- Per slot: module picker, port picker (P1…Pn) filtered to ports that exist on this board, support the module and are not used by another slot, module options (calibration dry/wet, `active_high`, `max_run_s` 1–300 s (the firmware ceiling), `min_pause_s` 0–65535 s).
 - Device-level fields: `report_interval_s` (10–3600 s, default 300), `fast_report_interval_s` (10–300 s, default 30, used while watering) and `fast_report_hold_s` (0–1800 s, default 120). The editor shows that a change is applied as soon as the device confirms it ("pending until the device reports the new revision").
 - Save = `PUT …/config` with `base_rev`; validation errors (422) show on the affected slot.
 - **Planned:** the calibration wizard (capture *dry* and *wet* with `sensor_sample`, review, save as a new revision). It needs the firmware command and a hub endpoint.

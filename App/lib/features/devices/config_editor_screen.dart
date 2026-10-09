@@ -261,9 +261,9 @@ class _SlotCard extends StatelessWidget {
             ],
           ),
           if (s != null && s.isPump) ...[
-            _IntField(label: l.pumpMaxRun, value: s.maxRunS, min: 1, max: 600, suffix: 's',
+            _IntField(label: l.pumpMaxRun, value: s.maxRunS, min: 1, max: 300, suffix: 's',
                 onChanged: (v) => onChanged(s.copyWith(maxRunS: v))),
-            _IntField(label: l.pumpMinPause, value: s.minPauseS, min: 0, max: 86400, suffix: 's',
+            _IntField(label: l.pumpMinPause, value: s.minPauseS, min: 0, max: 65535, suffix: 's',
                 onChanged: (v) => onChanged(s.copyWith(minPauseS: v))),
             SwitchListTile(
               contentPadding: EdgeInsets.zero,
