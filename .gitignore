@@ -25,3 +25,8 @@ PlantModule/hardware/.history/
 __pycache__/
 *.pyc
 .pytest_cache/
+
+# Gateway stack
+Gateway/firmware/mosquitto/passwd
+Gateway/firmware/mosquitto/tls/
+Gateway/firmware/mosquitto/conf.d/*.conf

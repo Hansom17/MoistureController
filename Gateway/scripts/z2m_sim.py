@@ -245,6 +245,8 @@ async def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--host", default="127.0.0.1")
     ap.add_argument("--port", type=int, default=1884)
+    ap.add_argument("--user")
+    ap.add_argument("--password")
     ap.add_argument("--modules", type=int, default=1)
     ap.add_argument("--pending", type=int, default=0)
     ap.add_argument("--speed", type=float, default=1.0)
@@ -254,7 +256,7 @@ async def main() -> None:
     a = ap.parse_args()
     sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "firmware" / "hub" / "src"))
     from mc_hub.bus.transport import MqttTransport
-    t = MqttTransport(a.host, a.port, client_id="z2m-sim")
+    t = MqttTransport(a.host, a.port, a.user, a.password, client_id="z2m-sim")
     sim = Sim(t, a.modules, a.pending, a.speed, a.report_interval, fail_interview=a.fail_interview,
               reject_config=a.reject_config)
     await t.connect()

@@ -1,0 +1,23 @@
+# One user per service. Mosquitto ACLs only grant, so each rule lists what the user may do.
+
+user z2m
+topic readwrite zigbee2mqtt/#
+
+user hub
+topic readwrite zigbee2mqtt/#
+topic read  mc/v1/req/hub/#
+topic read  mc/v1/event/api/#
+topic read  mc/v1/status/api/#
+topic write mc/v1/res/#
+topic write mc/v1/event/#
+topic write mc/v1/state/#
+topic write mc/v1/status/hub
+
+user api
+topic write mc/v1/req/hub/#
+topic write mc/v1/event/api/#
+topic write mc/v1/status/api/#
+topic read  mc/v1/res/#
+topic read  mc/v1/event/#
+topic read  mc/v1/state/#
+topic read  mc/v1/status/#

@@ -10,6 +10,7 @@ dependencies = [
   "alembic",
   "pydantic>=2",
   "python-ulid",
+  "tzdata",
 ]
 
 [project.optional-dependencies]
@@ -26,7 +27,7 @@ build-backend = "setuptools.build_meta"
 where = ["src"]
 
 [tool.setuptools.package-data]
-mc_hub = ["migrations/*", "migrations/versions/*", "alembic.ini"]
+mc_hub = ["migrations/*", "migrations/versions/*", "boards/*.json"]
 
 [tool.pytest.ini_options]
 pythonpath = ["src"]

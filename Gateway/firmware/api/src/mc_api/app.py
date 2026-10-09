@@ -136,6 +136,9 @@ def create_app(settings: Settings, transport, sessions, clock: Clock | None = No
             f = (root / path).resolve()
             if path and f.is_file() and root in f.parents:
                 return FileResponse(f, media_type=mimetypes.guess_type(f.name)[0])
-            return FileResponse(root / "index.html", media_type="text/html")
+            index = root / "index.html"
+            if not index.is_file():
+                raise StarletteHTTPException(404, "The web app is not installed")
+            return FileResponse(index, media_type="text/html")
 
     return app

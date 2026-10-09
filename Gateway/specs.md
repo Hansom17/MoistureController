@@ -603,7 +603,15 @@ Opening or resolving an alert emits an `alert` event (shown live in the app by `
 
 ### 15.2 Compose
 
-`zigbee2mqtt` (coordinator passed through, e.g. `/dev/serial/by-id/…`), `mosquitto`, `hub` (no port), `api` (publishes the web port; `depends_on` `mosquitto`). `api` is a separate service in the same compose file by default. Profile `remote-api`: adds the TLS listener to Mosquitto on the box, and `docker-compose.api.yml` runs only `api` on another device with `MC_MQTT_HOST` pointing at the box. Optional profile `lan` for the mDNS advertisement of `moisture.local` and the service `_moisture-api._tcp` (multicast needs the host network; `advertise_mdns.py` is reused). Containers run as non-root where the images allow it.
+`firmware/docker-compose.yml` (project name `moisture`) starts `mosquitto` (password file and ACLs from `firmware/mosquitto/`, healthcheck on the port), `z2m-init` (one-shot: copies `zigbee2mqtt/configuration.yaml` into the data volume if there is none), `zigbee2mqtt` (image `koenkk/zigbee2mqtt` with a pinned version, the coordinator passed in as `/dev/ttyZigbee`, MQTT user and password and the adapter from the environment, the converter folder mounted read-only), `hub` (no port) and `api` (the only published port, `MC_PORT`, and the Flutter build mounted read-only from `WEB_DIR`). Volumes: `mosquitto-data`, `z2m-data`, `hub-data`, `api-data`. The services run as an unprivileged user where the images allow it (`hub` and `api`: uid 10001).
+
+`scripts/setup.sh` makes `.env` (generated MQTT passwords for `hub`, `api`, `z2m`) and the Mosquitto password file. `.env.example` lists every setting.
+
+**`api` on another device:** `scripts/remote-api.sh <address>` creates a small CA and server certificate and enables the TLS listener (`conf.d/remote.conf`); the box then runs `docker-compose.yml` plus `docker-compose.remote.yml` (publishes 8883). The other device runs only `docker-compose.api.yml` with `ca.pem` copied from the box and `MC_MQTT_HOST` set. Optional later: a profile for the mDNS advertisement of `moisture.local` and `_moisture-api._tcp` (multicast needs the host network; `advertise_mdns.py` is reused).
+
+**Images:** built from `firmware/hub/Dockerfile` and `firmware/api/Dockerfile` (`python:3.13-slim`, one package each, no shared code). Multi-arch: `docker buildx build --platform linux/arm64,linux/amd64 firmware/hub` (the same for `api`); plain `docker compose build` builds for the host.
+
+**Backup:** `scripts/backup.sh` copies the services' backup folders and the whole Zigbee2MQTT data volume.
 
 ### 15.3 Code layout (target)
 
@@ -611,9 +619,9 @@ Opening or resolving an alert emits an `alert` event (shown live in the app by `
 Gateway/
 ├── mqtt-contract.yaml              # the api ↔ hub contract (3.7)
 ├── firmware/
-│   ├── docker-compose.yml · docker-compose.api.yml · .env.example
-│   ├── zigbee2mqtt/                # configuration.yaml template, external converter (PlantModule)
-│   ├── mosquitto/                  # mosquitto.conf, ACLs, TLS profile
+│   ├── docker-compose.yml · docker-compose.remote.yml · docker-compose.api.yml · .env.example
+│   ├── zigbee2mqtt/                # configuration.yaml template, external_converters/ (PlantModule converter)
+│   ├── mosquitto/                  # mosquitto.conf, acl, conf.d/ (TLS listener written by remote-api.sh)
 │   ├── hub/                        # package mc_hub (own pyproject, Dockerfile, tests)
 │   │   └── src/mc_hub/
 │   │       ├── main.py · config.py · cli.py · errors.py
@@ -631,7 +639,7 @@ Gateway/
 │           ├── routers/ · schemas/
 │           ├── bus/                # MQTT client, request/response, read model
 │           └── realtime/           # SSE bus
-├── scripts/                        # backup.sh, advertise_mdns.py, z2m simulator, TLS setup
+├── scripts/                        # setup.sh, remote-api.sh, backup.sh, z2m_sim.py (advertise_mdns.py later)
 └── hardware/                       # empty
 ```
 
@@ -657,7 +665,7 @@ There is no shared Python package: `mc_hub` and `mc_api` depend only on the cont
 
 ## 18. Status and open points
 
-Status: the split into `api` and `hub` (section 3) is the current design. `api` is implemented in `firmware/api` (30 tests, run against the real hub on an in-memory broker): setup code and first owner, login with rate limit, tokens, reauth proofs, roles, users, invites, ownership transfer, audit log, every REST endpoint of section 6 (reads from the snapshots, writes as hub requests, ISO timestamps), SSE with tickets, ring buffer and replay, export ZIP, backup, web build hosting with CSP, token cleanup, `mc-api run|status|reset-owner|migrate`. `hub` slices 1 to 3 are implemented in `firmware/hub` (72 tests): database and migration, in-memory and real MQTT transports, request handler with idempotency and deadlines, events and snapshots, Zigbee2MQTT adapter and device reconcile, ingest, alerts, installation/plant/rule/alert/device requests, commands with the full lifecycle, cancel, the sender (online/offline queueing, ttl, one item in flight, retries), configuration revisions with validation against the board descriptions (`firmware/hub/src/mc_hub/boards`, a copy until the firmware exists), rule evaluation, the late/offline/expiry/Zigbee-down jobs, and notifications (`app` events, Telegram). join control (permit-join window, install code, interview retries, removal), the paged `query/*` requests incl. export chunks, `backup` with a nightly job, and the Zigbee2MQTT/PlantModule simulator `scripts/z2m_sim.py`. Not yet built: Dockerfiles and the compose file, Mosquitto ACLs and the TLS profile, mDNS, the contract tests against the contract file, the app adaptation.
+Status: the split into `api` and `hub` (section 3) is the current design. `api` is implemented in `firmware/api` (30 tests, run against the real hub on an in-memory broker): setup code and first owner, login with rate limit, tokens, reauth proofs, roles, users, invites, ownership transfer, audit log, every REST endpoint of section 6 (reads from the snapshots, writes as hub requests, ISO timestamps), SSE with tickets, ring buffer and replay, export ZIP, backup, web build hosting with CSP, token cleanup, `mc-api run|status|reset-owner|migrate`. `hub` slices 1 to 3 are implemented in `firmware/hub` (72 tests): database and migration, in-memory and real MQTT transports, request handler with idempotency and deadlines, events and snapshots, Zigbee2MQTT adapter and device reconcile, ingest, alerts, installation/plant/rule/alert/device requests, commands with the full lifecycle, cancel, the sender (online/offline queueing, ttl, one item in flight, retries), configuration revisions with validation against the board descriptions (`firmware/hub/src/mc_hub/boards`, a copy until the firmware exists), rule evaluation, the late/offline/expiry/Zigbee-down jobs, and notifications (`app` events, Telegram). join control (permit-join window, install code, interview retries, removal), the paged `query/*` requests incl. export chunks, `backup` with a nightly job, and the Zigbee2MQTT/PlantModule simulator `scripts/z2m_sim.py`. Dockerfiles, the compose files, the Mosquitto password/ACL setup, the TLS option for a remote `api` and the setup/backup scripts are written (the compose config is validated; a build and a start of the stack with the real ACLs still have to be tried). Not yet built: the PlantModule converter, mDNS, the contract tests against the contract file, the app adaptation.
 
 Open points:
 - Zigbee2MQTT behaviour with the custom device (items marked *verify* in 7): publication of transient `cmd_ack`/`event` objects, `install_code/add` payload, `device/interview` and `device/configure` requests, reporting configuration for custom-cluster attributes, whether reporting configuration survives a module reset.
