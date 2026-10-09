@@ -5,7 +5,7 @@ The top-level document: **what the parts are, what each is responsible for, and 
 | Product | Folder | What it is |
 |---|---|---|
 | **PlantModule** | `PlantModule/` | Battery-powered ESP32-C6 Zigbee end device: firmware (ESP-IDF, `esp-zigbee-sdk`), carrier board, scripts |
-| **Gateway** | `Gateway/` | The box at home: Zigbee coordinator, Zigbee2MQTT, Mosquitto (internal) and our hub service (rules, API, database, web app hosting) |
+| **Gateway** | `Gateway/` | The box at home: Zigbee coordinator, Zigbee2MQTT, Mosquitto and our two services: `hub` (devices, commands, rules, alerts) and `api` (users, REST, web app hosting) |
 | **App** | `App/` | Flutter: runs as web app served by the Gateway; later also as Android/iOS app |
 
 > **Status:** this document is the **design**. The repository currently holds the specs, the carrier board and the Flutter app; the hub, the Zigbee firmware and the Zigbee2MQTT converter are still to be written. The previous WiFi/MQTT implementation is in git history at commit `eb97b07`.
@@ -46,11 +46,18 @@ flowchart LR
         CO["Zigbee coordinator<br/>(USB stick)"]
         Z2M["Zigbee2MQTT"]
         MQ["Mosquitto<br/>(internal only)"]
-        HUB["Hub service<br/>rules · command queue · alerts<br/>REST + SSE · web app hosting"]
-        DB[("SQLite")]
+        HUB["hub<br/>devices · command queue · rules · alerts"]
+        HDB[("hub.db")]
         CO <--> Z2M <--> MQ <--> HUB
-        HUB <--> DB
+        HUB <--> HDB
     end
+
+    subgraph Edge["Any device on the LAN (default: the box)"]
+        API["api<br/>users · tokens · REST + SSE · web app hosting"]
+        ADB[("api.db")]
+        API <--> ADB
+    end
+    API <-- "MQTT only" --> MQ
 
     subgraph Users["People, on the home network"]
         W["Flutter web app<br/>(in a browser)"]
@@ -58,16 +65,16 @@ flowchart LR
     end
 
     D1 & D2 & ZO <-- "Zigbee" --> CO
-    W & M -- "HTTP, login token" --> HUB
-    HUB -. "later: Telegram bot (outbound)" .-> TG["Telegram"]
+    W & M -- "HTTP, login token" --> API
+    HUB -. "Telegram bot (outbound)" .-> TG["Telegram"]
 ```
 
 ### Core architectural rules
 
-1. **One box, one trust boundary.** Devices talk only to the coordinator; apps talk only to the hub's API; nothing else is exposed. The database is reachable only by the hub service.
+1. **One box, one trust boundary.** Devices talk only to the coordinator; apps talk only to the `api` service; nothing else is exposed. Each service opens only its own database, and the services talk to each other only over MQTT (`Gateway/specs.md` §3).
 2. **Every interaction with a device is asynchronous.** The hub records an intent and sends it when the device can receive it: at once while the device is online, later if it is offline. "Pending" is a normal state in the API and the UI. Today the module is always awake; sleepy low-power devices are possible later and use the same model.
 3. **The hub is the source of truth for intent; the device for reality.** The hub stores *desired* state (config, commands, rules); the device reports *actual* state (readings, running config, command results). The app shows both, and where they differ.
-4. **Rules run on the hub**, next to the data. Watering does not depend on any browser being open or on the internet.
+4. **Rules run in `hub`**, next to the data. Watering does not depend on any browser being open, on `api` or on the internet.
 5. **The device stays dumb and safe.** It measures, reports, executes commands and enforces hard safety limits locally. The hub checks commands again before sending them.
 6. **Zigbee handles the radio side.** Joining, network keys, routing and delivery belong to Zigbee and Zigbee2MQTT. We add only what Zigbee has no standard for (custom settings, a command queue for devices that are offline).
 7. **Extensible by design.** Other Zigbee devices known to Zigbee2MQTT can appear as further device types; the hub works on normalized readings and commands, not on one device model.
@@ -146,7 +153,8 @@ sequenceDiagram
 | Home internet down | None. Everything is local. (Only the later Telegram notifications need internet.) |
 | Browser closed | Rules, the command queue and data collection keep running on the gateway. |
 | Gateway box down | Devices keep their local safety limits and retry; no data is collected; the app is unreachable. Data from that period is lost except what devices still hold themselves. |
-| Hub service restarts | Zigbee2MQTT and the network keep running; the hub resumes from SQLite. |
+| `hub` restarts | Zigbee2MQTT and the network keep running; `hub` resumes from SQLite; `api` shows the last state as stale and refuses changes meanwhile. |
+| `api` down or on another device and unreachable | Rules, commands in flight, data collection and Telegram alerts keep running; only the web app is unavailable. |
 
 ### 3.7 Security model
 
@@ -181,9 +189,10 @@ One box (Raspberry Pi 4/5, a mini PC or any 64-bit Linux with Docker, plus a Zig
 | Part | Responsibility |
 |---|---|
 | **Zigbee coordinator + Zigbee2MQTT** | Runs the Zigbee network, joins and talks to devices, publishes their messages on MQTT. Needs one external converter that describes the PlantModule's custom cluster. |
-| **Mosquitto** | Internal broker between Zigbee2MQTT and the hub service; not reachable from outside the box. |
-| **Hub service** (Python) | Ingest and normalization; SQLite history; device and plant records; the **command queue** (sent at once while a device is online, held while it is offline); local **rules**; alerts; users, tokens and invites; REST API and SSE live updates; serves the Flutter web build. |
-| **Shared code** (`mc_core`) | Contract models, rules engine, command checks, config validation; part of the hub, kept as a package so it stays testable. |
+| **Mosquitto** | The only channel between Zigbee2MQTT, `hub` and `api`; per-service users and ACLs; TLS listener only when `api` runs on another device. |
+| **`hub`** (Python) | Everything about plants and devices: ingest and normalization; SQLite history; device and plant records; the **command queue** (sent at once while a device is online, held while it is offline); **rules**; alerts and the Telegram notifier; export and backup of its data. Talks to Zigbee2MQTT and `api` over MQTT; no HTTP port. |
+| **`api`** (Python) | The edge: login, tokens, roles, invites and audit (own SQLite file); REST API and SSE live updates; serves the Flutter web build. Decides who may do something and asks `hub` over MQTT; can run on another device. |
+| **Contract** | `Gateway/mqtt-contract.yaml` describes the `api` ↔ `hub` messages; there is no shared code library. |
 
 ### 4.3 App — `App/`
 
@@ -250,7 +259,7 @@ flowchart TD
 sequenceDiagram
     participant Dev as Device
     participant Z as Zigbee2MQTT
-    participant Hub as Hub service
+    participant Hub as hub
     participant App as Web app
 
     Dev->>Z: Zigbee report (moisture, battery, link quality)
@@ -267,7 +276,7 @@ The app gets an answer **immediately** ("queued"); the result arrives within mom
 ```mermaid
 sequenceDiagram
     participant App as Web app
-    participant Hub as Hub service
+    participant Hub as hub
     participant Z as Zigbee2MQTT
     participant Dev as Device
 
@@ -338,9 +347,9 @@ See 3.5: open the join window, the device joins, name it, assign plants, configu
 | **Power** | The module is externally powered for now. Low power (sleepy end device, deep sleep, switched sensor supply) is a planned later step and is parked in `PlantModule/specs.md` Part A §18; the design keeps the hooks for it. |
 | **Safety** | Hard maximum pump duration and minimum pause, enforced on the device and again in the hub. |
 | **Data** | SQLite on the gateway. History stays local; the owner can export. Backup is copying the database file (documented, automatable later). |
-| **Notifications** | In-app alert list now; a Telegram bot later; web push needs HTTPS and comes with remote access. A notifier interface in the hub keeps channels pluggable. |
-| **Deployment** | Docker Compose, multi-arch (arm64 + amd64): Zigbee2MQTT, Mosquitto, hub service (serving the web build). |
-| **Updates** | Hub and Zigbee2MQTT via `docker compose pull`. Device firmware over Zigbee OTA (supported by Zigbee2MQTT) later. |
+| **Notifications** | In-app alerts are sent by `api`; Telegram messages are sent by `hub` itself (set per rule), so they work without `api`. Web push needs HTTPS and comes with remote access. |
+| **Deployment** | Docker Compose, multi-arch (arm64 + amd64): Zigbee2MQTT, Mosquitto, `hub`, `api` (serving the web build); `api` can be deployed on another device. |
+| **Updates** | `hub`, `api` and Zigbee2MQTT via `docker compose pull`. Device firmware over Zigbee OTA (supported by Zigbee2MQTT) later. |
 | **Remote access** | Not part of this design. Later through a VPN or a tunnel in front of the same web port, together with HTTPS. |
 
 ---
@@ -352,7 +361,7 @@ MoistureController/
 ├── PROJECT.md              ← this file
 ├── readme.md
 ├── PlantModule/            ← firmware/ (ESP-IDF) · hardware/ (KiCad) · scripts/ · specs.md · readme.md
-├── Gateway/                ← hub service, compose (Zigbee2MQTT, Mosquitto, hub), converter, mc_core · scripts/ · specs.md · readme.md
+├── Gateway/                ← hub + api services, compose (Zigbee2MQTT, Mosquitto, hub, api), converter, mqtt-contract.yaml · scripts/ · specs.md · readme.md
 └── App/                    ← Flutter (web, later mobile) · specs.md · readme.md
 ```
 
@@ -404,6 +413,8 @@ Planned order of work:
 | D18 | Reporting | **Zigbee2MQTT configures bindings and attribute reporting during the join**; the module adds explicit reports every 30 s while watering | The module only answers the configure step; reports are tied to the module's own sampling. |
 | D19 | Firmware structure | **Explicit state machines** (lifecycle, sensing/report, command, configuration) in a portable core, tested on the host with Unity | Every state has a timeout; a safe mode covers invalid factory data, an unknown board and crash loops. |
 | D20 | Install code | **Required for deployed devices**, optional with a development flag | The hub registers the code before opening the join window. |
+| D21 | Hub split | **Two services, `api` and `hub`, that talk only over MQTT**; each has its own SQLite file; no shared code library, a contract file instead | Watering and alerts do not depend on the web side; `api` can run on another device. `api` decides who may do something, `hub` decides whether it can be done. |
+| D22 | Notifications | **`api` sends in-app notifications, `hub` sends Telegram** (chosen per rule) | Telegram alerts work while `api` is down. |
 
 ### Still open
 

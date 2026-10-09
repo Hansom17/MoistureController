@@ -1,6 +1,6 @@
 # App — Specification
 
-The app is the only user interface of the system. It is a **Flutter web app served by the Gateway** and talks only to the Gateway's hub API on its own origin (`Gateway/specs.md` Part A §6). The same codebase is meant to become an Android/iOS app later. Responsibilities in the system: [`PROJECT.md`](../PROJECT.md) §4.3.
+The app is the only user interface of the system. It is a **Flutter web app served by the Gateway** and talks only to the Gateway's `api` service on its own origin (`Gateway/specs.md` Part A §6). The same codebase is meant to become an Android/iOS app later. Responsibilities in the system: [`PROJECT.md`](../PROJECT.md) §4.3.
 
 This file has two parts: **Part A** the app, **Part B** its design system. Build and run: [`readme.md`](readme.md).
 
@@ -58,7 +58,7 @@ flowchart TB
     SCR --> SESS
     REPO --> API
     LIVE -- "events → invalidate providers" --> CTRL
-    API -- "HTTP + token" --> HUB["Gateway hub"]
+    API -- "HTTP + token" --> HUB["Gateway api"]
     LIVE -- "SSE" --> HUB
 ```
 
@@ -143,7 +143,9 @@ The hub issues tokens; the app only stores and sends them (`Gateway/specs.md` Pa
 3. Reconnect with exponential backoff (1 s → 30 s) and `Last-Event-ID`, with a new ticket each time.
 4. A hidden browser tab may pause the stream; on becoming visible again the app reconnects and refreshes.
 
-### 6.3 Unreachable hub
+### 6.3 Unreachable gateway or hub
+
+Two cases look different: the `api` cannot be reached (the banner below), or `api` answers but the `hub` behind it is down. In the second case reads carry `stale: true` (the app shows the data greyed out with its age) and writes fail with 503 `hub_unavailable` ("the watering service is not reachable"); a 504 `hub_timeout` means "unknown, check again" and the app reloads the state instead of retrying blindly.
 
 There is no offline cache: when the hub cannot be reached the app keeps what was loaded, greyed out with "can't reach the gateway — showing data from HH:MM", disables actions, and retries in the background. This is a **state**, never an uncaught exception: the repository turns network errors into `ApiProblem(ApiProblem.network)` and the connection banner (Part B §4) shows the state with a Retry button. Nothing blocks on startup. A global error handler (`FlutterError.onError`, `PlatformDispatcher.onError` in `bootstrap.dart`) logs unexpected errors instead of terminating.
 
