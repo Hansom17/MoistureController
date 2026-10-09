@@ -38,7 +38,7 @@ class Hub:
         self.backup = Backup(engine, backup_dir) if engine is not None and backup_dir is not None else None
         self.jobs = Jobs(sessions, clock, self.topics, self.join, self.backup)
         self.notifier = Notifier(sessions, telegram)
-        self.requests = RequestHandler(transport, sessions, publisher, clock, self._flush, self.lock)
+        self.requests = RequestHandler(transport, sessions, publisher, clock, self._flush, self._publish_state, self.lock)
         domain.register(self.requests)
         handlers.register(self.requests, self)
         queries.register(self.requests, self.snapshots)
@@ -56,12 +56,18 @@ class Hub:
     async def stop(self) -> None:
         await self.pub.status("offline")
 
+    async def _publish_state(self, fx: Effects) -> None:
+        """Events and snapshots of a committed change (published once)."""
+        events, snaps = fx.events, fx.snapshots
+        fx.events, fx.snapshots = [], set()
+        for kind, body in events:
+            await self.pub.event(kind, body)
+        if snaps:
+            await self.snapshots.publish(snaps)
+
     async def _flush(self, fx: Effects) -> None:
         """Publish what a committed change produced, then let the sender look at the touched devices."""
-        for kind, body in fx.events:
-            await self.pub.event(kind, body)
-        if fx.snapshots:
-            await self.snapshots.publish(fx.snapshots)
+        await self._publish_state(fx)
         for note in await self.notifier.deliver(fx.notes):
             await self.pub.event("notification", note)
         for topic, payload in fx.out:

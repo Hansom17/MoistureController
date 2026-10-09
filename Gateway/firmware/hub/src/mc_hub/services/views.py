@@ -9,6 +9,7 @@ def device_view(d: Device) -> dict:
         "link_quality": d.link_quality, "voltage_mv": d.voltage_mv,
         "config_sync": config_sync(d), "desired_rev": d.desired_rev, "reported_rev": d.reported_rev,
         "latest_readings": d.slots or {}, "diagnostics": d.diagnostics or {},
+        "desired_config": d.desired_config, "reported_config": d.reported_config, "config_error": d.config_error,
         "updated_at": d.updated_at, "deleted": d.deleted_at is not None,
     }
 

@@ -43,9 +43,10 @@ HandlerFn = Callable[[Ctx, dict], Awaitable[dict | None]]
 class RequestHandler:
     def __init__(self, transport: Transport, sessions: async_sessionmaker[AsyncSession],
                  publisher: Publisher, clock: Clock, flush: Callable[[Effects], Awaitable[None]],
+                 publish_state: Callable[[Effects], Awaitable[None]],
                  lock: asyncio.Lock | None = None):
         self.t, self.sessions, self.pub, self.clock = transport, sessions, publisher, clock
-        self.flush = flush
+        self.flush, self.publish_state = flush, publish_state
         self.handlers: dict[str, HandlerFn] = {}
         # Requests are processed one at a time: simple and ordered. One household is small.
         self._lock = lock or asyncio.Lock()
@@ -71,6 +72,8 @@ class RequestHandler:
             return
         async with self._lock:
             answer, ctx = await self._process(kind, req)
+        if ctx is not None:
+            await self.publish_state(ctx.fx)       # events and snapshots first: read-your-writes for the caller
         await self.t.publish(req.reply_to, dumps(answer))
         if ctx is not None:
             await self.flush(ctx.fx)
