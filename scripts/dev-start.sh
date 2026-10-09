@@ -32,8 +32,8 @@ done
 
 DEV_UID=dev-user
 API=http://localhost:8000/api/v1
-central() { docker compose -f "$ROOT/api/docker-compose.yml" --env-file "$ROOT/api/.env.dev" "$@"; }
-gateway() { docker compose -f "$ROOT/gateway/docker-compose.yml" --env-file "$ROOT/gateway/.env.dev" "$@"; }
+central() { docker compose -f "$ROOT/Server/docker-compose.yml" --env-file "$ROOT/Server/.env.dev" "$@"; }
+gateway() { docker compose -f "$ROOT/Gateway/firmware/docker-compose.yml" --env-file "$ROOT/Gateway/firmware/.env.dev" "$@"; }
 api() { curl -sf -H "Authorization: Bearer dev:$DEV_UID" -H "Content-Type: application/json" "$@"; }
 field() { python3 -c "import json,sys; d=json.load(sys.stdin); print($1)"; }
 step() { printf '\n\033[1m▸ %s\033[0m\n' "$*"; }
@@ -68,19 +68,19 @@ if [ ! -x "$ROOT/.venv/bin/python" ]; then
   python3.13 -m venv ~/.venvs/moisturecontroller
   ln -sfn ~/.venvs/moisturecontroller "$ROOT/.venv"
   "$ROOT/.venv/bin/pip" install -q --upgrade pip
-  "$ROOT/.venv/bin/pip" install -q -e "$ROOT/core" -e "$ROOT/api[dev]" -e "$ROOT/gateway[dev]"
+  "$ROOT/.venv/bin/pip" install -q -e "$ROOT/Shared/core" -e "$ROOT/Server[dev]" -e "$ROOT/Gateway/firmware[dev]"
 fi
 echo "  $("$ROOT/.venv/bin/python" --version) at $ROOT/.venv"
 
 # --- 3. Central stack ------------------------------------------------------------------------
 step "Central stack (API server, PostgreSQL)"
-"$ROOT/api/scripts/make-secrets.sh" >/dev/null
+"$ROOT/Server/scripts/make-secrets.sh" >/dev/null
 central up -d --build --quiet-pull 2>&1 | grep -E "Error|error" || true
 wait_for 180 "the API" curl -sf http://localhost:8000/healthz
 
 # --- 4. Gateway stack --------------------------------------------------------------------------
 step "Gateway stack (gateway service, Mosquitto)"
-"$ROOT/gateway/scripts/make-secrets.sh" >/dev/null
+"$ROOT/Gateway/scripts/make-secrets.sh" >/dev/null
 gateway up -d --build --quiet-pull 2>&1 | grep -E "Error|error" || true
 wait_for 30 "the gateway service" gateway exec -T gateway mc-gateway status
 HID=$(api "$API/me/households" | field "next((h['id'] for h in d if h['name'] == 'Dev home'), '')")
@@ -105,7 +105,7 @@ stop_pid simulator
 MOISTURE_ARG=""
 [ -n "$MOISTURE" ] && MOISTURE_ARG="--moisture $MOISTURE"
 # shellcheck disable=SC2086 — MOISTURE_ARG is empty or two words
-nohup "$ROOT/.venv/bin/python" -u "$ROOT/gateway/tools/fake_device.py" --bundle "$DEV/bundle.json" \
+nohup "$ROOT/.venv/bin/python" -u "$ROOT/Gateway/scripts/fake_device.py" --bundle "$DEV/bundle.json" \
   --interval "$INTERVAL" --state "$DEV/simulator-state.json" $MOISTURE_ARG \
   > "$DEV/simulator.log" 2>&1 &
 echo $! > "$DEV/simulator.pid"
@@ -114,14 +114,14 @@ wait_for 45 "the first wake cycle" grep -q '"sleeping"' "$DEV/simulator.log"
 # --- 6. Web app -----------------------------------------------------------------------------------
 if [ "$APP" = 1 ]; then
   step "Web app"
-  if [ "$BUILD_APP" = 1 ] || [ ! -f "$ROOT/app/build/web/index.html" ]; then
-    (cd "$ROOT/app" && flutter build web --release -t lib/main_local.dart 2>&1 | tail -1)
+  if [ "$BUILD_APP" = 1 ] || [ ! -f "$ROOT/App/build/web/index.html" ]; then
+    (cd "$ROOT/App" && flutter build web --release -t lib/main_local.dart 2>&1 | tail -1)
   fi
   stop_pid web
   if lsof -iTCP:8420 -sTCP:LISTEN >/dev/null 2>&1; then
-    echo "  port 8420 is already in use — assuming it serves app/build/web"
+    echo "  port 8420 is already in use — assuming it serves App/build/web"
   else
-    nohup python3 -m http.server 8420 --bind 127.0.0.1 --directory "$ROOT/app/build/web" \
+    nohup python3 -m http.server 8420 --bind 127.0.0.1 --directory "$ROOT/App/build/web" \
       > "$DEV/web.log" 2>&1 &
     echo $! > "$DEV/web.pid"
     wait_for 10 "the web server" curl -sf http://localhost:8420/
@@ -139,9 +139,9 @@ $(printf '\033[1m')Ready$(printf '\033[0m')
 
 Logs
   simulator    tail -f .dev/simulator.log
-  API          docker compose -f api/docker-compose.yml --env-file api/.env.dev logs -f api
-  gateway      docker compose -f gateway/docker-compose.yml --env-file gateway/.env.dev logs -f gateway
-  gateway CLI  docker compose -f gateway/docker-compose.yml --env-file gateway/.env.dev exec gateway mc-gateway status
+  API          docker compose -f Server/docker-compose.yml --env-file Server/.env.dev logs -f api
+  gateway      docker compose -f Gateway/firmware/docker-compose.yml --env-file Gateway/firmware/.env.dev logs -f gateway
+  gateway CLI  docker compose -f Gateway/firmware/docker-compose.yml --env-file Gateway/firmware/.env.dev exec gateway mc-gateway status
 
 Stop with ./scripts/dev-stop.sh (add --wipe to delete all data)
 EOF

@@ -4,7 +4,7 @@
     {
       "name": "app-web",
       "runtimeExecutable": "python3",
-      "runtimeArgs": ["-m", "http.server", "8420", "--directory", "app/build/web"],
+      "runtimeArgs": ["-m", "http.server", "8420", "--directory", "App/build/web"],
       "port": 8420
     }
   ]

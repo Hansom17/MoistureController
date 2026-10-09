@@ -17,4 +17,6 @@ dev-bundle.json
 .dev/
 
 # Firmware
-firmware/dev.conf
+PlantModule/firmware/dev.conf
+PlantModule/scripts/factory/
+PlantModule/hardware/.history/

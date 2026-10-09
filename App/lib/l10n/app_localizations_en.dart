@@ -1,0 +1,804 @@
+// ignore: unused_import
+import 'package:intl/intl.dart' as intl;
+import 'app_localizations.dart';
+
+// ignore_for_file: type=lint
+
+/// The translations for English (`en`).
+class AppLocalizationsEn extends AppLocalizations {
+  AppLocalizationsEn([String locale = 'en']) : super(locale);
+
+  @override
+  String get appTitle => 'Moisture';
+
+  @override
+  String get navPlants => 'Plants';
+
+  @override
+  String get navDevices => 'Devices';
+
+  @override
+  String get navAlerts => 'Alerts';
+
+  @override
+  String get navSettings => 'Settings';
+
+  @override
+  String get switchHousehold => 'Switch household';
+
+  @override
+  String get roleViewer => 'Viewer';
+
+  @override
+  String get roleMember => 'Member';
+
+  @override
+  String get roleAdmin => 'Admin';
+
+  @override
+  String get roleOwner => 'Owner';
+
+  @override
+  String gatewayOfflineBanner(String time) {
+    return 'Gateway offline since $time. Watering is delivered when it\'s back.';
+  }
+
+  @override
+  String get noPlantsTitle => 'Start with your first plant';
+
+  @override
+  String get noPlantsBody => 'Add a device to start measuring moisture.';
+
+  @override
+  String get noHouseholdTitle => 'Create your first household';
+
+  @override
+  String get noHouseholdBody => 'Or join one with an invite link.';
+
+  @override
+  String get retry => 'Retry';
+
+  @override
+  String get errorGeneric => 'Something went wrong.';
+
+  @override
+  String get errorForbidden => 'Your role no longer allows this.';
+
+  @override
+  String get errorSafetyLimit => 'That\'s longer than this pump\'s limit.';
+
+  @override
+  String get errorGatewayOffline => 'The gateway is offline.';
+
+  @override
+  String get errorTooLate => 'The device already picked this up.';
+
+  @override
+  String get errorBusy => 'The device is busy. Try again shortly.';
+
+  @override
+  String moistureSemantics(int percent) {
+    return 'Moisture $percent percent';
+  }
+
+  @override
+  String percentValue(int value) {
+    return '$value %';
+  }
+
+  @override
+  String secondsValue(int value) {
+    return '$value s';
+  }
+
+  @override
+  String hoursValue(int value) {
+    return '$value h';
+  }
+
+  @override
+  String get justNow => 'just now';
+
+  @override
+  String minutesAgo(int n) {
+    return '$n min ago';
+  }
+
+  @override
+  String hoursAgo(int n) {
+    return '$n h ago';
+  }
+
+  @override
+  String daysAgo(int n) {
+    return '$n d ago';
+  }
+
+  @override
+  String get deviceOnline => 'Online';
+
+  @override
+  String get deviceSleeping => 'Sleeping';
+
+  @override
+  String get deviceLate => 'Late';
+
+  @override
+  String get deviceOffline => 'Offline';
+
+  @override
+  String lastSeen(String ago) {
+    return 'last seen $ago';
+  }
+
+  @override
+  String lastReading(String ago) {
+    return 'Last reading $ago';
+  }
+
+  @override
+  String batteryValue(int percent) {
+    return 'Battery $percent %';
+  }
+
+  @override
+  String get trendFalling => 'Drying';
+
+  @override
+  String get trendSteady => 'Steady';
+
+  @override
+  String get trendRising => 'Rising';
+
+  @override
+  String get pendingCommand => 'Watering pending';
+
+  @override
+  String get waterNow => 'Water now';
+
+  @override
+  String waterFor(int seconds) {
+    return 'Water for $seconds s';
+  }
+
+  @override
+  String waterSheetTitle(String plant) {
+    return 'Water $plant';
+  }
+
+  @override
+  String get waterSheetHint =>
+      'Devices sleep between readings. Watering starts on the next wake.';
+
+  @override
+  String pumpLimit(int seconds) {
+    return 'Pump limit: $seconds s';
+  }
+
+  @override
+  String get waterQueued => 'Watering queued';
+
+  @override
+  String get waterQueuedGatewayOffline =>
+      'Queued. It\'s delivered when the gateway is back online.';
+
+  @override
+  String get cancel => 'Cancel';
+
+  @override
+  String get cancelCommand => 'Cancel watering';
+
+  @override
+  String get cancelCommandHint => 'Best effort — it may already have run.';
+
+  @override
+  String commandTitle(int seconds) {
+    return '$seconds s watering';
+  }
+
+  @override
+  String commandQueued(String time) {
+    return 'Queued · device expected ~$time';
+  }
+
+  @override
+  String get commandDelivered => 'Delivered';
+
+  @override
+  String commandRunning(String time) {
+    return 'Running until $time';
+  }
+
+  @override
+  String get commandDone => 'Done';
+
+  @override
+  String get commandFailed => 'Failed';
+
+  @override
+  String get commandExpired => 'Expired';
+
+  @override
+  String get commandCancelled => 'Cancelled';
+
+  @override
+  String get originUser => 'Manual';
+
+  @override
+  String get originRule => 'Rule';
+
+  @override
+  String get originLocal => 'On the gateway';
+
+  @override
+  String get historyTitle => 'Moisture history';
+
+  @override
+  String get range24h => '24 h';
+
+  @override
+  String get range7d => '7 d';
+
+  @override
+  String get range30d => '30 d';
+
+  @override
+  String get range1y => '1 y';
+
+  @override
+  String chartSummary(int min, int max) {
+    return 'Moisture between $min and $max % in this period';
+  }
+
+  @override
+  String get commandsTitle => 'Watering';
+
+  @override
+  String get noCommands => 'No watering yet.';
+
+  @override
+  String get rulesTitle => 'Rules';
+
+  @override
+  String get noRules => 'Add a rule to water automatically.';
+
+  @override
+  String get addRule => 'Add rule';
+
+  @override
+  String get editRule => 'Edit rule';
+
+  @override
+  String get deleteRule => 'Delete rule';
+
+  @override
+  String ruleSummary(int percent, int seconds, int hours) {
+    return 'Below $percent % → water $seconds s, at most every $hours h';
+  }
+
+  @override
+  String get ruleBelow => 'Water when moisture is below';
+
+  @override
+  String get ruleDuration => 'Watering duration';
+
+  @override
+  String get ruleInterval => 'At most every';
+
+  @override
+  String get ruleEnabled => 'Rule enabled';
+
+  @override
+  String get save => 'Save';
+
+  @override
+  String get delete => 'Delete';
+
+  @override
+  String get noDevices => 'Add your first device';
+
+  @override
+  String firmwareValue(String version) {
+    return 'Firmware $version';
+  }
+
+  @override
+  String signalValue(int rssi) {
+    return 'Signal $rssi dBm';
+  }
+
+  @override
+  String get configInSync => 'Config in sync';
+
+  @override
+  String configPending(int rev) {
+    return 'Config pending (rev $rev)';
+  }
+
+  @override
+  String get configRejected => 'Config rejected';
+
+  @override
+  String get deviceDetails => 'Details';
+
+  @override
+  String get board => 'Board';
+
+  @override
+  String get wakeInterval => 'Wake interval';
+
+  @override
+  String everyMinutes(int minutes) {
+    return 'every $minutes min';
+  }
+
+  @override
+  String get nextExpected => 'Next wake expected';
+
+  @override
+  String get slots => 'Slots';
+
+  @override
+  String slotLabel(int index) {
+    return 'Slot $index';
+  }
+
+  @override
+  String pinLabel(int pin) {
+    return 'GPIO $pin';
+  }
+
+  @override
+  String get identify => 'Identify';
+
+  @override
+  String get reboot => 'Reboot';
+
+  @override
+  String get serviceMode => 'Service mode';
+
+  @override
+  String get deviceActionSent => 'Sent. The device acts on its next wake.';
+
+  @override
+  String get openAlerts => 'Open';
+
+  @override
+  String get closedAlerts => 'Closed';
+
+  @override
+  String get noAlerts => 'All plants are fine';
+
+  @override
+  String alertDeviceOffline(String subject) {
+    return '$subject is offline';
+  }
+
+  @override
+  String alertBatteryLow(String subject) {
+    return '$subject: battery low';
+  }
+
+  @override
+  String alertSensorSuspect(String subject) {
+    return '$subject: sensor readings look wrong';
+  }
+
+  @override
+  String alertCommandFailed(String subject) {
+    return '$subject: watering failed';
+  }
+
+  @override
+  String get acknowledge => 'Acknowledge';
+
+  @override
+  String acknowledgedAgo(String ago) {
+    return 'Acknowledged $ago';
+  }
+
+  @override
+  String get appearance => 'Appearance';
+
+  @override
+  String get themeSystem => 'System';
+
+  @override
+  String get themeLight => 'Light';
+
+  @override
+  String get themeDark => 'Dark';
+
+  @override
+  String get language => 'Language';
+
+  @override
+  String get household => 'Household';
+
+  @override
+  String get timezone => 'Time zone';
+
+  @override
+  String get yourRole => 'Your role';
+
+  @override
+  String get demoSection => 'Demo';
+
+  @override
+  String get demoRole => 'Demo role in this household';
+
+  @override
+  String get demoRoleHint => 'Only in the dev build without a backend.';
+
+  @override
+  String get notAllowed => 'Your role doesn\'t allow this.';
+
+  @override
+  String get battery => 'Battery';
+
+  @override
+  String get signal => 'Signal';
+
+  @override
+  String get firmware => 'Firmware';
+
+  @override
+  String get noReading => 'No reading yet';
+
+  @override
+  String alertOther(String subject, String kind) {
+    return '$subject: $kind';
+  }
+
+  @override
+  String get gatewayTitle => 'Gateway';
+
+  @override
+  String get gatewayNoneTitle => 'Connect your plants';
+
+  @override
+  String get gatewayNoneBody =>
+      'Plant devices talk to a gateway: a small computer at home, like a Raspberry Pi, that also runs your watering rules when the internet is down. Start the gateway software, then enter the code it shows.';
+
+  @override
+  String get gatewayAdd => 'Add gateway';
+
+  @override
+  String get gatewayCodeLabel => 'Code shown by the gateway';
+
+  @override
+  String get gatewayCodeInvalid =>
+      'Enter the 8-character code, like K7QM-2XPA.';
+
+  @override
+  String get gatewayClaimNote =>
+      'Devices paired before have to be re-paired to the new gateway.';
+
+  @override
+  String get gatewayAdded => 'Gateway added. Waiting for it to connect.';
+
+  @override
+  String get gatewayEnrolling => 'Waiting for the gateway to connect';
+
+  @override
+  String gatewayOfflineSince(String time) {
+    return 'Offline since $time';
+  }
+
+  @override
+  String get gatewayInSync => 'Settings in sync';
+
+  @override
+  String get gatewaySyncing => 'Syncing settings';
+
+  @override
+  String get gatewayVersion => 'Version';
+
+  @override
+  String get gatewayAdapters => 'Device types';
+
+  @override
+  String gatewayUpdateAvailable(String version) {
+    return 'Update available: $version';
+  }
+
+  @override
+  String get gatewayUpdateHint =>
+      'On the gateway, run: docker compose pull && docker compose up -d';
+
+  @override
+  String get gatewayOutbox => 'Messages not uploaded yet';
+
+  @override
+  String get gatewayClock => 'Clock';
+
+  @override
+  String get gatewayClockOk => 'Synced';
+
+  @override
+  String get gatewayClockBad => 'Not synced: no automatic watering';
+
+  @override
+  String get gatewayLastReport => 'Last report';
+
+  @override
+  String get gatewayLanAddress => 'LAN address';
+
+  @override
+  String get gatewayLanHint =>
+      'Devices connect to this address. Override it if the gateway has several network interfaces.';
+
+  @override
+  String get gatewayLanReported => 'Reported by the gateway';
+
+  @override
+  String get gatewayLanOverridden => 'Set manually';
+
+  @override
+  String get gatewayLanUnknown => 'Not reported yet';
+
+  @override
+  String get gatewayLanReset => 'Use reported address';
+
+  @override
+  String get edit => 'Edit';
+
+  @override
+  String get gatewayRepairTitle => 'Devices to re-pair';
+
+  @override
+  String get gatewayRepairBody =>
+      'These devices aren\'t paired to this gateway. Re-pair each one with the phone app, close to the device.';
+
+  @override
+  String get deviceNeedsRepair => 'Needs re-pairing';
+
+  @override
+  String get gatewayRemove => 'Remove gateway';
+
+  @override
+  String get gatewayRemoveTitle => 'Remove the gateway?';
+
+  @override
+  String get gatewayRemoveBody =>
+      'Its devices stop reporting until you add a gateway again and re-pair them. Automatic watering stops too. History is kept.';
+
+  @override
+  String get gatewayRemoved => 'Gateway removed';
+
+  @override
+  String get gatewayNone => 'No gateway';
+
+  @override
+  String get errorInvalidCode =>
+      'That code isn\'t valid or has expired. The gateway shows a new one.';
+
+  @override
+  String get errorGatewayExists => 'This household already has a gateway.';
+
+  @override
+  String get errorNoGateway =>
+      'Add a gateway to this household first (Settings → Gateway).';
+
+  @override
+  String get errorReauth => 'Sign in again to do this.';
+
+  @override
+  String get pairAddDevice => 'Add device';
+
+  @override
+  String get pairWebOnly =>
+      'Adding a device needs Bluetooth. Open the app on your phone.';
+
+  @override
+  String get pairLabelTitle => 'Scan the device label';
+
+  @override
+  String get pairLabelBody =>
+      'Hold the camera over the QR code on the label of the plant device.';
+
+  @override
+  String get pairManualToggle => 'Enter the code by hand';
+
+  @override
+  String get pairManualName => 'Name on the label (MC-XXXX)';
+
+  @override
+  String get pairManualCode => 'Code (26 characters)';
+
+  @override
+  String get pairLabelInvalid => 'That is not a MoistureController label.';
+
+  @override
+  String get pairContinue => 'Continue';
+
+  @override
+  String get pairNameTitle => 'Name your device';
+
+  @override
+  String get pairNameHint => 'Kitchen window';
+
+  @override
+  String get pairStart => 'Start pairing';
+
+  @override
+  String get pairCreating => 'Adding the device to your household …';
+
+  @override
+  String pairFinding(String name) {
+    return 'Looking for $name …';
+  }
+
+  @override
+  String get pairHandshake => 'Connecting securely …';
+
+  @override
+  String get pairScanning => 'Looking for WiFi networks …';
+
+  @override
+  String get pairWifiTitle => 'Choose the WiFi for the device';
+
+  @override
+  String get pairWifiBody => 'It must be the network your gateway is on.';
+
+  @override
+  String get pairSsidLabel => 'Network name';
+
+  @override
+  String get pairPasswordLabel => 'WiFi password';
+
+  @override
+  String get pairConnect => 'Connect and test';
+
+  @override
+  String get pairTestingTitle => 'Testing the connection …';
+
+  @override
+  String get pairTestingBody =>
+      'The device joins the WiFi and contacts your gateway. This takes up to 40 seconds.';
+
+  @override
+  String get pairTestWifiFailed =>
+      'The device could not join the WiFi. Check the name and the password.';
+
+  @override
+  String pairTestMqttFailed(String detail) {
+    return 'The device joined the WiFi but could not reach the gateway ($detail).';
+  }
+
+  @override
+  String get pairFinishing => 'Finishing up …';
+
+  @override
+  String get pairWaitingOnline => 'Waiting for the device to report in …';
+
+  @override
+  String get pairDoneTitle => 'Device added';
+
+  @override
+  String pairDoneBody(String name) {
+    return '$name is connected.';
+  }
+
+  @override
+  String get pairDoneSlow =>
+      'The device was added but has not reported in yet. It should show up online within a few minutes.';
+
+  @override
+  String get pairOpenDevice => 'Open device';
+
+  @override
+  String get pairFailNoGateway =>
+      'Add a gateway to this household first (Settings → Gateway).';
+
+  @override
+  String get pairFailGatewayOffline =>
+      'The gateway is offline. Bring it online first.';
+
+  @override
+  String get pairFailNotFound =>
+      'No device found. A new device advertises by itself; a paired one needs the BOOT button held for 3 seconds.';
+
+  @override
+  String get pairFailWrongCode =>
+      'Wrong device or wrong code. The device was removed again.';
+
+  @override
+  String get pairFailConnection => 'The connection to the device was lost.';
+
+  @override
+  String get pairFailBluetoothOff =>
+      'Bluetooth is off. Turn it on and try again.';
+
+  @override
+  String get pairFailBluetoothDenied =>
+      'The app needs permission to use Bluetooth. Allow it in the system settings.';
+
+  @override
+  String get pairFailUnsupported =>
+      'This device cannot pair over Bluetooth. Use the mobile app.';
+
+  @override
+  String get pairFailOther => 'Something went wrong.';
+
+  @override
+  String get pairTryAgain => 'Try again';
+
+  @override
+  String get pairClose => 'Close';
+
+  @override
+  String get pairCancelTitle => 'Cancel pairing?';
+
+  @override
+  String get pairCancelBody =>
+      'The device is removed from your household again.';
+
+  @override
+  String get pairKeepGoing => 'Keep going';
+
+  @override
+  String get serverTitle => 'Server';
+
+  @override
+  String get serverSubtitle => 'The server this app talks to';
+
+  @override
+  String get connSearching => 'Looking for the server on your network …';
+
+  @override
+  String get connUnreachable => 'Can\'t reach the server.';
+
+  @override
+  String get connChoose => 'Several servers found. Choose one.';
+
+  @override
+  String get connEnterAddress => 'Enter address';
+
+  @override
+  String get serverCurrent => 'Connected to';
+
+  @override
+  String get serverFound => 'Servers on your network';
+
+  @override
+  String get serverNone => 'No server found yet.';
+
+  @override
+  String get serverSearchAgain => 'Search again';
+
+  @override
+  String get serverAddress => 'Server address';
+
+  @override
+  String get serverAddressHint => '192.168.1.10:8000';
+
+  @override
+  String get serverAddressInvalid => 'That is not a valid address.';
+
+  @override
+  String get serverAddressNotLocal =>
+      'Only addresses on your home network are allowed.';
+
+  @override
+  String get serverAddressNoAnswer => 'No Moisture server answers there.';
+
+  @override
+  String get serverAuthDev => 'Dev login (no password)';
+
+  @override
+  String get serverAuthFirebase => 'Firebase login';
+
+  @override
+  String get serverDevWarningTitle => 'Unsigned dev login';
+
+  @override
+  String get serverDevWarningBody =>
+      'This server accepts logins without a password. Only continue if it is your own development server.';
+
+  @override
+  String get serverContinue => 'Connect';
+
+  @override
+  String get serverUseThis => 'Use this server';
+}
