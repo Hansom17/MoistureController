@@ -12,13 +12,15 @@ import 'app.dart';
 
 /// Shared start-up for all flavors.
 ///
-/// [connection] is set by the `local` flavor (LAN discovery, App/specs.md Part A §6.4);
+/// [connection] is set by the mobile flavor (LAN discovery, App/specs.md Part A §6.4);
 /// [onUnreachable] lets its repository report "server not reachable" so the
 /// app searches again instead of failing.
 Future<void> bootstrap(
   MoistureRepository repository, {
   ApiConnection? connection,
   void Function(void Function() callback)? onUnreachable,
+  void Function(void Function() callback)? onUnauthorized,
+  String origin = 'http://moisture.local',
 }) async {
   WidgetsFlutterBinding.ensureInitialized();
   _installErrorHandlers();
@@ -27,6 +29,7 @@ Future<void> bootstrap(
     overrides: [
       repositoryProvider.overrideWithValue(repository),
       sharedPreferencesProvider.overrideWithValue(prefs),
+      originProvider.overrideWithValue(origin),
       if (connection != null)
         apiConnectionProvider.overrideWithValue(connection),
     ],
@@ -34,6 +37,7 @@ Future<void> bootstrap(
   onUnreachable?.call(
     () => container.read(apiEndpointProvider.notifier).reportUnreachable(),
   );
+  onUnauthorized?.call(() => container.read(sessionProvider.notifier).expired());
   runApp(
     UncontrolledProviderScope(container: container, child: const MoistureApp()),
   );

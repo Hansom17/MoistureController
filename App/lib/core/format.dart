@@ -18,6 +18,13 @@ String formatAgo(AppLocalizations l, DateTime at, {DateTime? now}) {
   return l.daysAgo(d.inDays);
 }
 
+/// "3 d 4 h", "5 h 12 min", "42 min".
+String formatDuration(AppLocalizations l, Duration d) {
+  if (d.inDays >= 1) return '${d.inDays} d ${d.inHours % 24} h';
+  if (d.inHours >= 1) return '${d.inHours} h ${d.inMinutes % 60} min';
+  return '${d.inMinutes} min';
+}
+
 /// Clock time in the user's locale, e.g. "14:32" / "2:32 PM".
 String formatTime(BuildContext context, DateTime at) =>
     DateFormat.Hm(Localizations.localeOf(context).toString()).format(at);
@@ -29,19 +36,39 @@ String roleLabel(AppLocalizations l, Role role) => switch (role) {
   Role.owner => l.roleOwner,
 };
 
+/// Why a rule did not water ("cooldown", "quiet_hours", ...), localized.
+String skipReasonLabel(AppLocalizations l, String? reason) => switch (reason) {
+  'cooldown' => l.skipCooldown,
+  'quiet_hours' => l.skipQuietHours,
+  'daily_limit' => l.skipDailyLimit,
+  'pending_command' => l.skipPending,
+  'sensor_error' => l.skipSensorError,
+  'no_pump' => l.skipNoPump,
+  'clock_not_synced' => l.skipClock,
+  _ => reason ?? '—',
+};
+
 /// Maps backend problem types to localized messages (App/specs.md Part A §6.1).
 String describeError(AppLocalizations l, Object error) {
   if (error is ApiProblem) {
     return switch (error.type) {
       ApiProblem.forbidden => l.errorForbidden,
       ApiProblem.safetyLimit => l.errorSafetyLimit,
-      ApiProblem.gatewayOffline => l.errorGatewayOffline,
-      ApiProblem.tooLate => l.errorTooLate,
       ApiProblem.busy => l.errorBusy,
-      ApiProblem.invalidCode => l.errorInvalidCode,
-      ApiProblem.gatewayExists => l.errorGatewayExists,
-      ApiProblem.noGateway => l.errorNoGateway,
+      ApiProblem.conflict => error.detail ?? l.errorConflict,
+      ApiProblem.deviceNotReady => l.errorDeviceNotReady,
+      ApiProblem.deviceSafeMode => l.errorDeviceSafeMode,
+      ApiProblem.slotNotActuator => l.errorSlotNotActuator,
+      ApiProblem.invalidCredentials => l.errorInvalidCredentials,
+      ApiProblem.rateLimited => l.errorRateLimited,
       ApiProblem.reauthRequired => l.errorReauth,
+      ApiProblem.hubUnavailable => l.errorHubUnavailable,
+      ApiProblem.hubTimeout => l.errorHubTimeout,
+      ApiProblem.incompatibleHub => l.errorIncompatibleHub,
+      ApiProblem.invalidSetupCode => l.errorInvalidSetupCode,
+      ApiProblem.alreadySetUp => l.errorAlreadySetUp,
+      ApiProblem.invalidInvite => l.errorInvalidInvite,
+      ApiProblem.network => l.errorNetwork,
       _ => error.detail ?? l.errorGeneric,
     };
   }

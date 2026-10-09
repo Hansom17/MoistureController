@@ -5,11 +5,11 @@ import '../../app/theme/app_colors.dart';
 import '../../app/theme/tokens.dart';
 import '../../core/actions.dart';
 import '../../core/format.dart';
-import '../../core/household_data.dart';
+import '../../core/app_data.dart';
 import '../../core/permissions.dart';
 import '../../data/models.dart';
 import '../../ui/common.dart';
-import '../../ui/household_scope.dart';
+import '../../ui/app_scope.dart';
 
 class AlertsScreen extends StatelessWidget {
   const AlertsScreen({super.key});
@@ -17,17 +17,17 @@ class AlertsScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final l = context.l10n;
-    return HouseholdScope(
-      builder: (context, household) => Consumer(
+    return AppScope(
+      builder: (context, user) => Consumer(
         builder: (context, ref, _) {
-          final alerts = ref.watch(alertsProvider(household.id));
+          final alerts = ref.watch(alertsProvider);
           return Scaffold(
             appBar: AppBar(title: Text(l.navAlerts)),
             body: RefreshIndicator(
-              onRefresh: () => ref.refresh(alertsProvider(household.id).future),
+              onRefresh: () => ref.refresh(alertsProvider.future),
               child: AsyncBody(
                 value: alerts,
-                onRetry: () => ref.invalidate(alertsProvider(household.id)),
+                onRetry: () => ref.invalidate(alertsProvider),
                 data: (alerts) {
                   if (alerts.isEmpty) {
                     return ListView(
@@ -44,12 +44,12 @@ class AlertsScreen extends StatelessWidget {
                       if (open.isNotEmpty) ...[
                         _Header(l.openAlerts),
                         for (final a in open)
-                          _AlertTile(household: household, alert: a),
+                          _AlertTile(role: user.role, alert: a),
                       ],
                       if (closed.isNotEmpty) ...[
                         _Header(l.closedAlerts),
                         for (final a in closed)
-                          _AlertTile(household: household, alert: a),
+                          _AlertTile(role: user.role, alert: a),
                       ],
                     ],
                   );
@@ -76,9 +76,9 @@ class _Header extends StatelessWidget {
 }
 
 class _AlertTile extends ConsumerWidget {
-  const _AlertTile({required this.household, required this.alert});
+  const _AlertTile({required this.role, required this.alert});
 
-  final Household household;
+  final Role role;
   final Alert alert;
 
   @override
@@ -106,6 +106,16 @@ class _AlertTile extends ConsumerWidget {
         l.alertCommandFailed(alert.subject),
         status.error,
       ),
+      AlertKind.safeMode => (
+        Icons.shield_outlined,
+        l.alertSafeMode(alert.subject),
+        status.error,
+      ),
+      AlertKind.zigbeeOffline => (
+        Icons.cell_tower,
+        l.alertZigbeeOffline,
+        status.error,
+      ),
       AlertKind.other => (
         Icons.info_outline,
         l.alertOther(
@@ -130,13 +140,13 @@ class _AlertTile extends ConsumerWidget {
           subtitle: Text(subtitle),
           trailing: alert.open
               ? RoleGate(
-                  role: household.role,
+                  role: role,
                   action: AppAction.acknowledgeAlert,
                   builder: (context, allowed) => TextButton(
                     onPressed: allowed
                         ? () => ref
-                              .read(householdActionsProvider)
-                              .acknowledgeAlert(household.id, alert.id)
+                              .read(actionsProvider)
+                              .acknowledgeAlert(alert.id)
                               .catchError((Object e) {
                                 if (context.mounted) {
                                   showErrorSnackBar(context, e);

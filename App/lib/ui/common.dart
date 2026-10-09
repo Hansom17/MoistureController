@@ -6,9 +6,9 @@ import '../core/format.dart';
 import '../core/permissions.dart';
 import '../data/models.dart';
 
-/// Household-wide banner, e.g. "gateway offline since …" (App/specs.md Part A §7).
-class HouseholdBanner extends StatelessWidget {
-  const HouseholdBanner({super.key, required this.message});
+/// Banner for the whole screen, e.g. "Zigbee is not running" (App/specs.md Part A §7).
+class InfoBanner extends StatelessWidget {
+  const InfoBanner({super.key, required this.message});
 
   final String message;
 

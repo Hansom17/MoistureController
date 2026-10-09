@@ -3,75 +3,85 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../app/theme/tokens.dart';
+import '../../core/app_data.dart';
 import '../../core/format.dart';
-import '../../core/household_data.dart';
+import '../../core/permissions.dart';
+import '../../core/session.dart';
 import '../../data/models.dart';
+import '../../ui/app_scope.dart';
 import '../../ui/common.dart';
-import '../../ui/household_scope.dart';
 import '../../ui/plant_card.dart';
-import '../households/household_switcher.dart';
+import '../plants/plant_editor.dart';
 
 class DashboardScreen extends StatelessWidget {
   const DashboardScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
-    return HouseholdScope(
-      builder: (context, household) => Scaffold(
-        appBar: AppBar(
-          title: HouseholdSwitcherButton(current: household),
-          centerTitle: false,
-        ),
-        body: Column(
-          children: [
-            if (gatewayOfflineMessage(context, household) case final message?)
-              HouseholdBanner(message: message),
-            Expanded(child: _PlantGrid(household: household)),
-          ],
-        ),
+    return AppScope(
+      builder: (context, user) => Consumer(
+        builder: (context, ref, _) {
+          final name = ref.watch(installationProvider).value?.name ?? '';
+          return Scaffold(
+            appBar: AppBar(
+              title: Text(name.isEmpty ? context.l10n.appTitle : name),
+              centerTitle: false,
+            ),
+            floatingActionButton: can(user.role, AppAction.editPlants)
+                ? FloatingActionButton.extended(
+                    onPressed: () => showPlantEditor(context, ref),
+                    icon: const Icon(Icons.add),
+                    label: Text(context.l10n.addPlant),
+                  )
+                : null,
+            body: const Column(
+              children: [
+                GatewayBannerHost(),
+                Expanded(child: _PlantGrid()),
+              ],
+            ),
+          );
+        },
       ),
     );
   }
 }
 
-/// Banner text for households whose gateway is offline, else null.
-String? gatewayOfflineMessage(BuildContext context, Household household) {
-  final gateway = household.gateway;
-  if (gateway == null || gateway.online) return null;
-  final since = gateway.offlineSince;
-  return context.l10n.gatewayOfflineBanner(
-    since == null ? '—' : formatTime(context, since),
-  );
-}
-
 class _PlantGrid extends ConsumerWidget {
-  const _PlantGrid({required this.household});
-
-  final Household household;
+  const _PlantGrid();
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final l = context.l10n;
-    final plants = ref.watch(plantsProvider(household.id));
-    final devices = ref.watch(devicesProvider(household.id)).value ?? const [];
+    final plants = ref.watch(plantsProvider);
+    final devices = ref.watch(devicesProvider).value ?? const [];
     final byId = {for (final d in devices) d.id: d};
+    final role = ref.watch(currentUserProviderRole);
 
     return RefreshIndicator(
       onRefresh: () async {
-        ref.invalidate(devicesProvider(household.id));
-        final _ = await ref.refresh(plantsProvider(household.id).future);
+        ref.invalidate(devicesProvider);
+        final _ = await ref.refresh(plantsProvider.future);
       },
       child: AsyncBody(
         value: plants,
-        onRetry: () => ref.invalidate(plantsProvider(household.id)),
+        onRetry: () => ref.invalidate(plantsProvider),
         data: (plants) {
           if (plants.isEmpty) {
+            final noDevices = devices.where((d) => !d.isNew).isEmpty;
             return ListView(
               children: [
                 EmptyState(
                   icon: Icons.yard_outlined,
                   title: l.noPlantsTitle,
-                  body: l.noPlantsBody,
+                  body: noDevices ? l.noPlantsNoDevices : l.noPlantsBody,
+                  action: noDevices && can(role, AppAction.manageDevices)
+                      ? FilledButton.icon(
+                          onPressed: () => context.go('/devices/add'),
+                          icon: const Icon(Icons.add),
+                          label: Text(l.addDevice),
+                        )
+                      : null,
                 ),
               ],
             );
@@ -84,7 +94,7 @@ class _PlantGrid extends ConsumerWidget {
               final columns = ((width + gap) / (400 + gap)).floor().clamp(1, 4);
               final itemWidth = (width - gap * (columns - 1)) / columns;
               return ListView(
-                padding: const EdgeInsets.all(Spacing.lg),
+                padding: const EdgeInsets.fromLTRB(Spacing.lg, Spacing.lg, Spacing.lg, 96),
                 children: [
                   Wrap(
                     spacing: gap,
@@ -96,17 +106,8 @@ class _PlantGrid extends ConsumerWidget {
                           child: PlantCard(
                             plant: plant,
                             device: byId[plant.deviceId],
-                            hasPendingCommand:
-                                (ref
-                                            .watch(
-                                              commandsProvider((
-                                                householdId: household.id,
-                                                plantId: plant.id,
-                                              )),
-                                            )
-                                            .value ??
-                                        const <Command>[])
-                                    .any((c) => !c.state.isFinal),
+                            hasPendingCommand: (ref.watch(commandsProvider(plant.id)).value ?? const <Command>[])
+                                .any((c) => !c.state.isFinal),
                             onTap: () => context.go('/plants/${plant.id}'),
                           ),
                         ),

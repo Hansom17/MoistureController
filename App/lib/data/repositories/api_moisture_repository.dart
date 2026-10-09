@@ -8,17 +8,18 @@ import '../api_problem.dart';
 import '../models.dart';
 import 'moisture_repository.dart';
 
-/// Talks to the API server (`/api/v1`, Server/specs.md Part A §6).
+/// Talks to the gateway's api (`/api/v1`, Gateway/specs.md Part A §6).
 ///
-/// Hand-written until the Dart client is generated from the generated OpenAPI (api.yaml)
-/// (App/specs.md Part A §2); it maps the API's JSON onto the app's models.
+/// Hand-written until a Dart client is generated from the api's OpenAPI document; it maps the api's
+/// JSON onto the app's models.
 class ApiMoistureRepository implements MoistureRepository {
   ApiMoistureRepository({
     required String baseUrl,
-    required Future<String> Function() token,
-    String appHeader = 'dev/0.1.0',
+    String appHeader = 'web/0.1.0',
     HttpClientAdapter? httpAdapter, // tests
+    DateTime Function()? now,
   }) : _base = Uri.parse(baseUrl),
+       _now = now ?? DateTime.now,
        _dio = Dio(
          BaseOptions(
            baseUrl: '$baseUrl/api/v1',
@@ -30,8 +31,13 @@ class ApiMoistureRepository implements MoistureRepository {
     if (httpAdapter != null) _dio.httpClientAdapter = httpAdapter;
     _dio.interceptors.add(
       InterceptorsWrapper(
-        onRequest: (options, handler) async {
-          options.headers['Authorization'] = 'Bearer ${await token()}';
+        onRequest: (options, handler) {
+          final token = _token;
+          if (token != null) options.headers['Authorization'] = 'Bearer $token';
+          final proof = _proof;
+          if (proof != null && _now().isBefore(_proofUntil)) {
+            options.headers['X-MC-Reauth'] = proof;
+          }
           handler.next(options);
         },
       ),
@@ -40,10 +46,20 @@ class ApiMoistureRepository implements MoistureRepository {
 
   Uri _base;
   final Dio _dio;
+  final DateTime Function() _now;
+  String? _token;
+  String? _proof;
+  DateTime _proofUntil = DateTime.fromMillisecondsSinceEpoch(0);
+
+  /// The address pages and invite links are served from (`http://moisture.local`).
+  String get origin => _base.origin;
 
   /// Called when a request failed because the server could not be reached
   /// (not for HTTP error answers); the app then looks for the server again.
   void Function()? onUnreachable;
+
+  /// Called when the api no longer accepts the stored token (revoked, user removed).
+  void Function()? onUnauthorized;
 
   /// Points the repository at another server (LAN discovery, App/specs.md Part A §6.4).
   void setBaseUrl(Uri baseUrl) {
@@ -51,18 +67,28 @@ class ApiMoistureRepository implements MoistureRepository {
     _dio.options.baseUrl = '$baseUrl/api/v1';
   }
 
-  /// Last known `next_expected_at` per device, for "device expected ~14:32".
-  final _nextExpected = <String, DateTime>{};
+  @override
+  void useToken(String? token) {
+    _token = token;
+    if (token == null) _proof = null;
+  }
 
-  Future<dynamic> _get(String path, [Map<String, dynamic>? query]) =>
-      _call(() => _dio.get(path, queryParameters: query));
+  // ---- plumbing ------------------------------------------------------------------------------
 
-  Future<dynamic> _send(String method, String path, [Object? body]) => _call(
-    () => _dio.request(
-      path,
-      data: body,
-      options: Options(method: method),
-    ),
+  /// GETs are retried with backoff (max 3); writes never (App/specs.md Part A §6.1).
+  Future<dynamic> _get(String path, [Map<String, dynamic>? query]) async {
+    for (var attempt = 0; ; attempt++) {
+      try {
+        return await _call(() => _dio.get(path, queryParameters: query));
+      } on ApiProblem catch (e) {
+        if (e.type != ApiProblem.network || attempt >= 2) rethrow;
+        await Future<void>.delayed(Duration(milliseconds: 300 << attempt));
+      }
+    }
+  }
+
+  Future<dynamic> _send(String method, String path, [Object? body, Map<String, dynamic>? query]) => _call(
+    () => _dio.request(path, data: body, queryParameters: query, options: Options(method: method)),
   );
 
   Future<dynamic> _call(Future<Response<dynamic>> Function() request) async {
@@ -70,404 +96,755 @@ class ApiMoistureRepository implements MoistureRepository {
       return (await request()).data;
     } on DioException catch (e) {
       final data = e.response?.data;
-      if (data is Map && data['type'] is String) {
-        throw ApiProblem(
-          data['type'] as String,
-          status: e.response?.statusCode ?? 0,
-          detail: data['detail'] as String?,
-        );
+      final status = e.response?.statusCode ?? 0;
+      if (data is Map && data['code'] is String) {
+        final code = data['code'] as String;
+        if (status == 401 && code == ApiProblem.unauthorized) onUnauthorized?.call();
+        throw ApiProblem(code, status: status, detail: data['detail'] as String?);
       }
       if (e.response == null) onUnreachable?.call();
-      throw ApiProblem(
-        ApiProblem.network,
-        status: e.response?.statusCode ?? 0,
-        detail: e.message,
-      );
+      throw ApiProblem(ApiProblem.network, status: status, detail: e.message);
     }
   }
 
   static DateTime? _dt(Object? v) =>
       v == null ? null : DateTime.parse(v as String).toLocal();
 
-  // --- households ------------------------------------------------------------
+  static Map _map(Object? v) => (v as Map?) ?? const {};
+  static List _list(Object? v) => (v as List?) ?? const [];
+
+  // ---- sign-in -------------------------------------------------------------------------------
+
+  AppUser _user(Map u) => AppUser(
+    id: u['id'] as String,
+    username: u['username'] as String,
+    displayName: (u['display_name'] ?? u['username']) as String,
+    role: Role.values.byName(u['role'] as String),
+    disabled: (u['disabled'] as bool?) ?? false,
+    createdAt: _dt(u['created_at']),
+  );
+
+  Session _session(Object? r) =>
+      Session(token: _map(r)['token'] as String, user: _user(_map(_map(r)['user'])));
 
   @override
-  Future<List<Household>> households() async {
-    final list = await _get('/me/households') as List;
+  Future<GatewayMeta> meta() async {
+    final m = _map(await _get('/meta'));
+    final hub = _map(m['hub']);
+    return GatewayMeta(
+      name: (m['name'] ?? '') as String,
+      setupRequired: m['setup_required'] as bool,
+      hubOnline: (hub['online'] as bool?) ?? false,
+      hubCompatible: (hub['compatible'] as bool?) ?? true,
+      version: m['version'] as String?,
+    );
+  }
+
+  @override
+  Future<Session> setup({
+    required String setupCode,
+    required String name,
+    required String timezone,
+    required String username,
+    required String password,
+    String displayName = '',
+  }) async => _session(
+    await _send('POST', '/setup', {
+      'setup_code': setupCode.trim(),
+      'name': name,
+      'timezone': timezone,
+      'username': username,
+      'password': password,
+      'display_name': displayName,
+    }),
+  );
+
+  @override
+  Future<Session> login({
+    required String username,
+    required String password,
+    String deviceName = '',
+  }) async => _session(
+    await _send('POST', '/auth/login', {
+      'username': username,
+      'password': password,
+      'device_name': deviceName,
+    }),
+  );
+
+  @override
+  Future<InvitePreview> previewInvite(String code) async {
+    final r = _map(await _get('/invites/${Uri.encodeComponent(code)}'));
+    return InvitePreview(
+      role: Role.values.byName(r['role'] as String),
+      installation: (r['installation'] ?? '') as String,
+    );
+  }
+
+  @override
+  Future<Session> acceptInvite({
+    required String code,
+    required String username,
+    required String password,
+    String displayName = '',
+    String deviceName = '',
+  }) async => _session(
+    await _send('POST', '/invites/${Uri.encodeComponent(code)}/accept', {
+      'username': username,
+      'password': password,
+      'display_name': displayName,
+      'device_name': deviceName,
+    }),
+  );
+
+  @override
+  Future<AppUser> me() async => _user(_map(await _get('/me')));
+
+  @override
+  Future<void> logout() async {
+    try {
+      await _send('POST', '/auth/logout');
+    } on ApiProblem {
+      // already signed out on the server: nothing left to do
+    }
+  }
+
+  @override
+  Future<AppUser> updateMe({String? displayName}) async =>
+      _user(_map(await _send('PATCH', '/me', {'display_name': displayName})));
+
+  @override
+  Future<void> changePassword({
+    required String currentPassword,
+    required String newPassword,
+  }) => _send('PATCH', '/me', {
+    'password': newPassword,
+    'current_password': currentPassword,
+  });
+
+  @override
+  Future<void> reauth(String password) async {
+    final r = _map(await _send('POST', '/auth/reauth', {'password': password}));
+    _proof = r['proof'] as String;
+    _proofUntil = _now().add(Duration(seconds: ((r['expires_in'] as int?) ?? 300) - 5));
+  }
+
+  // ---- tokens, users, invites, audit -----------------------------------------------------------
+
+  @override
+  Future<List<TokenInfo>> tokens() async => [
+    for (final t in _list(await _get('/auth/tokens')).cast<Map>())
+      TokenInfo(
+        id: t['id'] as String,
+        name: (t['name'] ?? '') as String,
+        createdAt: _dt(t['created_at'])!,
+        lastUsedAt: _dt(t['last_used_at']),
+        current: (t['current'] as bool?) ?? false,
+      ),
+  ];
+
+  @override
+  Future<void> revokeToken(String id) => _send('DELETE', '/auth/tokens/$id');
+
+  @override
+  Future<List<AppUser>> users() async => [
+    for (final u in _list(await _get('/users')).cast<Map>()) _user(u),
+  ];
+
+  @override
+  Future<AppUser> updateUser(
+    String id, {
+    Role? role,
+    String? displayName,
+    bool? disabled,
+  }) async => _user(
+    _map(
+      await _send('PATCH', '/users/$id', {
+        'role': ?role?.name,
+        'display_name': ?displayName,
+        'disabled': ?disabled,
+      }),
+    ),
+  );
+
+  @override
+  Future<void> deleteUser(String id) => _send('DELETE', '/users/$id');
+
+  @override
+  Future<void> transferOwnership(String userId) =>
+      _send('POST', '/transfer-ownership', {'user_id': userId});
+
+  Invite _invite(Map i) => Invite(
+    id: i['id'] as String,
+    role: Role.values.byName(i['role'] as String),
+    status: i['status'] as String,
+    expiresAt: _dt(i['expires_at'])!,
+  );
+
+  @override
+  Future<List<Invite>> invites() async => [
+    for (final i in _list(await _get('/invites')).cast<Map>()) _invite(i),
+  ];
+
+  @override
+  Future<CreatedInvite> createInvite(Role role, {Duration? expiresIn}) async {
+    final r = _map(
+      await _send('POST', '/invites', {
+        'role': role.name,
+        'expires_in': ?expiresIn?.inSeconds,
+      }),
+    );
+    return CreatedInvite(invite: _invite(r), code: r['code'] as String);
+  }
+
+  @override
+  Future<void> revokeInvite(String id) => _send('DELETE', '/invites/$id');
+
+  @override
+  Future<List<AuditEntry>> audit({int? before, int limit = 100}) async {
+    final r = _map(await _get('/audit', {'limit': limit, 'before': ?before}));
     return [
-      for (final h in list.cast<Map>())
-        Household(
-          id: h['id'] as String,
-          name: h['name'] as String,
-          timezone: h['timezone'] as String,
-          role: Role.values.byName(h['role'] as String),
-          gateway: h['gateway'] == null
-              ? null
-              : GatewayStatus(
-                  online: h['gateway']['online'] as bool,
-                  offlineSince: _dt(h['gateway']['offline_since']),
-                ),
+      for (final a in _list(r['items']).cast<Map>())
+        AuditEntry(
+          id: a['id'] as int,
+          actor: (a['actor'] ?? '') as String,
+          action: a['action'] as String,
+          at: _dt(a['ts'])!,
+          detail: (a['detail'] as Map?)?.cast<String, Object?>(),
         ),
     ];
   }
 
-  // --- plants and readings ----------------------------------------------------
+  // ---- installation and gateway ------------------------------------------------------------------
 
-  @override
-  Future<List<Plant>> plants(String householdId) async {
-    final list = await _get('/households/$householdId/plants') as List;
-    return [for (final p in list.cast<Map>()) _plant(p)];
-  }
-
-  Plant _plant(Map p) => Plant(
-    id: p['id'] as String,
-    name: p['name'] as String,
-    deviceId: (p['sensor_device_id'] ?? p['pump_device_id'] ?? '') as String,
-    moisturePercent: (p['moisture'] as num?)?.toDouble(),
-    trend: Trend.values.byName(p['trend'] as String),
-    lastReadingAt: _dt(p['last_reading_at']),
-    maxRunS: (p['max_run_s'] as int?) ?? 0,
+  Installation _installation(Map i) => Installation(
+    name: (i['name'] ?? '') as String,
+    timezone: (i['timezone'] ?? 'UTC') as String,
+    batteryLowMv: (i['battery_low_mv'] as int?) ?? 3500,
+    telegramConfigured: (i['telegram_configured'] as bool?) ?? false,
   );
 
-  static const _buckets = {
-    ChartRange.day: 'raw',
-    ChartRange.week: '1h',
-    ChartRange.month: '1h',
-    ChartRange.year: '1d',
-  };
+  @override
+  Future<Installation> installation() async =>
+      _installation(_map(await _get('/installation')));
 
   @override
-  Future<List<Reading>> readings(
-    String householdId,
-    String plantId,
-    ChartRange range,
-  ) async {
-    final end = DateTime.now().toUtc();
-    final list =
-        await _get('/households/$householdId/plants/$plantId/readings', {
-              'start': end.subtract(range.span).toIso8601String(),
-              'end': end.toIso8601String(),
-              'bucket': _buckets[range],
-            })
-            as List;
+  Future<Installation> updateInstallation({
+    String? name,
+    String? timezone,
+    int? batteryLowMv,
+    String? telegramToken,
+    String? telegramChatId,
+  }) async {
+    await _send('PATCH', '/installation', {
+      'name': ?name,
+      'timezone': ?timezone,
+      'battery_low_mv': ?batteryLowMv,
+      if (telegramToken != null || telegramChatId != null)
+        'telegram': {'token': ?telegramToken, 'chat_id': ?telegramChatId},
+    });
+    return installation();
+  }
+
+  @override
+  Future<GatewayStatus> gatewayStatus() async {
+    final s = _map(await _get('/status'));
+    final hub = _map(s['hub']);
+    final gw = _map(s['gateway']);
+    return GatewayStatus(
+      hubOnline: (hub['online'] as bool?) ?? false,
+      zigbee: (gw['zigbee2mqtt'] ?? 'unknown') as String,
+      coordinator: gw['coordinator'] as String?,
+      hubVersion: (hub['version'] ?? gw['hub_version']) as String?,
+      apiVersion: _map(s['api'])['version'] as String?,
+      clockSynced: gw['clock_synced'] as bool?,
+      dbSizeBytes: _map(s['api'])['db_size'] as int?,
+    );
+  }
+
+  @override
+  Future<void> backup() => _send('POST', '/backup');
+
+  @override
+  Future<List<int>> exportData() async {
+    final r = await _call(
+      () => _dio.post<List<int>>('/export', options: Options(responseType: ResponseType.bytes)),
+    );
+    return (r as List).cast<int>();
+  }
+
+  // ---- plants and readings ---------------------------------------------------------------------
+
+  @override
+  Future<List<Plant>> plants() async {
+    final results = await Future.wait([_get('/plants'), _get('/devices')]);
+    final devices = {
+      for (final d in _list(results[1]).cast<Map>()) d['id'] as String: d,
+    };
     return [
-      for (final r in list.cast<Map>())
-        if (r['value'] != null)
-          Reading(_dt(r['ts'])!, (r['value'] as num).toDouble()),
+      for (final p in _list(results[0]).cast<Map>()) _plant(p, devices),
     ];
   }
 
-  // --- commands -----------------------------------------------------------------
+  /// The pump slot's `max_run_s` from the configuration the device runs; 0 when the plant has no pump.
+  int _maxRun(Map p, Map<String, Map> devices) {
+    final ref = _map(p['pump']);
+    final dev = devices[ref['device_id']];
+    if (dev == null) return 0;
+    final cfg = _map(dev['reported_config']);
+    for (final s in _list(cfg['slots']).cast<Map>()) {
+      if (s['slot'] == ref['slot'] && s['module'] == 'pump') {
+        return (s['max_run_s'] as int?) ?? 0;
+      }
+    }
+    return 0;
+  }
+
+  SlotRef _ref(Object? v) {
+    final m = _map(v);
+    return SlotRef(deviceId: m['device_id'] as String?, slot: m['slot'] as int?);
+  }
+
+  Plant _plant(Map p, Map<String, Map> devices) => Plant(
+    id: p['id'] as String,
+    name: p['name'] as String,
+    notes: (p['notes'] ?? '') as String,
+    sensor: _ref(p['sensor']),
+    pump: _ref(p['pump']),
+    moisturePercent: (p['latest_value'] as num?)?.toDouble(),
+    trend: switch (p['trend']) {
+      'rising' => Trend.rising,
+      'falling' => Trend.falling,
+      _ => Trend.steady,
+    },
+    lastReadingAt: _dt(p['latest_ts']),
+    maxRunS: _maxRun(p, devices),
+  );
+
+  Future<Plant> _plantAfterWrite(Map p) async {
+    final devices = {
+      for (final d in _list(await _get('/devices')).cast<Map>()) d['id'] as String: d,
+    };
+    return _plant(p, devices);
+  }
+
+  Map<String, Object?> _refJson(SlotRef r) => {'device_id': r.deviceId, 'slot': r.slot};
+
+  @override
+  Future<Plant> createPlant({
+    required String name,
+    SlotRef sensor = const SlotRef(),
+    SlotRef pump = const SlotRef(),
+    String notes = '',
+  }) async => _plantAfterWrite(
+    _map(
+      await _send('POST', '/plants', {
+        'name': name,
+        'notes': notes,
+        if (sensor.isSet) 'sensor': _refJson(sensor),
+        if (pump.isSet) 'pump': _refJson(pump),
+      }),
+    ),
+  );
+
+  @override
+  Future<Plant> updatePlant(
+    String id, {
+    String? name,
+    String? notes,
+    SlotRef? sensor,
+    SlotRef? pump,
+  }) async => _plantAfterWrite(
+    _map(
+      await _send('PATCH', '/plants/$id', {
+        'name': ?name,
+        'notes': ?notes,
+        if (sensor != null) 'sensor': _refJson(sensor),
+        if (pump != null) 'pump': _refJson(pump),
+      }),
+    ),
+  );
+
+  @override
+  Future<void> deletePlant(String id) => _send('DELETE', '/plants/$id');
+
+  static const _buckets = {
+    ChartRange.day: 'raw',
+    ChartRange.week: 'hour',
+    ChartRange.month: 'hour',
+    ChartRange.year: 'day',
+  };
+
+  @override
+  Future<List<Reading>> readings(String plantId, ChartRange range) async {
+    final end = _now().toUtc();
+    final out = <Reading>[];
+    String? cursor;
+    for (var page = 0; page < 5; page++) {
+      final r = _map(
+        await _get('/plants/$plantId/readings', {
+          'from': end.subtract(range.span).toIso8601String(),
+          'to': end.toIso8601String(),
+          'bucket': _buckets[range],
+          'limit': 2000,
+          'cursor': ?cursor,
+        }),
+      );
+      for (final i in _list(r['items']).cast<Map>()) {
+        final v = (i['avg'] ?? i['value']) as num?;
+        if (v != null) out.add(Reading(_dt(i['ts'])!, v.toDouble()));
+      }
+      cursor = r['next_cursor'] as String?;
+      if (cursor == null) break;
+    }
+    return out;
+  }
+
+  // ---- commands ----------------------------------------------------------------------------------
 
   Command _command(Map c) {
-    final state = switch (c['state'] as String) {
-      'queued' || 'cancelling' => CommandState.queued,
-      'delivered' => CommandState.delivered,
-      'running' => CommandState.running,
+    final status = c['status'] as String;
+    final delivered = c['delivered_at'] != null;
+    final state = switch (status) {
+      'queued' => CommandState.queued,
+      'delivered' => CommandState.running,
+      'cancelling' => delivered ? CommandState.running : CommandState.queued,
       'done' => CommandState.done,
       'failed' => CommandState.failed,
       'expired' => CommandState.expired,
       _ => CommandState.cancelled,
     };
-    final createdAt = _dt(c['created_at'])!;
-    final origin = switch (c['source']) {
-      'rule' => CommandOrigin.rule,
-      'local' => CommandOrigin.local,
-      _ => CommandOrigin.user,
-    };
     return Command(
       id: c['id'] as String,
       plantId: (c['plant_id'] ?? '') as String,
-      seconds: (c['seconds'] as int?) ?? 0,
+      deviceId: c['device_id'] as String,
+      seconds: (_map(c['args'])['seconds'] as int?) ?? 0,
       state: state,
-      createdAt: createdAt,
-      expectedAt: _nextExpected[c['device_id']] ?? createdAt,
+      createdAt: _dt(c['created_at'])!,
+      cancelling: status == 'cancelling',
+      sent: c['sent_at'] != null,
+      expiresAt: _dt(c['exp']),
       runningUntil: _dt(c['ends_at']),
       finishedAt: _dt(c['finished_at']),
       failureReason: c['reason'] as String?,
-      origin: origin,
+      origin: c['source'] == 'rule' ? CommandOrigin.rule : CommandOrigin.user,
     );
   }
 
   @override
-  Future<List<Command>> commands(String householdId, String plantId) async {
-    final list =
-        await _get('/households/$householdId/plants/$plantId/commands') as List;
-    return [for (final c in list.cast<Map>()) _command(c)];
+  Future<List<Command>> commands(String plantId) async {
+    final r = _map(await _get('/plants/$plantId/commands', {'limit': 50}));
+    return [
+      for (final c in _list(r['items']).cast<Map>())
+        if (c['action'] == 'pump.run') _command(c),
+    ];
   }
 
   @override
-  Future<Command> waterNow(
-    String householdId,
-    String plantId,
-    int seconds,
-  ) async {
-    final res =
-        await _send('POST', '/households/$householdId/plants/$plantId/water', {
-              'seconds': seconds,
-            })
-            as Map;
-    return _command(res['command'] as Map);
-  }
+  Future<Command> waterNow(String plantId, int seconds) async =>
+      _command(_map(await _send('POST', '/plants/$plantId/water', {'seconds': seconds})));
 
   @override
-  Future<void> cancelCommand(String householdId, String commandId) =>
-      _send('POST', '/households/$householdId/commands/$commandId/cancel');
+  Future<void> cancelCommand(String commandId) =>
+      _send('POST', '/commands/$commandId/cancel');
 
-  // --- rules ----------------------------------------------------------------------
+  // ---- rules ---------------------------------------------------------------------------------------
 
   Rule _rule(Map r) => Rule(
     id: r['id'] as String,
     plantId: r['plant_id'] as String,
     belowPercent: (r['threshold'] as num).round(),
     waterSeconds: r['water_s'] as int,
-    minIntervalHours: ((r['cooldown_s'] as int) / 3600).round(),
+    cooldownS: r['cooldown_s'] as int,
+    maxPerDay: r['max_per_day'] as int,
     enabled: r['enabled'] as bool,
+    quietFrom: r['quiet_from'] as String?,
+    quietTo: r['quiet_to'] as String?,
+    notifyChannels: [for (final c in _list(r['notify_channels'])) c as String],
+    notifyOn: [for (final c in _list(r['notify_on'])) c as String],
   );
 
   @override
-  Future<List<Rule>> rules(String householdId, String plantId) async {
-    final list =
-        await _get('/households/$householdId/plants/$plantId/rules') as List;
-    return [for (final r in list.cast<Map>()) _rule(r)];
-  }
+  Future<List<Rule>> rules(String plantId) async => [
+    for (final r in _list(await _get('/plants/$plantId/rules')).cast<Map>()) _rule(r),
+  ];
 
   @override
-  Future<Rule> saveRule(String householdId, Rule rule) async {
-    final base = '/households/$householdId/plants/${rule.plantId}/rules';
+  Future<Rule> saveRule(Rule rule) async {
+    final base = '/plants/${rule.plantId}/rules';
     final body = {
       'enabled': rule.enabled,
       'threshold': rule.belowPercent,
       'water_s': rule.waterSeconds,
-      'cooldown_s': rule.minIntervalHours * 3600,
+      'cooldown_s': rule.cooldownS,
+      'max_per_day': rule.maxPerDay,
+      'quiet_from': rule.quietFrom,
+      'quiet_to': rule.quietTo,
+      'notify_channels': rule.notifyChannels,
+      'notify_on': rule.notifyOn,
     };
     final res = rule.id.isEmpty
         ? await _send('POST', base, body)
         : await _send('PATCH', '$base/${rule.id}', body);
-    return _rule(res as Map);
+    return _rule(_map(res));
   }
 
   @override
-  Future<void> deleteRule(String householdId, Rule rule) => _send(
-    'DELETE',
-    '/households/$householdId/plants/${rule.plantId}/rules/${rule.id}',
-  );
-
-  // --- devices --------------------------------------------------------------------
+  Future<void> deleteRule(Rule rule) =>
+      _send('DELETE', '/plants/${rule.plantId}/rules/${rule.id}');
 
   @override
-  Future<List<Device>> devices(String householdId) async {
-    final list = (await _get('/households/$householdId/devices') as List)
-        .cast<Map>();
-    final configs = await Future.wait([
-      for (final d in list)
-        _get('/households/$householdId/devices/${d['id']}/config'),
-    ]);
-    return [for (final (i, d) in list.indexed) _device(d, configs[i] as Map)];
+  Future<List<RuleExecution>> ruleExecutions(String plantId, String ruleId) async {
+    final r = _map(await _get('/plants/$plantId/rules/$ruleId/executions', {'limit': 30}));
+    return [
+      for (final e in _list(r['items']).cast<Map>())
+        RuleExecution(
+          at: _dt(e['ts'])!,
+          decision: e['decision'] as String,
+          skipReason: e['skip_reason'] as String?,
+          commandId: e['command_id'] as String?,
+        ),
+    ];
   }
 
-  PairingBundle _bundle(Map b) {
-    final mqtt = b['mqtt'] as Map;
-    return PairingBundle(
-      deviceId: b['device_id'] as String,
-      host: mqtt['host'] as String,
-      port: mqtt['port'] as int,
-      psk: mqtt['psk'] as String,
-    );
-  }
+  // ---- devices ---------------------------------------------------------------------------------------
 
-  @override
-  Future<NewDevice> createDevice(String householdId, String name) async {
-    final r =
-        await _send('POST', '/households/$householdId/devices', {'name': name})
-            as Map;
-    final d = r['device'] as Map;
-    // a fresh device has no reported config yet: the desired one has the slots
-    return NewDevice(
-      _device(d, {'desired': null, 'reported': null}),
-      _bundle(r['bundle'] as Map),
-    );
-  }
+  static DeviceStatus _status(String? s) => switch (s) {
+    'joining' => DeviceStatus.joining,
+    'join_failed' => DeviceStatus.joinFailed,
+    'unsupported' => DeviceStatus.unsupported,
+    'ready' => DeviceStatus.ready,
+    'online' => DeviceStatus.online,
+    'late' => DeviceStatus.late,
+    'safe_mode' => DeviceStatus.safeMode,
+    _ => DeviceStatus.offline,
+  };
 
-  @override
-  Future<PairingBundle> rekeyDevice(
-    String householdId,
-    String deviceId,
-  ) async => _bundle(
-    await _send('POST', '/households/$householdId/devices/$deviceId/rekey')
-        as Map,
-  );
+  static ConfigSync _sync(String? s) => switch (s) {
+    'in_sync' => ConfigSync.inSync,
+    'rejected' => ConfigSync.rejected,
+    _ => ConfigSync.pending,
+  };
 
-  @override
-  Future<void> deleteDevice(String householdId, String deviceId) =>
-      _send('DELETE', '/households/$householdId/devices/$deviceId');
-
-  Device _device(Map d, Map config) {
-    final created = _dt(d['created_at'])!;
-    final next = _dt(d['next_expected_at']);
-    if (next != null) _nextExpected[d['id'] as String] = next;
-    final slots =
-        ((config['reported'] ?? config['desired'])?['slots'] ?? []) as List;
-    final error = d['config_error'] as Map?;
-    return Device(
-      id: d['id'] as String,
-      name: d['name'] as String,
-      board: d['board'] as String,
-      firmware: (d['fw'] ?? '—') as String,
-      batteryPercent: (d['battery_percent'] as int?) ?? 0,
-      rssi: (d['rssi'] as int?) ?? 0,
-      state: switch (d['status'] as String) {
-        'online' || 'service' => DeviceState.online,
-        'sleeping' => DeviceState.sleeping,
-        'late' => DeviceState.late,
-        _ => DeviceState.offline, // offline, or `new` = never connected
-      },
-      lastSeen: _dt(d['last_seen_at']) ?? created,
-      nextExpectedAt: next ?? created,
-      wakeIntervalS: d['wake_interval_s'] as int,
-      configSync: switch (d['sync_state'] as String) {
-        'in_sync' => ConfigSync.inSync,
-        'rejected' => ConfigSync.rejected,
-        _ => ConfigSync.pending,
-      },
-      configRev: d['reported_rev'] as int,
-      configError: error == null
-          ? null
-          : (error['detail'] ?? error['code']) as String?,
-      // the API says `needs_repair` (the device's key is not on the household's gateway)
-      gateway: (d['needs_repair'] as bool? ?? false)
-          ? GatewayLink.none
-          : GatewayLink.gateway,
+  DeviceConfigBody? _body(Object? v) {
+    if (v is! Map) return null;
+    return DeviceConfigBody(
+      rev: (v['rev'] as int?) ?? 0,
+      reportIntervalS: (v['report_interval_s'] as int?) ?? 300,
+      fastReportIntervalS: (v['fast_report_interval_s'] as int?) ?? 30,
+      fastReportHoldS: (v['fast_report_hold_s'] as int?) ?? 120,
+      battLowMv: (v['batt_low_mv'] as int?) ?? 3500,
       slots: [
-        for (final s in slots.cast<Map>())
-          Slot(
-            index: s['slot'] as int,
+        for (final s in _list(v['slots']).cast<Map>())
+          SlotConfig(
+            slot: s['slot'] as int,
             module: s['module'] as String,
-            pin: (s['pin'] ?? s['addr'] ?? 0) as int,
-            maxRunS: s['max_run_s'] as int?,
+            port: s['port'] as String,
+            calDry: (s['cal_dry'] as int?) ?? 3000,
+            calWet: (s['cal_wet'] as int?) ?? 1200,
+            samples: (s['samples'] as int?) ?? 16,
+            maxRunS: (s['max_run_s'] as int?) ?? 60,
+            minPauseS: (s['min_pause_s'] as int?) ?? 600,
+            activeHigh: (s['active_high'] as bool?) ?? true,
           ),
       ],
     );
   }
 
-  @override
-  Future<void> deviceAction(
-    String householdId,
-    String deviceId,
-    DeviceAction action,
-  ) => _send('POST', '/households/$householdId/devices/$deviceId/actions', {
-    'action': switch (action) {
-      DeviceAction.identify => 'identify',
-      DeviceAction.serviceMode => 'service',
-      DeviceAction.reboot => 'reboot',
-    },
-  });
+  String? _configError(Object? e) {
+    if (e is! Map) return null;
+    final raw = e['raw'];
+    return raw == null ? 'rejected' : 'rejected ($raw)';
+  }
 
-  // --- alerts ---------------------------------------------------------------------
-
-  static const _alertKinds = {
-    'device_offline': AlertKind.deviceOffline,
-    'device_crashed': AlertKind.deviceOffline,
-    'battery_low': AlertKind.batteryLow,
-    'sensor_error': AlertKind.sensorSuspect,
-    'command_failed': AlertKind.commandFailed,
-  };
-
-  @override
-  Future<List<Alert>> alerts(String householdId) async {
-    final list = await _get('/households/$householdId/alerts') as List;
-    return [
-      for (final a in list.cast<Map>())
-        Alert(
-          id: a['id'] as String,
-          kind: _alertKinds[a['kind']] ?? AlertKind.other,
-          kindName: a['kind'] as String,
-          subject: (a['subject_name'] ?? '') as String,
-          createdAt: _dt(a['opened_at'])!,
-          open: a['resolved_at'] == null,
-          acknowledgedAt: _dt(a['acked_at']),
-        ),
-    ];
+  Device _device(Map d) {
+    final reported = _body(d['reported_config']);
+    return Device(
+      id: d['id'] as String,
+      name: ((d['name'] as String?)?.isNotEmpty ?? false) ? d['name'] as String : d['id'] as String,
+      status: _status(d['status'] as String?),
+      configSync: _sync(d['config_sync'] as String?),
+      model: d['model'] as String?,
+      board: d['board'] as String?,
+      firmware: d['fw'] as String?,
+      safeReason: d['safe_reason'] as String?,
+      lastSeen: _dt(d['last_seen_at']),
+      linkQuality: d['link_quality'] as int?,
+      voltageMv: d['voltage_mv'] as int?,
+      desiredRev: (d['desired_rev'] as int?) ?? 0,
+      reportedRev: d['reported_rev'] as int?,
+      configError: _configError(d['config_error']),
+      slots: reported?.slots ?? const [],
+      diagnostics: (_map(d['diagnostics'])).cast<String, Object?>(),
+    );
   }
 
   @override
-  Future<void> acknowledgeAlert(String householdId, String alertId) =>
-      _send('POST', '/households/$householdId/alerts/$alertId/ack');
-
-  // --- gateway (App/specs.md Part A §12) -------------------------------------------------------------
-
-  GatewayInfo _gateway(Map h) => GatewayInfo(
-    id: h['id'] as String,
-    status: h['status'] as String,
-    online: h['online'] as bool,
-    inSync: h['in_sync'] as bool,
-    offlineSince: _dt(h['offline_since']),
-    version: h['version'] as String?,
-    latestVersion: h['latest_version'] as String?,
-    arch: h['arch'] as String?,
-    adapters: [
-      for (final a in (h['adapters'] as List? ?? const [])) a as String,
-    ],
-    outboxDepth: h['outbox_depth'] as int?,
-    timeSynced: h['time_synced'] as bool?,
-    lanHost: h['lan_host'] as String?,
-    lanPort: (h['lan_port'] as int?) ?? 8883,
-    lanHostOverride: h['lan_host_override'] as String?,
-    lastStateAt: _dt(h['last_state_at']),
-  );
+  Future<List<Device>> devices() async => [
+    for (final d in _list(await _get('/devices')).cast<Map>()) _device(d),
+  ];
 
   @override
-  Future<GatewayInfo?> gateway(String householdId) async {
+  Future<DeviceConfig> deviceConfig(String deviceId) async {
+    final c = _map(await _get('/devices/$deviceId/config'));
+    return DeviceConfig(
+      desiredRev: (c['desired_rev'] as int?) ?? 0,
+      reportedRev: c['reported_rev'] as int?,
+      sync: _sync(c['sync_state'] as String?),
+      desired: _body(c['desired']),
+      reported: _body(c['reported']),
+      error: _configError(c['error']),
+      board: c['board'] as String?,
+    );
+  }
+
+  @override
+  Future<Board?> board(String name) async {
     try {
-      return _gateway(await _get('/households/$householdId/gateway') as Map);
+      final b = _map(await _get('/meta/boards/${Uri.encodeComponent(name)}'));
+      return Board(
+        name: b['name'] as String,
+        ports: [
+          for (final p in _list(b['ports']).cast<Map>())
+            BoardPort(id: p['id'] as String, roles: [for (final r in _list(p['roles'])) r as String]),
+        ],
+      );
     } on ApiProblem catch (e) {
       if (e.status == 404) return null;
       rethrow;
     }
   }
 
+  Map<String, Object?> _slotJson(SlotConfig s) => {
+    'slot': s.slot,
+    'module': s.module,
+    'port': s.port,
+    if (s.isPump) ...{
+      'max_run_s': s.maxRunS,
+      'min_pause_s': s.minPauseS,
+      'active_high': s.activeHigh,
+    } else ...{
+      'cal_dry': s.calDry,
+      'cal_wet': s.calWet,
+      'samples': s.samples,
+    },
+  };
+
   @override
-  Future<GatewayInfo> claimGateway(String householdId, String userCode) async =>
-      _gateway(
-        await _send('POST', '/households/$householdId/gateway', {
-              'user_code': userCode.trim(),
-            })
-            as Map,
+  Future<int> saveDeviceConfig(String deviceId, int baseRev, DeviceConfigBody config) async {
+    final r = _map(
+      await _send('PUT', '/devices/$deviceId/config', {
+        'base_rev': baseRev,
+        'config': {
+          'report_interval_s': config.reportIntervalS,
+          'fast_report_interval_s': config.fastReportIntervalS,
+          'fast_report_hold_s': config.fastReportHoldS,
+          'batt_low_mv': config.battLowMv,
+          'slots': [for (final s in config.slots) _slotJson(s)],
+        },
+      }),
+    );
+    return r['rev'] as int;
+  }
+
+  @override
+  Future<Device> renameDevice(String deviceId, String name) async =>
+      _device(_map(await _send('PATCH', '/devices/$deviceId', {'name': name})));
+
+  @override
+  Future<void> deleteDevice(String deviceId, {bool force = false}) =>
+      _send('DELETE', '/devices/$deviceId', null, force ? {'force': true} : null);
+
+  @override
+  Future<void> deviceAction(String deviceId, DeviceAction action) =>
+      _send('POST', '/devices/$deviceId/actions', {
+        'action': switch (action) {
+          DeviceAction.identify => 'identify',
+          DeviceAction.reboot => 'reboot',
+          DeviceAction.clearSafeMode => 'clear_safe_mode',
+        },
+      });
+
+  @override
+  Future<List<Map<String, Object?>>> deviceEvents(String deviceId) async {
+    final r = _map(await _get('/devices/$deviceId/events', {'limit': 50}));
+    return [for (final e in _list(r['items']).cast<Map>()) e.cast<String, Object?>()];
+  }
+
+  JoinState _join(Object? v) {
+    final j = _map(v);
+    return JoinState(
+      open: (j['open'] as bool?) ?? false,
+      endsAt: _dt(j['ends_at']),
+      deviceIds: [for (final d in _list(j['devices'])) d as String],
+      error: j['error'] as String?,
+    );
+  }
+
+  @override
+  Future<JoinState> joinState() async => _join(await _get('/devices/join'));
+
+  @override
+  Future<JoinState> openJoin({String? installCode, int seconds = 120}) async =>
+      _join(
+        await _send('POST', '/devices/join', {
+          'seconds': seconds,
+          if (installCode != null && installCode.trim().isNotEmpty) 'install_code': installCode.trim(),
+        }),
       );
 
   @override
-  Future<GatewayInfo> setGatewayLanHost(
-    String householdId,
-    String? lanHostOverride,
-  ) async => _gateway(
-    await _send('PATCH', '/households/$householdId/gateway', {
-          'lan_host_override': lanHostOverride,
-        })
-        as Map,
-  );
+  Future<void> closeJoin() => _send('DELETE', '/devices/join');
+
+  // ---- alerts ---------------------------------------------------------------------------------------------
+
+  static const _alertKinds = {
+    'device_offline': AlertKind.deviceOffline,
+    'battery_low': AlertKind.batteryLow,
+    'sensor_error': AlertKind.sensorSuspect,
+    'command_failed': AlertKind.commandFailed,
+    'device_safe_mode': AlertKind.safeMode,
+    'zigbee_offline': AlertKind.zigbeeOffline,
+  };
 
   @override
-  Future<void> removeGateway(String householdId) =>
-      _send('DELETE', '/households/$householdId/gateway');
+  Future<List<Alert>> alerts() async => [
+    for (final a in _list(await _get('/alerts')).cast<Map>())
+      Alert(
+        id: a['id'] as String,
+        kind: _alertKinds[a['kind']] ?? AlertKind.other,
+        kindName: a['kind'] as String,
+        subject: (_map(a['subject'])['name'] ?? '') as String,
+        createdAt: _dt(a['opened_at'])!,
+        open: a['acked_at'] == null,
+        critical: a['severity'] == 'critical',
+        acknowledgedAt: _dt(a['acked_at']),
+        acknowledgedBy: a['acked_by'] as String?,
+      ),
+  ];
 
-  // --- live updates (SSE, App/specs.md Part A §6.2) --------------------------------------------
+  @override
+  Future<void> acknowledgeAlert(String alertId) => _send('POST', '/alerts/$alertId/ack');
+
+  // ---- live updates (SSE, App/specs.md Part A §6.2) -------------------------------------------------------
 
   static const _eventKinds = {
     'reading': LiveEventKind.reading,
-    'plant': LiveEventKind.reading,
+    'plant': LiveEventKind.plant,
     'command': LiveEventKind.command,
     'device': LiveEventKind.device,
     'config': LiveEventKind.config,
     'alert': LiveEventKind.alert,
-    'gateway': LiveEventKind.gateway,
-    'household': LiveEventKind.household,
+    'installation': LiveEventKind.installation,
+    'join': LiveEventKind.join,
     'rule': LiveEventKind.rule,
-    'rule_execution': LiveEventKind.rule,
+    'notification': LiveEventKind.notification,
+    'status': LiveEventKind.status,
     'resync': LiveEventKind.resync,
   };
 
   @override
-  Stream<LiveEvent> events(String householdId) {
+  Stream<LiveEvent> events() {
     late final StreamController<LiveEvent> out;
     StreamSubscription<SseEvent>? sub;
     var closed = false;
@@ -479,9 +856,9 @@ class ApiMoistureRepository implements MoistureRepository {
     Future<void> connect() async {
       if (closed) return;
       try {
-        final ticket = (await _send('POST', '/events/ticket') as Map)['ticket'];
+        final ticket = _map(await _send('POST', '/events/ticket'))['ticket'];
         final url = _base.replace(
-          path: '${_base.path}/api/v1/households/$householdId/stream',
+          path: '${_base.path}/api/v1/stream',
           queryParameters: {'ticket': ticket},
         );
         if (attempt > 0) out.add(const LiveEvent(LiveEventKind.resync));
@@ -490,17 +867,18 @@ class ApiMoistureRepository implements MoistureRepository {
             attempt = 0;
             if (e.id != null && e.id!.isNotEmpty) lastId = e.id;
             final kind = _eventKinds[e.event];
-            if (kind == null) return; // ping
-            String? entity;
+            if (kind == null) return; // ping, hello
+            String? entity, text;
             try {
               final data = jsonDecode(e.data);
               if (data is Map) {
-                entity = (data['plant_id'] ?? data['id']) as String?;
+                entity = (data['plant_id'] ?? data['device_id'] ?? data['id']) as String?;
+                text = data['text'] as String?;
               }
             } on FormatException {
-              // Payload is informational only.
+              // The payload is informational only.
             }
-            out.add(LiveEvent(kind, entityId: entity));
+            out.add(LiveEvent(kind, entityId: entity, text: text));
           },
           onError: (_) => retry(),
           onDone: retry,

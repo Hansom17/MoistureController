@@ -16,21 +16,28 @@ class MoistureChart extends StatelessWidget {
     required this.readings,
     required this.range,
     this.thresholds = const [],
+    this.now,
   });
 
   final List<Reading> readings;
   final ChartRange range;
   final List<int> thresholds;
 
+  /// The right edge of the chart; the current time unless a test fixes it.
+  final DateTime? now;
+
   @override
   Widget build(BuildContext context) {
-    if (readings.isEmpty) return const SizedBox(height: 200);
+    if (readings.isEmpty) {
+      return SizedBox(height: 120, child: Center(child: Text(context.l10n.noReadings)));
+    }
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
     final moisture = MoistureColors.of(context);
     final locale = Localizations.localeOf(context).toString();
-    final start = readings.first.at;
-    double x(DateTime t) => t.difference(start).inMinutes / 60;
+    // The x axis always spans the whole selected range, so a few readings do not stretch over it.
+    final start = (now ?? DateTime.now()).subtract(range.span);
+    double x(DateTime t) => t.difference(start).inSeconds / 3600;
 
     final values = readings.map((r) => r.moisturePercent);
     final lowest = values.reduce(min);
@@ -44,7 +51,7 @@ class MoistureChart extends StatelessWidget {
       ChartRange.month => DateFormat.Md(locale),
       ChartRange.year => DateFormat.MMM(locale),
     };
-    final spanH = x(readings.last.at);
+    final spanH = range.span.inSeconds / 3600;
     final labelStyle = theme.textTheme.labelSmall?.copyWith(
       color: scheme.onSurfaceVariant,
     );

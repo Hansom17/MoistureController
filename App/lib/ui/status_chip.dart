@@ -17,41 +17,30 @@ class StatusChip extends StatelessWidget {
     this.tinted = true,
   });
 
-  /// Chip for a device's connectivity state.
+  /// Chip for a device's connectivity and lifecycle state.
   factory StatusChip.device(
     BuildContext context,
     Device device, {
     bool withLastSeen = false,
   }) {
     final l = context.l10n;
-    final (kind, label, icon) = switch (device.state) {
-      DeviceState.online => (
-        StatusKind.ok,
-        l.deviceOnline,
-        Icons.check_circle_outline,
-      ),
-      DeviceState.sleeping => (
-        StatusKind.sleeping,
-        l.deviceSleeping,
-        Icons.bedtime_outlined,
-      ),
-      DeviceState.late => (
-        StatusKind.warning,
-        l.deviceLate,
-        Icons.warning_amber_rounded,
-      ),
-      DeviceState.offline => (
-        StatusKind.error,
-        l.deviceOffline,
-        Icons.error_outline,
-      ),
+    final (kind, label, icon) = switch (device.status) {
+      DeviceStatus.online => (StatusKind.ok, l.deviceOnline, Icons.check_circle_outline),
+      DeviceStatus.ready => (StatusKind.pending, l.deviceReady, Icons.hourglass_empty),
+      DeviceStatus.joining => (StatusKind.pending, l.deviceJoining, Icons.sync),
+      DeviceStatus.joinFailed => (StatusKind.error, l.deviceJoinFailed, Icons.error_outline),
+      DeviceStatus.unsupported => (StatusKind.warning, l.deviceUnsupported, Icons.block),
+      DeviceStatus.late => (StatusKind.warning, l.deviceLate, Icons.warning_amber_rounded),
+      DeviceStatus.offline => (StatusKind.error, l.deviceOffline, Icons.error_outline),
+      DeviceStatus.safeMode => (StatusKind.error, l.deviceSafeMode, Icons.shield_outlined),
     };
-    final showSeen = withLastSeen && device.state != DeviceState.online;
+    final seen = device.lastSeen;
+    final showSeen = withLastSeen && device.status != DeviceStatus.online && seen != null;
     return StatusChip(
       kind: kind,
       label: label,
       icon: icon,
-      detail: showSeen ? l.lastSeen(formatAgo(l, device.lastSeen)) : null,
+      detail: showSeen ? l.lastSeen(formatAgo(l, seen)) : null,
     );
   }
 

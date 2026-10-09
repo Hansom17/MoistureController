@@ -4,13 +4,13 @@ import 'package:go_router/go_router.dart';
 
 import '../../app/theme/app_colors.dart';
 import '../../app/theme/tokens.dart';
+import '../../core/app_data.dart';
 import '../../core/format.dart';
-import '../../core/household_data.dart';
+import '../../core/permissions.dart';
 import '../../data/models.dart';
+import '../../ui/app_scope.dart';
 import '../../ui/common.dart';
-import '../../ui/household_scope.dart';
 import '../../ui/status_chip.dart';
-import '../dashboard/dashboard_screen.dart';
 
 class DevicesScreen extends StatelessWidget {
   const DevicesScreen({super.key});
@@ -18,40 +18,35 @@ class DevicesScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final l = context.l10n;
-    return HouseholdScope(
-      builder: (context, household) => Consumer(
+    return AppScope(
+      builder: (context, user) => Consumer(
         builder: (context, ref, _) {
-          final devices = ref.watch(devicesProvider(household.id));
-          final banner = gatewayOfflineMessage(context, household);
+          final devices = ref.watch(devicesProvider);
           return Scaffold(
             appBar: AppBar(title: Text(l.navDevices)),
+            floatingActionButton: can(user.role, AppAction.manageDevices)
+                ? FloatingActionButton.extended(
+                    onPressed: () => context.go('/devices/add'),
+                    icon: const Icon(Icons.add),
+                    label: Text(l.addDevice),
+                  )
+                : null,
             body: Column(
               children: [
-                ?(banner == null ? null : HouseholdBanner(message: banner)),
+                const GatewayBannerHost(),
                 Expanded(
                   child: RefreshIndicator(
-                    onRefresh: () =>
-                        ref.refresh(devicesProvider(household.id).future),
+                    onRefresh: () => ref.refresh(devicesProvider.future),
                     child: AsyncBody(
                       value: devices,
-                      onRetry: () =>
-                          ref.invalidate(devicesProvider(household.id)),
+                      onRetry: () => ref.invalidate(devicesProvider),
                       data: (devices) => devices.isEmpty
-                          ? ListView(
-                              children: [
-                                EmptyState(
-                                  icon: Icons.sensors,
-                                  title: l.noDevices,
-                                ),
-                              ],
-                            )
+                          ? ListView(children: [EmptyState(icon: Icons.sensors, title: l.noDevices, body: l.noDevicesBody)])
                           : ListView.separated(
-                              padding: const EdgeInsets.all(Spacing.lg),
+                              padding: const EdgeInsets.fromLTRB(Spacing.lg, Spacing.lg, Spacing.lg, 96),
                               itemCount: devices.length,
-                              separatorBuilder: (_, _) =>
-                                  const SizedBox(height: Spacing.sm),
-                              itemBuilder: (context, i) =>
-                                  _DeviceTile(device: devices[i]),
+                              separatorBuilder: (_, _) => const SizedBox(height: Spacing.sm),
+                              itemBuilder: (context, i) => _DeviceTile(device: devices[i]),
                             ),
                     ),
                   ),
@@ -74,9 +69,7 @@ class _DeviceTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final l = context.l10n;
     final theme = Theme.of(context);
-    final muted = theme.textTheme.bodySmall?.copyWith(
-      color: theme.colorScheme.onSurfaceVariant,
-    );
+    final muted = theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant);
     return Card(
       clipBehavior: Clip.antiAlias,
       child: InkWell(
@@ -88,12 +81,7 @@ class _DeviceTile extends StatelessWidget {
             children: [
               Row(
                 children: [
-                  Expanded(
-                    child: Text(
-                      device.name,
-                      style: theme.textTheme.titleMedium,
-                    ),
-                  ),
+                  Expanded(child: Text(device.name, style: theme.textTheme.titleMedium)),
                   const Icon(Icons.chevron_right),
                 ],
               ),
@@ -103,21 +91,15 @@ class _DeviceTile extends StatelessWidget {
                 runSpacing: Spacing.xs,
                 children: [
                   StatusChip.device(context, device, withLastSeen: true),
-                  if (device.needsRepair)
-                    StatusChip(
-                      kind: StatusKind.warning,
-                      icon: Icons.link_off,
-                      label: context.l10n.deviceNeedsRepair,
-                    ),
-                  configSyncChip(context, device),
+                  if (!device.isNew) configSyncChip(context, device),
                 ],
               ),
               const SizedBox(height: Spacing.sm),
               Text(
                 [
-                  l.batteryValue(device.batteryPercent),
-                  l.signalValue(device.rssi),
-                  l.firmwareValue(device.firmware),
+                  if (device.linkQuality != null) l.signalValue(device.linkQuality!),
+                  if (device.firmware != null) l.firmwareValue(device.firmware!),
+                  if (device.board != null) device.board!,
                 ].join(' · '),
                 style: muted,
               ),
@@ -133,19 +115,8 @@ class _DeviceTile extends StatelessWidget {
 StatusChip configSyncChip(BuildContext context, Device device) {
   final l = context.l10n;
   return switch (device.configSync) {
-    ConfigSync.inSync => StatusChip(
-      kind: StatusKind.ok,
-      label: l.configInSync,
-      icon: Icons.sync,
-    ),
-    ConfigSync.pending => StatusChip(
-      kind: StatusKind.pending,
-      label: l.configPending(device.configRev + 1),
-    ),
-    ConfigSync.rejected => StatusChip(
-      kind: StatusKind.error,
-      label: l.configRejected,
-      detail: device.configError,
-    ),
+    ConfigSync.inSync => StatusChip(kind: StatusKind.ok, label: l.configInSync, icon: Icons.sync),
+    ConfigSync.pending => StatusChip(kind: StatusKind.pending, label: l.configPending(device.desiredRev)),
+    ConfigSync.rejected => StatusChip(kind: StatusKind.error, label: l.configRejected, detail: device.configError),
   };
 }

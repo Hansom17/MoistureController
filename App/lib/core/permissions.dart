@@ -4,18 +4,21 @@ import '../data/models.dart';
 enum AppAction {
   viewData(Role.viewer),
   water(Role.member),
+  editPlants(Role.member),
   editRules(Role.member),
   identifyDevice(Role.member),
   acknowledgeAlert(Role.member),
   manageDevices(Role.admin),
-  manageMembers(Role.admin),
-  manageHousehold(Role.owner);
+  manageUsers(Role.admin),
+  backup(Role.admin),
+  manageInstallation(Role.owner),
+  exportData(Role.owner);
 
   const AppAction(this.minRole);
 
   final Role minRole;
 }
 
-/// Mirrors the backend's role checks so the UI can hide or disable actions.
-/// The backend stays the authority (App/specs.md Part A §8).
+/// Mirrors the api's role checks so the UI can hide or disable actions.
+/// The api stays the authority (App/specs.md Part A §8).
 bool can(Role role, AppAction action) => role.index >= action.minRole.index;

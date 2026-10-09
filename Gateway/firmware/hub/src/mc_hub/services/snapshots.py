@@ -40,7 +40,7 @@ class Snapshots:
                                          .order_by(Reading.ts.desc(), Reading.id.desc()).limit(1))).scalar_one_or_none()
                     if r is not None:
                         latest = {"value": r.value, "ts": r.ts}
-                out.append(plant_view(p, latest))
+                out.append(plant_view(p, latest, await self._trend(s, p.id, latest)))
             return out
         if name == "rules":
             return [rule_view(r) for r in (await s.execute(select(Rule).where(Rule.deleted_at.is_(None)).order_by(Rule.plant_id, Rule.id))).scalars()]
@@ -55,6 +55,19 @@ class Snapshots:
         if name == "status":
             return {**self.extra_status, "hub_version": __version__}
         raise KeyError(name)
+
+    @staticmethod
+    async def _trend(s: AsyncSession, plant_id: str, latest: dict | None) -> str:
+        """rising / falling / steady: the latest value against the average of the readings 1 to 6 hours older."""
+        if not latest or latest.get("value") is None:
+            return "steady"
+        ts = latest["ts"]
+        avg = (await s.execute(select(func.avg(Reading.value)).where(
+            Reading.plant_id == plant_id, Reading.value.is_not(None),
+            Reading.ts <= ts - 3600, Reading.ts >= ts - 6 * 3600))).scalar()
+        if avg is None or abs(latest["value"] - avg) < 3:
+            return "steady"
+        return "rising" if latest["value"] > avg else "falling"
 
     async def publish(self, names: set[str] | tuple[str, ...] = NAMES) -> None:
         async with self.sessions() as s:

@@ -93,8 +93,8 @@ api_events:                  # api -> hub
 
 snapshots:                   # retained, republished on every change and on hub start
   installation: {fields: [name, timezone, battery_low_mv, telegram_configured]}
-  devices: {item: [id, ieee, name, model, fw, board, status, last_seen_at, link_quality, config_sync, latest_readings]}
-  plants: {item: [id, name, notes, sensor, pump, latest_value, latest_ts, archived]}
+  devices: {item: [id, ieee, name, model, fw, board, status, safe_reason, last_seen_at, link_quality, voltage_mv, config_sync, desired_rev, reported_rev, desired_config, reported_config, config_error, latest_readings, diagnostics]}
+  plants: {item: [id, name, notes, sensor, pump, latest_value, latest_ts, trend, archived]}
   rules: {item: [id, plant_id, enabled, threshold, water_s, cooldown_s, max_per_day, quiet_from, quiet_to, notify_channels, notify_on]}
   alerts_open: {item: [id, kind, subject, severity, opened_at, acked_by, acked_at, detail]}
   join: {fields: [open, ends_at, devices]}

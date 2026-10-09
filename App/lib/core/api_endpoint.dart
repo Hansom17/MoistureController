@@ -4,7 +4,7 @@ import 'dart:math';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../data/discovery/api_discovery.dart';
-import 'household_data.dart';
+import 'app_data.dart';
 import 'session.dart';
 
 /// Where the API is and whether we can reach it (App/specs.md Part A §6.4.1).
@@ -36,8 +36,8 @@ class ApiChoose extends ApiEndpointState {
   final List<ApiServer> servers;
 }
 
-/// What the `local` flavor wires in: discovery, and how to point the
-/// repository at a new address. Null in every other flavor.
+/// What the mobile flavor wires in: discovery, and how to point the
+/// repository at a new address. Null on web and in the fake flavor.
 class ApiConnection {
   const ApiConnection({required this.discovery, required this.apply});
 
@@ -119,14 +119,14 @@ class ApiEndpointController extends Notifier<ApiEndpointState> {
 
   /// Data loaded (or failed) against the old address is stale now.
   void _refreshData() {
-    ref.invalidate(householdsProvider);
+    ref.invalidate(metaProvider);
     ref.invalidate(plantsProvider);
     ref.invalidate(readingsProvider);
     ref.invalidate(commandsProvider);
     ref.invalidate(rulesProvider);
     ref.invalidate(devicesProvider);
     ref.invalidate(alertsProvider);
-    ref.invalidate(gatewayProvider);
+    ref.invalidate(gatewayStatusProvider);
   }
 
   /// The user picked one of several found servers.

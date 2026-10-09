@@ -5,17 +5,22 @@ import '../api_problem.dart';
 import '../models.dart';
 import 'moisture_repository.dart';
 
-/// In-memory backend for development without a server.
+/// In-memory backend for development without a gateway.
 ///
-/// Mirrors the backend's behaviour closely enough to exercise the UI: role
-/// checks, pump limits, and commands that go queued → delivered → running →
-/// done over a few seconds with live events, like a real sleeping device.
+/// Mirrors the api's behaviour closely enough to exercise the UI: sign-in and roles, pump limits,
+/// commands that go queued → running → done over a few seconds with live events (or stay queued
+/// while a device is offline), configuration revisions that are pending until the "device"
+/// confirms, and a join window that brings a new device in.
 class FakeMoistureRepository implements MoistureRepository {
   FakeMoistureRepository({
     DateTime Function()? clock,
     this.latency = const Duration(milliseconds: 250),
-    this.deviceDelay = const Duration(seconds: 5),
-  }) : _clock = clock ?? DateTime.now {
+    this.deviceDelay = const Duration(seconds: 2),
+    bool setupRequired = false,
+    Role role = Role.owner,
+  }) : _clock = clock ?? DateTime.now,
+       _setupRequired = setupRequired,
+       _role = role {
     _seed();
   }
 
@@ -24,781 +29,880 @@ class FakeMoistureRepository implements MoistureRepository {
   /// Simulated network round trip.
   final Duration latency;
 
-  /// Time until a "sleeping" device wakes up and picks up a command.
+  /// Time a device needs to answer (acknowledge a command, apply a configuration).
   final Duration deviceDelay;
 
-  final _households = <String, Household>{};
-  final _plants = <String, List<Plant>>{};
-  final _devices = <String, List<Device>>{};
-  final _commands = <String, List<Command>>{};
-  final _rules = <String, List<Rule>>{};
-  final _alerts = <String, List<Alert>>{};
-  final _gateways = <String, GatewayInfo?>{};
-  final _curves = <String, _Curve>{};
-  final _streams = <String, StreamController<LiveEvent>>{};
-  final _timers = <Timer>[];
-  var _nextId = 1;
+  bool _setupRequired;
+  Role _role;
+  String? _token;
+  var _meId = 'u-demo';
+  var _proofUntil = DateTime.fromMillisecondsSinceEpoch(0);
+  var _installation = const Installation(name: 'Home', timezone: 'Europe/Berlin');
+  var _join = const JoinState();
+  var _nextId = 100; // above the ids of the seed data
+  var _zigbee = 'online';
 
-  /// Dev-only: lets the settings screen switch the demo role per household.
-  void setRole(String householdId, Role role) {
-    _households[householdId] = _households[householdId]!.copyWith(role: role);
-    _emit(householdId, const LiveEvent(LiveEventKind.household));
+  final _users = <AppUser>[];
+  final _passwords = <String, String>{};
+  final _tokens = <TokenInfo>[];
+  final _invites = <Invite>[];
+  final _inviteCodes = <String, String>{};
+  final _audit = <AuditEntry>[];
+  final _plants = <Plant>[];
+  final _devices = <Device>[];
+  final _configs = <String, DeviceConfigBody>{};
+  final _commands = <Command>[];
+  final _rules = <Rule>[];
+  final _alerts = <Alert>[];
+  final _curves = <String, _Curve>{};
+  final _stream = StreamController<LiveEvent>.broadcast();
+  final _timers = <Timer>[];
+
+  /// Dev-only: lets the settings screen switch the demo role.
+  void setRole(Role role) {
+    _role = role;
+    final i = _users.indexWhere((u) => u.id == _meId);
+    _users[i] = _users[i].copyWith(role: role);
+    _emit(const LiveEvent(LiveEventKind.installation));
+  }
+
+  Role get role => _role;
+
+  /// Dev-only: Zigbee2MQTT goes down or comes back.
+  void setZigbee(String state) {
+    _zigbee = state;
+    _emit(const LiveEvent(LiveEventKind.status));
   }
 
   void dispose() {
     for (final t in _timers) {
       t.cancel();
     }
-    for (final s in _streams.values) {
-      s.close();
+    _stream.close();
+  }
+
+  void _after(Duration d, void Function() f) => _timers.add(Timer(d, f));
+
+  // ---- sign-in ------------------------------------------------------------------------------
+
+  @override
+  Future<GatewayMeta> meta() => _delay(
+    () => GatewayMeta(
+      name: _installation.name,
+      setupRequired: _setupRequired,
+      hubOnline: true,
+      version: 'fake',
+    ),
+  );
+
+  Session _newSession(AppUser user, String deviceName) {
+    final token = 'tok-${_nextId++}';
+    _tokens.add(
+      TokenInfo(
+        id: token,
+        name: deviceName.isEmpty ? 'this device' : deviceName,
+        createdAt: _clock(),
+        lastUsedAt: _clock(),
+        current: true,
+      ),
+    );
+    _token = token;
+    return Session(token: token, user: user);
+  }
+
+  @override
+  Future<Session> setup({
+    required String setupCode,
+    required String name,
+    required String timezone,
+    required String username,
+    required String password,
+    String displayName = '',
+  }) => _delay(() {
+    if (!_setupRequired) throw const ApiProblem(ApiProblem.alreadySetUp, status: 409);
+    if (setupCode.trim().toUpperCase() != 'DEMOCODE') {
+      throw const ApiProblem(ApiProblem.invalidSetupCode, status: 403);
+    }
+    _installation = Installation(name: name, timezone: timezone);
+    final user = AppUser(
+      id: 'u-owner',
+      username: username,
+      displayName: displayName.isEmpty ? username : displayName,
+      role: Role.owner,
+      createdAt: _clock(),
+    );
+    _users
+      ..clear()
+      ..add(user);
+    _meId = user.id;
+    _passwords[username] = password;
+    _role = Role.owner;
+    _setupRequired = false;
+    return _newSession(user, 'setup');
+  });
+
+  @override
+  Future<Session> login({
+    required String username,
+    required String password,
+    String deviceName = '',
+  }) => _delay(() {
+    final user = _users.where((u) => u.username == username.toLowerCase()).firstOrNull;
+    if (user == null || user.disabled || _passwords[user.username] != password) {
+      throw const ApiProblem(ApiProblem.invalidCredentials, status: 401);
+    }
+    _role = user.role;
+    _meId = user.id;
+    return _newSession(user, deviceName);
+  });
+
+  @override
+  Future<InvitePreview> previewInvite(String code) => _delay(() {
+    final invite = _openInvite(code);
+    return InvitePreview(role: invite.role, installation: _installation.name);
+  });
+
+  Invite _openInvite(String code) {
+    final id = _inviteCodes[code.trim().toUpperCase()];
+    final invite = _invites.where((i) => i.id == id && i.status == 'open').firstOrNull;
+    if (invite == null) throw const ApiProblem(ApiProblem.invalidInvite, status: 404);
+    return invite;
+  }
+
+  @override
+  Future<Session> acceptInvite({
+    required String code,
+    required String username,
+    required String password,
+    String displayName = '',
+    String deviceName = '',
+  }) => _delay(() {
+    final invite = _openInvite(code);
+    if (_users.any((u) => u.username == username.toLowerCase())) {
+      throw const ApiProblem(ApiProblem.conflict, status: 409);
+    }
+    final user = AppUser(
+      id: 'u${_nextId++}',
+      username: username.toLowerCase(),
+      displayName: displayName.isEmpty ? username : displayName,
+      role: invite.role,
+      createdAt: _clock(),
+    );
+    _users.add(user);
+    _passwords[user.username] = password;
+    _invites[_invites.indexOf(invite)] = Invite(
+      id: invite.id,
+      role: invite.role,
+      status: 'used',
+      expiresAt: invite.expiresAt,
+    );
+    _role = user.role;
+    _meId = user.id;
+    return _newSession(user, deviceName);
+  });
+
+  @override
+  void useToken(String? token) => _token = token;
+
+  AppUser get _me => _users.firstWhere((u) => u.id == _meId);
+
+  @override
+  Future<AppUser> me() => _delay(() {
+    if (_token == null) throw const ApiProblem(ApiProblem.unauthorized, status: 401);
+    return _me.copyWith(role: _role);
+  });
+
+  @override
+  Future<void> logout() => _delay(() {
+    _tokens.removeWhere((t) => t.id == _token);
+    _token = null;
+  });
+
+  @override
+  Future<AppUser> updateMe({String? displayName}) => _delay(() {
+    final i = _users.indexWhere((u) => u.id == _meId);
+    _users[i] = _users[i].copyWith(displayName: displayName);
+    return _users[i];
+  });
+
+  @override
+  Future<void> changePassword({required String currentPassword, required String newPassword}) =>
+      _delay(() {
+        if (_passwords[_me.username] != currentPassword) {
+          throw const ApiProblem(ApiProblem.invalidCredentials, status: 401);
+        }
+        _passwords[_me.username] = newPassword;
+        _tokens.removeWhere((t) => !t.current);
+      });
+
+  @override
+  Future<void> reauth(String password) => _delay(() {
+    if (_passwords[_me.username] != password) {
+      throw const ApiProblem(ApiProblem.invalidCredentials, status: 401);
+    }
+    _proofUntil = _clock().add(const Duration(minutes: 5));
+  });
+
+  void _needProof() {
+    if (_clock().isAfter(_proofUntil)) {
+      throw const ApiProblem(ApiProblem.reauthRequired, status: 401);
     }
   }
 
-  // --- MoistureRepository ---------------------------------------------------
+  // ---- tokens, users, invites, audit ----------------------------------------------------------
 
   @override
-  Future<List<Household>> households() =>
-      _delay(() => _households.values.toList());
+  Future<List<TokenInfo>> tokens() => _delay(() => List.of(_tokens));
 
   @override
-  Future<List<Plant>> plants(String householdId) =>
-      _delay(() => List.of(_plants[householdId]!));
+  Future<void> revokeToken(String id) => _delay(() => _tokens.removeWhere((t) => t.id == id));
 
   @override
-  Future<List<Reading>> readings(
-    String householdId,
-    String plantId,
-    ChartRange range,
-  ) => _delay(() {
+  Future<List<AppUser>> users() => _delay(() => List.of(_users));
+
+  @override
+  Future<AppUser> updateUser(String id, {Role? role, String? displayName, bool? disabled}) =>
+      _delay(() {
+        _require(Role.admin);
+        final i = _users.indexWhere((u) => u.id == id);
+        if (i < 0) throw const ApiProblem(ApiProblem.notFound, status: 404);
+        if (_users[i].role == Role.owner) throw const ApiProblem(ApiProblem.forbidden, status: 403);
+        if (_role != Role.owner && (_users[i].role == Role.admin || role == Role.admin)) {
+          throw const ApiProblem(ApiProblem.forbidden, status: 403);
+        }
+        if (role == Role.admin || _users[i].role == Role.admin) _needProof();
+        _users[i] = _users[i].copyWith(role: role, displayName: displayName, disabled: disabled);
+        _log('user_updated');
+        return _users[i];
+      });
+
+  @override
+  Future<void> deleteUser(String id) => _delay(() {
+    _require(Role.admin);
+    final u = _users.firstWhere((u) => u.id == id);
+    if (u.role == Role.owner) throw const ApiProblem(ApiProblem.forbidden, status: 403);
+    if (u.role == Role.admin) _needProof();
+    _users.remove(u);
+    _log('user_removed');
+  });
+
+  @override
+  Future<void> transferOwnership(String userId) => _delay(() {
+    _require(Role.owner);
+    _needProof();
+    for (var i = 0; i < _users.length; i++) {
+      if (_users[i].role == Role.owner) _users[i] = _users[i].copyWith(role: Role.admin);
+      if (_users[i].id == userId) _users[i] = _users[i].copyWith(role: Role.owner);
+    }
+    _role = Role.admin;
+  });
+
+  @override
+  Future<List<Invite>> invites() => _delay(() {
+    _require(Role.admin);
+    return List.of(_invites);
+  });
+
+  @override
+  Future<CreatedInvite> createInvite(Role role, {Duration? expiresIn}) => _delay(() {
+    _require(Role.admin);
+    final id = 'i${_nextId++}';
+    final code = 'CODE${id.toUpperCase()}ABCDEFGH';
+    final invite = Invite(
+      id: id,
+      role: role,
+      status: 'open',
+      expiresAt: _clock().add(expiresIn ?? const Duration(hours: 48)),
+    );
+    _invites.insert(0, invite);
+    _inviteCodes[code] = id;
+    _log('invite_created');
+    return CreatedInvite(invite: invite, code: code);
+  });
+
+  @override
+  Future<void> revokeInvite(String id) => _delay(() {
+    final i = _invites.indexWhere((x) => x.id == id);
+    final v = _invites[i];
+    _invites[i] = Invite(id: v.id, role: v.role, status: 'revoked', expiresAt: v.expiresAt);
+  });
+
+  @override
+  Future<List<AuditEntry>> audit({int? before, int limit = 100}) => _delay(() {
+    _require(Role.admin);
+    return [
+      for (final a in _audit.reversed)
+        if (before == null || a.id < before) a,
+    ].take(limit).toList();
+  });
+
+  void _log(String action) =>
+      _audit.add(AuditEntry(id: _audit.length + 1, actor: _me.id, action: action, at: _clock()));
+
+  // ---- installation and gateway -----------------------------------------------------------------
+
+  @override
+  Future<Installation> installation() => _delay(() => _installation);
+
+  @override
+  Future<Installation> updateInstallation({
+    String? name,
+    String? timezone,
+    int? batteryLowMv,
+    String? telegramToken,
+    String? telegramChatId,
+  }) => _delay(() {
+    _require(Role.owner);
+    _installation = Installation(
+      name: name ?? _installation.name,
+      timezone: timezone ?? _installation.timezone,
+      batteryLowMv: batteryLowMv ?? _installation.batteryLowMv,
+      telegramConfigured:
+          _installation.telegramConfigured || (telegramToken != null && telegramChatId != null),
+    );
+    _emit(const LiveEvent(LiveEventKind.installation));
+    return _installation;
+  });
+
+  @override
+  Future<GatewayStatus> gatewayStatus() => _delay(
+    () => GatewayStatus(
+      hubOnline: true,
+      zigbee: _zigbee,
+      coordinator: 'SONOFF Dongle Plus MG24',
+      hubVersion: '0.1.0',
+      apiVersion: '0.1.0',
+      clockSynced: true,
+      dbSizeBytes: 1536000,
+    ),
+  );
+
+  @override
+  Future<void> backup() => _delay(() => _require(Role.admin));
+
+  @override
+  Future<List<int>> exportData() => _delay(() {
+    _require(Role.owner);
+    _needProof();
+    return [0x50, 0x4b, 0x05, 0x06];
+  });
+
+  // ---- plants and readings -----------------------------------------------------------------------
+
+  @override
+  Future<List<Plant>> plants() => _delay(() => List.of(_plants));
+
+  @override
+  Future<Plant> createPlant({
+    required String name,
+    SlotRef sensor = const SlotRef(),
+    SlotRef pump = const SlotRef(),
+    String notes = '',
+  }) => _delay(() {
+    _require(Role.member);
+    final p = Plant(
+      id: 'p${_nextId++}',
+      name: name,
+      notes: notes,
+      sensor: sensor,
+      pump: pump,
+      moisturePercent: null,
+      trend: Trend.steady,
+      lastReadingAt: null,
+      maxRunS: _pumpLimit(pump),
+    );
+    _plants.add(p);
+    _curves[p.id] = _Curve(Random(p.id.hashCode).nextDouble() * 40 + 30, _clock());
+    _emit(LiveEvent(LiveEventKind.plant, entityId: p.id));
+    return p;
+  });
+
+  int _pumpLimit(SlotRef pump) {
+    final cfg = pump.deviceId == null ? null : _configs[pump.deviceId];
+    for (final s in cfg?.slots ?? const <SlotConfig>[]) {
+      if (s.slot == pump.slot && s.isPump) return s.maxRunS;
+    }
+    return 0;
+  }
+
+  @override
+  Future<Plant> updatePlant(String id, {String? name, String? notes, SlotRef? sensor, SlotRef? pump}) =>
+      _delay(() {
+        _require(Role.member);
+        final i = _plants.indexWhere((p) => p.id == id);
+        final p = _plants[i];
+        _plants[i] = Plant(
+          id: p.id,
+          name: name ?? p.name,
+          notes: notes ?? p.notes,
+          sensor: sensor ?? p.sensor,
+          pump: pump ?? p.pump,
+          moisturePercent: p.moisturePercent,
+          trend: p.trend,
+          lastReadingAt: p.lastReadingAt,
+          maxRunS: pump == null ? p.maxRunS : _pumpLimit(pump),
+        );
+        _emit(LiveEvent(LiveEventKind.plant, entityId: id));
+        return _plants[i];
+      });
+
+  @override
+  Future<void> deletePlant(String id) => _delay(() {
+    _require(Role.member);
+    _plants.removeWhere((p) => p.id == id);
+    _emit(LiveEvent(LiveEventKind.plant, entityId: id));
+  });
+
+  @override
+  Future<List<Reading>> readings(String plantId, ChartRange range) => _delay(() {
     final curve = _curves[plantId]!;
     final now = _clock();
     final count = range.span.inMinutes ~/ range.bucket.inMinutes;
     return [
       for (var i = count; i >= 0; i--)
-        Reading(
-          now.subtract(range.bucket * i),
-          curve.at(now.subtract(range.bucket * i)),
-        ),
+        Reading(now.subtract(range.bucket * i), curve.at(now.subtract(range.bucket * i))),
     ];
   });
 
-  @override
-  Future<List<Command>> commands(String householdId, String plantId) =>
-      _delay(() {
-        final list =
-            (_commands[householdId] ?? [])
-                .where((c) => c.plantId == plantId)
-                .toList()
-              ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
-        return list;
-      });
+  // ---- commands ------------------------------------------------------------------------------------
 
   @override
-  Future<Command> waterNow(String householdId, String plantId, int seconds) =>
-      _delay(() {
-        _requireRole(householdId, Role.member);
-        final plant = _plant(householdId, plantId);
-        if (seconds < 1 || seconds > plant.maxRunS) {
-          throw ApiProblem(
-            ApiProblem.safetyLimit,
-            status: 422,
-            detail: 'max_run_s is ${plant.maxRunS}',
-          );
-        }
-        final now = _clock();
-        final command = Command(
-          id: 'c${_nextId++}',
-          plantId: plantId,
-          seconds: seconds,
-          state: CommandState.queued,
-          createdAt: now,
-          expectedAt: now.add(deviceDelay),
-        );
-        _commands.putIfAbsent(householdId, () => []).add(command);
-        _emit(householdId, LiveEvent(LiveEventKind.command, entityId: plantId));
-        _simulateDevice(householdId, command.id);
-        return command;
-      });
-
-  @override
-  Future<void> cancelCommand(String householdId, String commandId) =>
-      _delay(() {
-        _requireRole(householdId, Role.member);
-        final command = _command(householdId, commandId);
-        if (command.state != CommandState.queued) {
-          throw const ApiProblem(ApiProblem.tooLate, status: 409);
-        }
-        _updateCommand(
-          householdId,
-          commandId,
-          (c) =>
-              c.copyWith(state: CommandState.cancelled, finishedAt: _clock()),
-        );
-      });
-
-  @override
-  Future<List<Rule>> rules(String householdId, String plantId) => _delay(
-    () =>
-        (_rules[householdId] ?? []).where((r) => r.plantId == plantId).toList(),
+  Future<List<Command>> commands(String plantId) => _delay(
+    () => _commands.where((c) => c.plantId == plantId).toList()
+      ..sort((a, b) => b.createdAt.compareTo(a.createdAt)),
   );
 
   @override
-  Future<Rule> saveRule(String householdId, Rule rule) => _delay(() {
-    _requireRole(householdId, Role.member);
-    final list = _rules.putIfAbsent(householdId, () => []);
+  Future<Command> waterNow(String plantId, int seconds) => _delay(() {
+    _require(Role.member);
+    final plant = _plants.firstWhere((p) => p.id == plantId);
+    if (!plant.hasPump) throw const ApiProblem(ApiProblem.conflict, status: 409, detail: 'no pump');
+    if (seconds < 1 || seconds > plant.maxRunS) {
+      throw ApiProblem(ApiProblem.safetyLimit, status: 422, detail: 'max_run_s is ${plant.maxRunS}');
+    }
+    if (_commands.any((c) => c.plantId == plantId && !c.state.isFinal)) {
+      throw const ApiProblem(ApiProblem.busy, status: 409);
+    }
+    final device = _devices.firstWhere((d) => d.id == plant.pump.deviceId);
+    final now = _clock();
+    final command = Command(
+      id: 'c${_nextId++}',
+      plantId: plantId,
+      deviceId: device.id,
+      seconds: seconds,
+      state: CommandState.queued,
+      createdAt: now,
+      expiresAt: now.add(const Duration(minutes: 15)),
+      sent: device.reachable,
+    );
+    _commands.add(command);
+    _emit(LiveEvent(LiveEventKind.command, entityId: plantId));
+    if (device.reachable) _simulateDevice(command.id);
+    return command;
+  });
+
+  @override
+  Future<void> cancelCommand(String commandId) => _delay(() {
+    _require(Role.member);
+    final c = _commands.firstWhere((c) => c.id == commandId);
+    if (c.state.isFinal) throw const ApiProblem(ApiProblem.conflict, status: 409);
+    _updateCommand(commandId, (c) => c.copyWith(state: CommandState.cancelled, finishedAt: _clock()));
+  });
+
+  void _simulateDevice(String commandId) {
+    _after(deviceDelay, () {
+      final c = _commands.firstWhere((c) => c.id == commandId);
+      if (c.state != CommandState.queued) return;
+      final until = _clock().add(Duration(seconds: c.seconds));
+      _updateCommand(commandId, (c) => c.copyWith(state: CommandState.running, runningUntil: until));
+      _after(Duration(seconds: c.seconds), () {
+        if (_commands.firstWhere((x) => x.id == commandId).state != CommandState.running) return;
+        _updateCommand(commandId, (c) => c.copyWith(state: CommandState.done, finishedAt: _clock()));
+        _applyWatering(c.plantId, c.seconds);
+      });
+    });
+  }
+
+  void _applyWatering(String plantId, int seconds) {
+    final i = _plants.indexWhere((p) => p.id == plantId);
+    final now = _clock();
+    final value = min(95.0, (_plants[i].moisturePercent ?? 0) + seconds * 2.5);
+    _plants[i] = _plants[i].copyWith(moisturePercent: value, trend: Trend.rising, lastReadingAt: now);
+    _curves[plantId] = _curves[plantId]!.wateredTo(value, now);
+    _emit(LiveEvent(LiveEventKind.reading, entityId: plantId));
+  }
+
+  void _updateCommand(String id, Command Function(Command) update) {
+    final i = _commands.indexWhere((c) => c.id == id);
+    _commands[i] = update(_commands[i]);
+    _emit(LiveEvent(LiveEventKind.command, entityId: _commands[i].plantId));
+  }
+
+  // ---- rules -----------------------------------------------------------------------------------------
+
+  @override
+  Future<List<Rule>> rules(String plantId) => _delay(() => _rules.where((r) => r.plantId == plantId).toList());
+
+  @override
+  Future<Rule> saveRule(Rule rule) => _delay(() {
+    _require(Role.member);
     final saved = rule.id.isEmpty
         ? Rule(
             id: 'r${_nextId++}',
             plantId: rule.plantId,
             belowPercent: rule.belowPercent,
             waterSeconds: rule.waterSeconds,
-            minIntervalHours: rule.minIntervalHours,
+            cooldownS: rule.cooldownS,
+            maxPerDay: rule.maxPerDay,
             enabled: rule.enabled,
+            quietFrom: rule.quietFrom,
+            quietTo: rule.quietTo,
+            notifyChannels: rule.notifyChannels,
+            notifyOn: rule.notifyOn,
           )
         : rule;
-    final index = list.indexWhere((r) => r.id == saved.id);
-    index < 0 ? list.add(saved) : list[index] = saved;
+    final index = _rules.indexWhere((r) => r.id == saved.id);
+    index < 0 ? _rules.add(saved) : _rules[index] = saved;
     return saved;
   });
 
   @override
-  Future<void> deleteRule(String householdId, Rule rule) => _delay(() {
-    _requireRole(householdId, Role.member);
-    _rules[householdId]?.removeWhere((r) => r.id == rule.id);
+  Future<void> deleteRule(Rule rule) => _delay(() {
+    _require(Role.member);
+    _rules.removeWhere((r) => r.id == rule.id);
   });
 
   @override
-  Future<List<Device>> devices(String householdId) =>
-      _delay(() => List.of(_devices[householdId]!));
-
-  var _newDevices = 0;
-
-  @override
-  Future<NewDevice> createDevice(String householdId, String name) => _delay(() {
-    _requireRole(householdId, Role.admin);
-    final gateway = _gateways[householdId];
-    if (gateway == null) {
-      throw const ApiProblem(ApiProblem.noGateway, status: 409);
-    }
-    if (!gateway.online) {
-      throw const ApiProblem(ApiProblem.gatewayOffline, status: 409);
-    }
-    final n = ++_newDevices;
+  Future<List<RuleExecution>> ruleExecutions(String plantId, String ruleId) => _delay(() {
     final now = _clock();
-    final device = Device(
-      id: 'mc-new${n.toString().padLeft(12, '0')}',
-      name: name,
-      board: 'doit_esp32_devkit_v1',
-      firmware: '—',
-      batteryPercent: 0,
-      rssi: 0,
-      state: DeviceState.offline,
-      lastSeen: now,
-      nextExpectedAt: now,
-      wakeIntervalS: 600,
-      configSync: ConfigSync.pending,
-      configRev: 0,
-      slots: const [],
+    return [
+      RuleExecution(at: now.subtract(const Duration(hours: 5)), decision: 'water', commandId: 'c0'),
+      RuleExecution(at: now.subtract(const Duration(hours: 9)), decision: 'skip', skipReason: 'cooldown'),
+      RuleExecution(at: now.subtract(const Duration(days: 1)), decision: 'skip', skipReason: 'quiet_hours'),
+    ];
+  });
+
+  // ---- devices -----------------------------------------------------------------------------------------
+
+  @override
+  Future<List<Device>> devices() => _delay(() => List.of(_devices));
+
+  @override
+  Future<DeviceConfig> deviceConfig(String deviceId) => _delay(() {
+    final d = _devices.firstWhere((d) => d.id == deviceId);
+    final desired = _configs[deviceId];
+    return DeviceConfig(
+      desiredRev: d.desiredRev,
+      reportedRev: d.reportedRev,
+      sync: d.configSync,
+      desired: desired,
+      reported: DeviceConfigBody(rev: d.reportedRev ?? 0, slots: d.slots),
+      error: d.configError,
+      board: d.board,
     );
-    _devices[householdId] = [...?_devices[householdId], device];
-    _emit(householdId, const LiveEvent(LiveEventKind.device));
-    return NewDevice(device, _bundleFor(device.id, gateway));
   });
 
-  PairingBundle _bundleFor(String deviceId, GatewayInfo gateway) => PairingBundle(
-    deviceId: deviceId,
-    host: gateway.lanHostOverride ?? gateway.lanHost ?? '192.168.1.20',
-    port: gateway.lanPort,
-    psk: 'ab' * 32,
-  );
-
   @override
-  Future<PairingBundle> rekeyDevice(String householdId, String deviceId) =>
-      _delay(() {
-        _requireRole(householdId, Role.admin);
-        final gateway = _gateways[householdId];
-        if (gateway == null) {
-          throw const ApiProblem(ApiProblem.noGateway, status: 409);
-        }
-        return _bundleFor(deviceId, gateway);
-      });
-
-  @override
-  Future<void> deleteDevice(String householdId, String deviceId) => _delay(() {
-    _requireRole(householdId, Role.admin);
-    _devices[householdId] = [
-      for (final d in _devices[householdId]!)
-        if (d.id != deviceId) d,
-    ];
-    _emit(householdId, const LiveEvent(LiveEventKind.device));
-  });
-
-  /// Test helper: a paired device connects for the first time.
-  void simulateDeviceOnline(String householdId, String deviceId) {
-    _devices[householdId] = [
-      for (final d in _devices[householdId]!)
-        if (d.id == deviceId)
-          d.copyWith(state: DeviceState.online, lastSeen: _clock())
-        else
-          d,
-    ];
-    _emit(householdId, const LiveEvent(LiveEventKind.device));
-  }
-
-  @override
-  Future<void> deviceAction(
-    String householdId,
-    String deviceId,
-    DeviceAction action,
-  ) => _delay(
-    () => _requireRole(
-      householdId,
-      action == DeviceAction.identify ? Role.member : Role.admin,
+  Future<Board?> board(String name) => _delay(
+    () => Board(
+      name: name,
+      ports: [for (var i = 1; i <= 4; i++) BoardPort(id: 'P$i', roles: const ['moisture', 'pump'])],
     ),
   );
 
   @override
-  Future<List<Alert>> alerts(String householdId) => _delay(
-    () =>
-        List.of(_alerts[householdId] ?? [])
-          ..sort((a, b) => b.createdAt.compareTo(a.createdAt)),
-  );
-
-  @override
-  Future<void> acknowledgeAlert(String householdId, String alertId) =>
-      _delay(() {
-        _requireRole(householdId, Role.member);
-        final list = _alerts[householdId]!;
-        final i = list.indexWhere((a) => a.id == alertId);
-        list[i] = list[i].acknowledge(_clock());
-        _emit(householdId, LiveEvent(LiveEventKind.alert, entityId: alertId));
-      });
-
-  // --- gateway ------------------------------------------------------------------------
-
-  @override
-  Future<GatewayInfo?> gateway(String householdId) =>
-      _delay(() => _gateways[householdId]);
-
-  @override
-  Future<GatewayInfo> claimGateway(String householdId, String userCode) =>
-      _delay(() {
-        _requireRole(householdId, Role.admin);
-        final code = userCode.replaceAll(RegExp(r'[\s-]'), '');
-        if (!RegExp(r'^[0-9A-Za-z]{8}$').hasMatch(code)) {
-          throw const ApiProblem(ApiProblem.invalidCode, status: 422);
-        }
-        if (_gateways[householdId] != null) {
-          throw const ApiProblem(ApiProblem.gatewayExists, status: 409);
-        }
-        // A new gateway: every device must be re-paired to it.
-        _devices[householdId] = [
-          for (final d in _devices[householdId]!)
-            _withGateway(d, GatewayLink.none),
-        ];
-        _setGateway(
-          householdId,
-          _gatewayInfo('enrolling', online: false, inSync: false),
-        );
-        // Simulate the gateway fetching its credential, connecting and syncing.
-        _timers.add(
-          Timer(const Duration(seconds: 3), () {
-            _setGateway(
-              householdId,
-              _gatewayInfo('online', online: true, inSync: false),
-            );
-          }),
-        );
-        _timers.add(
-          Timer(const Duration(seconds: 5), () {
-            _setGateway(
-              householdId,
-              _gatewayInfo('online', online: true, inSync: true),
-            );
-          }),
-        );
-        _emit(householdId, const LiveEvent(LiveEventKind.device));
-        return _gateways[householdId]!;
-      });
-
-  @override
-  Future<GatewayInfo> setGatewayLanHost(
-    String householdId,
-    String? lanHostOverride,
-  ) => _delay(() {
-    _requireRole(householdId, Role.admin);
-    final h = _gateways[householdId]!;
-    _setGateway(
-      householdId,
-      GatewayInfo(
-        id: h.id,
-        status: h.status,
-        online: h.online,
-        inSync: h.inSync,
-        offlineSince: h.offlineSince,
-        version: h.version,
-        latestVersion: h.latestVersion,
-        arch: h.arch,
-        adapters: h.adapters,
-        outboxDepth: h.outboxDepth,
-        timeSynced: h.timeSynced,
-        lanHost: lanHostOverride ?? '192.168.1.20',
-        lanHostOverride: lanHostOverride,
-        lastStateAt: h.lastStateAt,
-      ),
+  Future<int> saveDeviceConfig(String deviceId, int baseRev, DeviceConfigBody config) => _delay(() {
+    _require(Role.admin);
+    final i = _devices.indexWhere((d) => d.id == deviceId);
+    final d = _devices[i];
+    if (baseRev != d.desiredRev) throw const ApiProblem(ApiProblem.conflict, status: 409);
+    final ports = <String>{};
+    for (final s in config.slots) {
+      if (!ports.add(s.port)) {
+        throw ApiProblem(ApiProblem.validation, status: 422, detail: 'slot ${s.slot}: port ${s.port} is used twice');
+      }
+    }
+    final rev = d.desiredRev + 1;
+    _configs[deviceId] = DeviceConfigBody(
+      rev: rev,
+      reportIntervalS: config.reportIntervalS,
+      fastReportIntervalS: config.fastReportIntervalS,
+      fastReportHoldS: config.fastReportHoldS,
+      slots: config.slots,
     );
-    return _gateways[householdId]!;
+    _devices[i] = _copy(d, desiredRev: rev, sync: ConfigSync.pending);
+    _emit(LiveEvent(LiveEventKind.device, entityId: deviceId));
+    _after(deviceDelay, () {
+      final j = _devices.indexWhere((x) => x.id == deviceId);
+      if (j < 0) return;
+      _devices[j] = _copy(_devices[j], reportedRev: rev, sync: ConfigSync.inSync, slots: config.slots);
+      _syncPlantLimits();
+      _emit(LiveEvent(LiveEventKind.device, entityId: deviceId));
+    });
+    return rev;
   });
 
-  @override
-  Future<void> removeGateway(String householdId) => _delay(() {
-    _requireRole(householdId, Role.admin);
-    _devices[householdId] = [
-      for (final d in _devices[householdId]!) _withGateway(d, GatewayLink.none),
-    ];
-    _setGateway(householdId, null);
-    _emit(householdId, const LiveEvent(LiveEventKind.device));
-  });
-
-  GatewayInfo _gatewayInfo(
-    String status, {
-    required bool online,
-    required bool inSync,
-  }) => GatewayInfo(
-    id: 'gw-4k9m2x7q1v8w3h5t',
-    status: status,
-    online: online,
-    inSync: inSync,
-    offlineSince: online ? null : _clock(),
-    version: online ? '0.1.0' : null,
-    latestVersion: '0.1.0',
-    arch: 'arm64',
-    adapters: const ['esp32-mqtt'],
-    outboxDepth: 0,
-    timeSynced: online ? true : null,
-    lanHost: online ? '192.168.1.20' : null,
-    lastStateAt: online ? _clock() : null,
-  );
-
-  void _setGateway(String householdId, GatewayInfo? gateway) {
-    _gateways[householdId] = gateway;
-    final h = _households[householdId]!;
-    _households[householdId] = Household(
-      id: h.id,
-      name: h.name,
-      timezone: h.timezone,
-      role: h.role,
-      gateway: gateway == null
-          ? null
-          : GatewayStatus(
-              online: gateway.online,
-              offlineSince: gateway.offlineSince,
-            ),
-    );
-    _emit(householdId, const LiveEvent(LiveEventKind.gateway));
+  void _syncPlantLimits() {
+    for (var i = 0; i < _plants.length; i++) {
+      final p = _plants[i];
+      _plants[i] = Plant(
+        id: p.id, name: p.name, notes: p.notes, sensor: p.sensor, pump: p.pump,
+        moisturePercent: p.moisturePercent, trend: p.trend, lastReadingAt: p.lastReadingAt,
+        maxRunS: _pumpLimit(p.pump),
+      );
+    }
   }
 
-  Device _withGateway(Device d, GatewayLink g) => Device(
+  Device _copy(
+    Device d, {
+    int? desiredRev,
+    int? reportedRev,
+    ConfigSync? sync,
+    List<SlotConfig>? slots,
+    DeviceStatus? status,
+    String? name,
+    String? configError,
+  }) => Device(
     id: d.id,
-    name: d.name,
+    name: name ?? d.name,
+    status: status ?? d.status,
+    configSync: sync ?? d.configSync,
+    model: d.model,
     board: d.board,
     firmware: d.firmware,
-    batteryPercent: d.batteryPercent,
-    rssi: d.rssi,
-    state: d.state,
+    safeReason: d.safeReason,
     lastSeen: d.lastSeen,
-    nextExpectedAt: d.nextExpectedAt,
-    wakeIntervalS: d.wakeIntervalS,
-    configSync: d.configSync,
-    configRev: d.configRev,
-    configError: d.configError,
-    slots: d.slots,
-    gateway: g,
+    linkQuality: d.linkQuality,
+    voltageMv: d.voltageMv,
+    desiredRev: desiredRev ?? d.desiredRev,
+    reportedRev: reportedRev ?? d.reportedRev,
+    configError: configError ?? d.configError,
+    slots: slots ?? d.slots,
+    diagnostics: d.diagnostics,
   );
 
   @override
-  Stream<LiveEvent> events(String householdId) => _stream(householdId).stream;
+  Future<Device> renameDevice(String deviceId, String name) => _delay(() {
+    _require(Role.admin);
+    final i = _devices.indexWhere((d) => d.id == deviceId);
+    _devices[i] = _copy(_devices[i], name: name);
+    _emit(LiveEvent(LiveEventKind.device, entityId: deviceId));
+    return _devices[i];
+  });
 
-  // --- Simulation -------------------------------------------------------------
+  @override
+  Future<void> deleteDevice(String deviceId, {bool force = false}) => _delay(() {
+    _require(Role.admin);
+    _needProof();
+    _devices.removeWhere((d) => d.id == deviceId);
+    _emit(LiveEvent(LiveEventKind.device, entityId: deviceId));
+  });
 
-  void _simulateDevice(String householdId, String commandId) {
-    void after(Duration d, void Function() f) => _timers.add(Timer(d, f));
+  @override
+  Future<void> deviceAction(String deviceId, DeviceAction action) => _delay(() {
+    _require(action == DeviceAction.identify ? Role.member : Role.admin);
+    if (action == DeviceAction.clearSafeMode) {
+      final i = _devices.indexWhere((d) => d.id == deviceId);
+      _devices[i] = _copy(_devices[i], status: DeviceStatus.online);
+      _emit(LiveEvent(LiveEventKind.device, entityId: deviceId));
+    }
+  });
 
-    after(deviceDelay, () {
-      final c = _command(householdId, commandId);
-      if (c.state != CommandState.queued) return;
-      _updateCommand(
-        householdId,
-        commandId,
-        (c) => c.copyWith(state: CommandState.delivered),
-      );
+  @override
+  Future<List<Map<String, Object?>>> deviceEvents(String deviceId) => _delay(
+    () => [
+      {'ts': _clock().subtract(const Duration(hours: 3)).toIso8601String(), 'code': 'boot'},
+      {'ts': _clock().subtract(const Duration(days: 1)).toIso8601String(), 'code': 'low_battery'},
+    ],
+  );
 
-      after(const Duration(seconds: 1), () {
-        final c = _command(householdId, commandId);
-        final until = _clock().add(Duration(seconds: c.seconds));
-        _updateCommand(
-          householdId,
-          commandId,
-          (c) => c.copyWith(state: CommandState.running, runningUntil: until),
+  @override
+  Future<JoinState> joinState() => _delay(() => _join);
+
+  @override
+  Future<JoinState> openJoin({String? installCode, int seconds = 120}) => _delay(() {
+    _require(Role.admin);
+    final ends = _clock().add(Duration(seconds: seconds));
+    _join = JoinState(open: true, endsAt: ends);
+    _emit(const LiveEvent(LiveEventKind.join));
+    _after(deviceDelay, _joinNewDevice);
+    return _join;
+  });
+
+  void _joinNewDevice() {
+    if (!_join.open) return;
+    final id = 'dev-new${_nextId++}';
+    _devices.add(
+      Device(id: id, name: id, status: DeviceStatus.joining, configSync: ConfigSync.pending, model: 'MC-PLANT'),
+    );
+    _join = JoinState(open: true, endsAt: _join.endsAt, deviceIds: [..._join.deviceIds, id]);
+    _emit(LiveEvent(LiveEventKind.join, entityId: id));
+    _after(deviceDelay, () {
+      final i = _devices.indexWhere((d) => d.id == id);
+      if (i < 0) return;
+      _devices[i] = _copy(_devices[i], status: DeviceStatus.ready);
+      _emit(LiveEvent(LiveEventKind.device, entityId: id));
+      _after(deviceDelay, () {
+        final j = _devices.indexWhere((d) => d.id == id);
+        if (j < 0) return;
+        _devices[j] = Device(
+          id: id, name: id, status: DeviceStatus.online, configSync: ConfigSync.inSync,
+          model: 'MC-PLANT', board: 'carrier-v1', firmware: '0.1.0', lastSeen: _clock(), linkQuality: 180,
+          desiredRev: 1, reportedRev: 1,
         );
-
-        after(Duration(seconds: c.seconds), () {
-          _updateCommand(
-            householdId,
-            commandId,
-            (c) => c.copyWith(state: CommandState.done, finishedAt: _clock()),
-          );
-          _applyWatering(householdId, c.plantId, c.seconds);
-        });
+        _configs[id] = const DeviceConfigBody(rev: 1);
+        _emit(LiveEvent(LiveEventKind.device, entityId: id));
       });
     });
   }
 
-  void _applyWatering(String householdId, String plantId, int seconds) {
-    final plants = _plants[householdId]!;
-    final i = plants.indexWhere((p) => p.id == plantId);
-    final now = _clock();
-    final value = min(95.0, (plants[i].moisturePercent ?? 0) + seconds * 2.5);
-    plants[i] = plants[i].copyWith(
-      moisturePercent: value,
-      trend: Trend.rising,
-      lastReadingAt: now,
-    );
-    _curves[plantId] = _curves[plantId]!.wateredTo(value, now);
-    _emit(householdId, LiveEvent(LiveEventKind.reading, entityId: plantId));
-  }
+  @override
+  Future<void> closeJoin() => _delay(() {
+    _require(Role.admin);
+    _join = const JoinState();
+    _emit(const LiveEvent(LiveEventKind.join));
+  });
 
-  // --- Helpers ----------------------------------------------------------------
+  // ---- alerts ----------------------------------------------------------------------------------------------
+
+  @override
+  Future<List<Alert>> alerts() => _delay(() => List.of(_alerts)..sort((a, b) => b.createdAt.compareTo(a.createdAt)));
+
+  @override
+  Future<void> acknowledgeAlert(String alertId) => _delay(() {
+    _require(Role.member);
+    final i = _alerts.indexWhere((a) => a.id == alertId);
+    _alerts[i] = _alerts[i].acknowledge(_clock(), by: _me.id);
+    _emit(LiveEvent(LiveEventKind.alert, entityId: alertId));
+  });
+
+  @override
+  Stream<LiveEvent> events() => _stream.stream;
+
+  // ---- helpers ---------------------------------------------------------------------------------------------
 
   Future<T> _delay<T>(T Function() body) async {
     if (latency > Duration.zero) await Future<void>.delayed(latency);
     return body();
   }
 
-  void _requireRole(String householdId, Role min) {
-    if (_households[householdId]!.role.index < min.index) {
-      throw const ApiProblem(ApiProblem.forbidden, status: 403);
-    }
+  void _require(Role min) {
+    if (_role.index < min.index) throw const ApiProblem(ApiProblem.forbidden, status: 403);
   }
 
-  Plant _plant(String householdId, String plantId) =>
-      _plants[householdId]!.firstWhere((p) => p.id == plantId);
-
-  Command _command(String householdId, String commandId) =>
-      _commands[householdId]!.firstWhere((c) => c.id == commandId);
-
-  void _updateCommand(
-    String householdId,
-    String commandId,
-    Command Function(Command) update,
-  ) {
-    final list = _commands[householdId]!;
-    final i = list.indexWhere((c) => c.id == commandId);
-    list[i] = update(list[i]);
-    _emit(
-      householdId,
-      LiveEvent(LiveEventKind.command, entityId: list[i].plantId),
-    );
+  void _emit(LiveEvent event) {
+    if (!_stream.isClosed) _stream.add(event);
   }
 
-  StreamController<LiveEvent> _stream(String householdId) =>
-      _streams.putIfAbsent(householdId, StreamController<LiveEvent>.broadcast);
-
-  void _emit(String householdId, LiveEvent event) {
-    final s = _streams[householdId];
-    if (s != null && !s.isClosed) s.add(event);
-  }
-
-  // --- Seed data --------------------------------------------------------------
+  // ---- seed data ------------------------------------------------------------------------------------------------
 
   void _seed() {
     final now = _clock();
     DateTime ago(Duration d) => now.subtract(d);
 
-    _households['h1'] = const Household(
-      id: 'h1',
-      name: 'Home',
-      timezone: 'Europe/Berlin',
-      role: Role.owner,
-      gateway: GatewayStatus(online: true, version: '1.2.0'),
-    );
-    _households['h2'] = Household(
-      id: 'h2',
-      name: "Parents' garden",
-      timezone: 'Europe/Berlin',
-      role: Role.viewer,
-      gateway: GatewayStatus(
-        online: false,
-        offlineSince: ago(const Duration(hours: 3)),
-        version: '1.1.4',
-      ),
-    );
+    _users.addAll([
+      AppUser(id: 'u-demo', username: 'demo', displayName: 'Demo user', role: _role, createdAt: ago(const Duration(days: 30))),
+      AppUser(id: 'u-anna', username: 'anna', displayName: 'Anna', role: Role.member, createdAt: ago(const Duration(days: 12))),
+      AppUser(id: 'u-ben', username: 'ben', displayName: 'Ben', role: Role.viewer, createdAt: ago(const Duration(days: 3))),
+    ]);
+    _passwords.addAll({'demo': 'demo', 'anna': 'anna', 'ben': 'ben'});
+    _tokens.addAll([
+      TokenInfo(id: 'tok-0', name: 'Demo browser', createdAt: ago(const Duration(days: 2)), lastUsedAt: now, current: true),
+      TokenInfo(id: 'tok-x', name: "Philipp's phone", createdAt: ago(const Duration(days: 20)), lastUsedAt: ago(const Duration(days: 4)), current: false),
+    ]);
+    _token = 'tok-0';
+
+    SlotConfig moisture(int slot, String port) => SlotConfig(slot: slot, module: 'moisture', port: port);
+    final slots = [moisture(0, 'P1'), moisture(1, 'P2'), const SlotConfig(slot: 2, module: 'pump', port: 'P3', maxRunS: 30)];
 
     Device device(
       String id,
       String name,
-      DeviceState state, {
-      int battery = 80,
-      int rssi = -62,
-      Duration lastSeen = const Duration(minutes: 12),
+      DeviceStatus status, {
+      int? link = 150,
+      int? mv = 3900,
+      Duration seen = const Duration(minutes: 2),
       ConfigSync sync = ConfigSync.inSync,
       String? configError,
-    }) => Device(
-      id: id,
-      name: name,
-      board: 'doit_esp32_devkit_v1',
-      firmware: '0.4.2',
-      batteryPercent: battery,
-      rssi: rssi,
-      state: state,
-      lastSeen: ago(lastSeen),
-      nextExpectedAt: ago(lastSeen).add(const Duration(minutes: 30)),
-      wakeIntervalS: 1800,
-      configSync: sync,
-      configRev: 7,
-      configError: configError,
-      gateway: GatewayLink.gateway,
-      slots: const [
-        Slot(index: 0, module: 'capacitive_moisture', pin: 34),
-        Slot(index: 1, module: 'capacitive_moisture', pin: 35),
-        Slot(index: 2, module: 'pump', pin: 26, maxRunS: 30),
-      ],
-    );
-
-    _gateways['h1'] = GatewayInfo(
-      id: 'gw-4k9m2x7q1v8w3h5t',
-      status: 'online',
-      online: true,
-      inSync: true,
-      version: '0.1.0',
-      latestVersion: '0.2.0',
-      arch: 'arm64',
-      adapters: const ['esp32-mqtt'],
-      outboxDepth: 0,
-      timeSynced: true,
-      lanHost: '192.168.1.20',
-      lastStateAt: ago(const Duration(minutes: 4)),
-    );
-    _gateways['h2'] = GatewayInfo(
-      id: 'gw-7c2m9x1q4v8w3h5z',
-      status: 'offline',
-      online: false,
-      inSync: true,
-      offlineSince: ago(const Duration(hours: 3)),
-      version: '0.1.0',
-      latestVersion: '0.2.0',
-      arch: 'amd64',
-      adapters: const ['esp32-mqtt'],
-      outboxDepth: 212,
-      timeSynced: true,
-      lanHost: '192.168.178.40',
-      lastStateAt: ago(const Duration(hours: 3)),
-    );
-
-    _devices['h1'] = [
-      device('d1', 'Kitchen window', DeviceState.sleeping, battery: 18),
-      device(
-        'd2',
-        'Bathroom shelf',
-        DeviceState.online,
-        lastSeen: const Duration(minutes: 1),
-        sync: ConfigSync.pending,
-      ),
-      device(
-        'd3',
-        'Balcony',
-        DeviceState.late,
-        rssi: -81,
-        lastSeen: const Duration(hours: 2),
-      ),
-      device(
-        'd4',
-        'Office',
-        DeviceState.offline,
-        battery: 0,
-        lastSeen: const Duration(days: 2),
-        sync: ConfigSync.rejected,
-        configError: 'GPIO 34 is input-only',
-      ),
-    ];
-    _devices['h2'] = [
-      device(
-        'd5',
-        'Rose bed',
-        DeviceState.sleeping,
-        lastSeen: const Duration(hours: 3, minutes: 5),
-      ),
-      device(
-        'd6',
-        'Orchard',
-        DeviceState.sleeping,
-        battery: 64,
-        lastSeen: const Duration(hours: 3, minutes: 20),
-      ),
-    ];
-
-    Plant plant(
-      String id,
-      String name,
-      String deviceId,
-      double moisture,
-      Trend trend,
-      Duration age, {
-      int maxRunS = 30,
+      String? safeReason,
     }) {
-      _curves[id] = _Curve.through(moisture, now, seed: id.hashCode);
-      return Plant(
-        id: id,
-        name: name,
-        deviceId: deviceId,
-        moisturePercent: moisture,
-        trend: trend,
-        lastReadingAt: ago(age),
-        maxRunS: maxRunS,
+      _configs[id] = DeviceConfigBody(rev: 7, slots: slots);
+      return Device(
+        id: id, name: name, status: status, configSync: sync, model: 'MC-PLANT', board: 'carrier-v1',
+        firmware: '0.1.0', safeReason: safeReason, lastSeen: ago(seen), linkQuality: link, voltageMv: mv,
+        desiredRev: sync == ConfigSync.inSync ? 7 : 8, reportedRev: 7, configError: configError, slots: slots,
+        diagnostics: const {
+          'uptime_s': 86400, 'boot_reason': 'power_on', 'reset_count': 0, 'rejoin_count': 1,
+          'last_error': 0, 'free_heap': 143000,
+        },
       );
     }
 
-    _plants['h1'] = [
-      plant(
-        'p1',
-        'Basil',
-        'd1',
-        22,
-        Trend.falling,
-        const Duration(minutes: 12),
-      ),
-      plant(
-        'p2',
-        'Monstera',
-        'd1',
-        48,
-        Trend.steady,
-        const Duration(minutes: 12),
-      ),
-      plant('p3', 'Fern', 'd2', 81, Trend.rising, const Duration(minutes: 1)),
-      plant(
-        'p4',
-        'Tomatoes',
-        'd3',
-        35,
-        Trend.falling,
-        const Duration(hours: 2),
-      ),
-      plant(
-        'p5',
-        'Lemon tree',
-        'd4',
-        12,
-        Trend.falling,
-        const Duration(days: 2),
-      ),
-    ];
-    _plants['h2'] = [
-      plant(
-        'p6',
-        'Roses',
-        'd5',
-        57,
-        Trend.steady,
-        const Duration(hours: 3, minutes: 5),
-      ),
-      plant(
-        'p7',
-        'Apple tree',
-        'd6',
-        29,
-        Trend.falling,
-        const Duration(hours: 3, minutes: 20),
-        maxRunS: 120,
-      ),
-    ];
+    _devices.addAll([
+      device('d1', 'Kitchen window', DeviceStatus.online),
+      device('d2', 'Bathroom shelf', DeviceStatus.online, sync: ConfigSync.pending),
+      device('d3', 'Balcony', DeviceStatus.late, link: 60, seen: const Duration(minutes: 40)),
+      device('d4', 'Office', DeviceStatus.offline, link: null, seen: const Duration(days: 2),
+          sync: ConfigSync.rejected, configError: 'rejected (port P3 cannot drive this module)'),
+      device('d5', 'Greenhouse', DeviceStatus.safeMode, safeReason: 'crash_loop'),
+    ]);
 
-    _rules['h1'] = [
-      const Rule(
-        id: 'r1',
-        plantId: 'p1',
-        belowPercent: 30,
-        waterSeconds: 10,
-        minIntervalHours: 6,
-        enabled: true,
-      ),
-    ];
+    Plant plant(String id, String name, String device, int sensorSlot, double? value, Trend trend, Duration seen, {bool pump = true}) {
+      _curves[id] = _Curve(value ?? 50, now);
+      return Plant(
+        id: id, name: name, sensor: SlotRef(deviceId: device, slot: sensorSlot),
+        pump: pump ? SlotRef(deviceId: device, slot: 2) : const SlotRef(),
+        moisturePercent: value, trend: trend, lastReadingAt: value == null ? null : ago(seen), maxRunS: pump ? 30 : 0,
+      );
+    }
 
-    _commands['h1'] = [
-      Command(
-        id: 'c0',
-        plantId: 'p1',
-        seconds: 10,
-        state: CommandState.done,
-        createdAt: ago(const Duration(hours: 26)),
-        expectedAt: ago(const Duration(hours: 26)),
-        finishedAt: ago(const Duration(hours: 25, minutes: 40)),
-        origin: CommandOrigin.rule,
-      ),
-    ];
+    _plants.addAll([
+      plant('p1', 'Monstera', 'd1', 0, 18, Trend.falling, const Duration(minutes: 3)),
+      plant('p2', 'Basil', 'd1', 1, 47, Trend.steady, const Duration(minutes: 3)),
+      plant('p3', 'Ficus', 'd2', 0, 72, Trend.rising, const Duration(minutes: 1)),
+      plant('p4', 'Geranium', 'd3', 0, 35, Trend.falling, const Duration(minutes: 40)),
+      plant('p5', 'Aloe', 'd4', 0, 22, Trend.steady, const Duration(days: 2), pump: false),
+      plant('p6', 'Tomatoes', 'd5', 0, null, Trend.steady, Duration.zero),
+    ]);
 
-    _alerts['h1'] = [
-      Alert(
-        id: 'a1',
-        kind: AlertKind.batteryLow,
-        subject: 'Kitchen window',
-        createdAt: ago(const Duration(hours: 5)),
-        open: true,
-      ),
-      Alert(
-        id: 'a2',
-        kind: AlertKind.deviceOffline,
-        subject: 'Office',
-        createdAt: ago(const Duration(days: 2)),
-        open: true,
-      ),
-      Alert(
-        id: 'a3',
-        kind: AlertKind.sensorSuspect,
-        subject: 'Fern',
-        createdAt: ago(const Duration(days: 6)),
-        open: false,
-        acknowledgedAt: ago(const Duration(days: 5)),
-      ),
-    ];
-    _alerts['h2'] = [];
+    _rules.add(
+      const Rule(id: 'r1', plantId: 'p1', belowPercent: 25, waterSeconds: 10, cooldownS: 21600, maxPerDay: 2, enabled: true),
+    );
+    _commands.add(
+      Command(id: 'c0', plantId: 'p1', deviceId: 'd1', seconds: 8, state: CommandState.done,
+          createdAt: ago(const Duration(hours: 5)), finishedAt: ago(const Duration(hours: 5)), origin: CommandOrigin.rule),
+    );
+    _alerts.addAll([
+      Alert(id: 'a1', kind: AlertKind.deviceOffline, kindName: 'device_offline', subject: 'Office',
+          createdAt: ago(const Duration(days: 2)), open: true),
+      Alert(id: 'a2', kind: AlertKind.safeMode, kindName: 'device_safe_mode', subject: 'Greenhouse',
+          createdAt: ago(const Duration(hours: 1)), open: true, critical: true),
+      Alert(id: 'a3', kind: AlertKind.batteryLow, kindName: 'battery_low', subject: 'Balcony',
+          createdAt: ago(const Duration(days: 4)), open: false, acknowledgedAt: ago(const Duration(days: 3)), acknowledgedBy: 'u-anna'),
+    ]);
+    _invites.add(Invite(id: 'i0', role: Role.member, status: 'open', expiresAt: now.add(const Duration(hours: 30))));
+    _inviteCodes['DEMOINVITE'] = 'i0';
   }
 }
 
-/// Sawtooth drying curve with small noise: dries from [_high] to [_low] over
-/// [_period], then gets watered back up.
+/// A synthetic moisture curve for the charts: slow decay with a daily wobble.
 class _Curve {
-  _Curve(this._low, this._high, this._period, this._anchor, this._seed);
+  _Curve(this.current, this.at0, {double? wateredAt, DateTime? wateredTime})
+    : _wateredAt = wateredAt,
+      _wateredTime = wateredTime;
 
-  factory _Curve.through(double current, DateTime now, {required int seed}) {
-    final rnd = Random(seed);
-    final low = 15 + rnd.nextDouble() * 10;
-    final high = max(current + 5, 70 + rnd.nextDouble() * 15);
-    final period = Duration(hours: 72 + rnd.nextInt(72));
-    // Place the last watering so that at(now) == current.
-    final frac = ((high - current) / (high - low)).clamp(0.0, 0.999);
-    final anchor = now.subtract(period * frac);
-    return _Curve(low, high, period, anchor, seed);
-  }
-
-  final double _low;
-  final double _high;
-  final Duration _period;
-
-  /// Time of a watering (curve at [_high]).
-  final DateTime _anchor;
-  final int _seed;
+  final double current;
+  final DateTime at0;
+  final double? _wateredAt;
+  final DateTime? _wateredTime;
 
   double at(DateTime t) {
-    final hours = t.difference(_anchor).inMinutes / 60;
-    final periodH = _period.inMinutes / 60;
-    var frac = (hours / periodH) % 1;
-    if (frac < 0) frac += 1;
-    final base = _high - (_high - _low) * frac;
-    final noise = sin(hours * 1.7 + _seed) * 0.8;
-    return (base + noise).clamp(0, 100).toDouble();
+    final hours = at0.difference(t).inMinutes / 60;
+    var v = current + hours * 0.35 + sin(t.millisecondsSinceEpoch / 4.3e6) * 3;
+    if (_wateredTime != null && t.isAfter(_wateredTime)) v = _wateredAt!;
+    return v.clamp(5, 95).toDouble();
   }
 
-  _Curve wateredTo(double value, DateTime now) =>
-      _Curve(_low, max(value, _low + 1), _period, now, _seed);
+  _Curve wateredTo(double value, DateTime when) =>
+      _Curve(current, at0, wateredAt: value, wateredTime: when);
 }

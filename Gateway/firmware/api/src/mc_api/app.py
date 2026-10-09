@@ -129,7 +129,7 @@ def create_app(settings: Settings, transport, sessions, clock: Clock | None = No
     if web is not None and Path(web).is_dir():
         root = Path(web).resolve()
 
-        @app.get("/{path:path}", include_in_schema=False)
+        @app.api_route("/{path:path}", methods=["GET", "HEAD"], include_in_schema=False)
         async def spa(path: str):
             if path.startswith("api/"):
                 raise StarletteHTTPException(404, "Not found")

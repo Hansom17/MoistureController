@@ -1,19 +1,22 @@
 # MoistureController app
 
-Flutter client (Android, iOS, web). Spec and design system: [specs.md](specs.md).
+Flutter app, served as a **web app by the gateway** (`Gateway/`); Android and iOS later from the same code. Spec and design system: [specs.md](specs.md).
 
 ## Run
 
 ```bash
-flutter run -t lib/main_dev.dart          # device/simulator
-flutter run -d chrome -t lib/main_dev.dart
-flutter run -t lib/main_local.dart --dart-define=API_URL=http://<host>:8000 --dart-define=DEV_UID=<uid>   # real API (the hub, once it exists)
-flutter test
+cd App
+flutter run -d chrome -t lib/main_dev.dart                       # fake backend, no gateway needed
+flutter test                                                      # unit and widget tests (fake backend, mocked HTTP)
+
+flutter build web --release --no-web-resources-cdn                # the product: App/build/web, served by the gateway's api
+flutter run -d chrome --dart-define=API_URL=http://localhost:8000 # against a running api, for development
 ```
 
-`main_dev.dart` uses `FakeMoistureRepository` — an in-memory backend with two households, sample plants, devices and alerts. Watering goes queued → delivered → running → done over a few seconds with live events, like a sleeping device. Settings → Demo switches your role per household to try the role-aware UI.
-
-`main_local.dart` talks to a real API (`ApiMoistureRepository`, hand-written Dio) with dev tokens and can find the server through mDNS. It was written against the previous API; there is no server to run it against until the hub exists, and it has to be adapted to the hub API (see `specs.md` §14).
+- `lib/main_dev.dart` uses `FakeMoistureRepository`: sample plants, devices, alerts and users in memory. Sign in as `demo` / `demo` (owner), `anna` / `anna` (member) or `ben` / `ben` (viewer); setup code `DEMOCODE`, invite code `DEMOINVITE`. Watering goes queued → running → done over a few seconds with live events; a join window brings a new device in. Settings → Demo switches your role.
+- `lib/main.dart` talks to the gateway's `api` (`ApiMoistureRepository`, hand-written Dio, SSE for live updates). On web it uses the page's own origin.
+- The web build is self-contained: CanvasKit and Roboto come from the gateway, nothing from a CDN. Texts may only use characters Roboto has (`test/l10n_test.dart` guards this).
+- To try the whole stack on one machine: `Gateway/firmware/` (compose) or the processes described in `Gateway/readme.md`, with `scripts/z2m_sim.py` as the Zigbee side; set `MC_WEB_DIR` to `App/build/web`.
 
 ## Theme
 
@@ -25,6 +28,6 @@ dart run tool/gen_color_scheme.dart
 
 ## Status
 
-Done: theme + design tokens, dashboard, household switcher, plant detail (chart, water now, commands, rules), devices, device detail, alerts, settings (theme, language), role-aware UI, live-update wiring, DE/EN, gateway screen, API discovery on the LAN with connection banner and Server screen, API repository. Tests cover discovery, the repository, permissions and the gateway screen.
+Adapted to the gateway `api`: setup, login, invite join, dashboard with plant create/edit, plant detail (chart over the whole range, water now, command history, rules with quiet hours / daily limit / notifications and "why did it water"), devices, add device (Zigbee join window with steps), device detail (diagnostics, events, safe mode, rename, remove with password), slot editor (modules, ports from the board description, report intervals), alerts, users and invites, my devices (tokens, password), installation settings (name, timezone, battery, Telegram), gateway status, backup and export, live updates, role-aware UI, DE/EN. 97 tests; the full flow was also run in a browser against the real api, hub and simulator.
 
-Removed with the redesign: the BLE pairing wizard and its dependencies. Still to do for the hub design (see `specs.md`): hub login (setup, login, join, tokens), the Zigbee join screen, users and invites, adapting the API repository to the hub API, calibration wizard, export.
+Not done: the calibration wizard, QR code for invites (the link can be copied), browser push, the mobile flavor (secure token storage, mDNS discovery is kept but not wired in), golden tests.

@@ -22,13 +22,13 @@ def config_sync(d: Device) -> str:
     return "pending"
 
 
-def plant_view(p: Plant, latest: dict | None = None) -> dict:
+def plant_view(p: Plant, latest: dict | None = None, trend: str = "steady") -> dict:
     latest = latest or {}
     return {
         "id": p.id, "name": p.name, "notes": p.notes,
         "sensor": {"device_id": p.sensor_device_id, "slot": p.sensor_slot},
         "pump": {"device_id": p.pump_device_id, "slot": p.pump_slot},
-        "latest_value": latest.get("value"), "latest_ts": latest.get("ts"),
+        "latest_value": latest.get("value"), "latest_ts": latest.get("ts"), "trend": trend,
         "archived": p.archived_at is not None, "updated_at": p.updated_at,
     }
 

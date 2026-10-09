@@ -4,12 +4,23 @@ import 'dart:math';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../data/models.dart';
-import 'household_data.dart';
+import 'app_data.dart';
 import 'session.dart';
 
-/// Keeps the live event stream of one household open while watched and
-/// invalidates the matching providers on each event (App/specs.md Part A §6.2).
-final liveUpdatesProvider = Provider.family<void, String>((ref, householdId) {
+/// Messages the gateway wants shown (rule notifications), e.g. as a snack bar in the shell.
+final notificationBusProvider = Provider<StreamController<String>>((ref) {
+  final controller = StreamController<String>.broadcast();
+  ref.onDispose(controller.close);
+  return controller;
+});
+
+final notificationsProvider = StreamProvider<String>(
+  (ref) => ref.watch(notificationBusProvider).stream,
+);
+
+/// Keeps the live event stream open while watched and invalidates the matching providers on each
+/// event (App/specs.md Part A §6.2).
+final liveUpdatesProvider = Provider<void>((ref) {
   final repository = ref.watch(repositoryProvider);
   StreamSubscription<LiveEvent>? subscription;
   Timer? retry;
@@ -17,30 +28,24 @@ final liveUpdatesProvider = Provider.family<void, String>((ref, householdId) {
   var disposed = false;
 
   void connect() {
-    subscription = repository
-        .events(householdId)
-        .listen(
-          (event) {
-            attempt = 0;
-            applyLiveEvent(ref, householdId, event);
-          },
-          onError: (Object _) {
-            // Reconnect with exponential backoff 1 s → 30 s; then refresh
-            // everything, as events may have been missed.
-            subscription?.cancel();
-            if (disposed) return;
-            final delay = Duration(seconds: min(30, 1 << attempt++));
-            retry = Timer(delay, () {
-              if (disposed) return;
-              applyLiveEvent(
-                ref,
-                householdId,
-                const LiveEvent(LiveEventKind.resync),
-              );
-              connect();
-            });
-          },
-        );
+    subscription = repository.events().listen(
+      (event) {
+        attempt = 0;
+        applyLiveEvent(ref, event);
+      },
+      onError: (Object _) {
+        // Reconnect with exponential backoff 1 s → 30 s; then refresh
+        // everything, as events may have been missed.
+        subscription?.cancel();
+        if (disposed) return;
+        final delay = Duration(seconds: min(30, 1 << attempt++));
+        retry = Timer(delay, () {
+          if (disposed) return;
+          applyLiveEvent(ref, const LiveEvent(LiveEventKind.resync));
+          connect();
+        });
+      },
+    );
   }
 
   connect();
@@ -51,33 +56,50 @@ final liveUpdatesProvider = Provider.family<void, String>((ref, householdId) {
   });
 });
 
-void applyLiveEvent(Ref ref, String householdId, LiveEvent event) {
+void applyLiveEvent(Ref ref, LiveEvent event) {
   switch (event.kind) {
     case LiveEventKind.reading:
-      ref.invalidate(plantsProvider(householdId));
+      ref.invalidate(plantsProvider);
       ref.invalidate(readingsProvider);
+      ref.invalidate(devicesProvider);
+    case LiveEventKind.plant:
+      ref.invalidate(plantsProvider);
     case LiveEventKind.command:
       ref.invalidate(commandsProvider);
     case LiveEventKind.device:
     case LiveEventKind.config:
-      ref.invalidate(devicesProvider(householdId));
-    case LiveEventKind.alert:
-      ref.invalidate(alertsProvider(householdId));
-    case LiveEventKind.gateway:
-      ref.invalidate(householdsProvider);
-      ref.invalidate(gatewayProvider(householdId));
-    case LiveEventKind.household:
-      ref.invalidate(householdsProvider);
+      ref.invalidate(devicesProvider);
+      ref.invalidate(deviceConfigProvider);
+      ref.invalidate(plantsProvider);
     case LiveEventKind.rule:
       ref.invalidate(rulesProvider);
+      ref.invalidate(ruleExecutionsProvider);
+    case LiveEventKind.alert:
+      ref.invalidate(alertsProvider);
+    case LiveEventKind.installation:
+      ref.invalidate(installationProvider);
+      ref.invalidate(metaProvider);
+      ref.read(sessionProvider.notifier).refresh();
+    case LiveEventKind.join:
+      ref.invalidate(joinStateProvider);
+      ref.invalidate(devicesProvider);
+    case LiveEventKind.status:
+      ref.invalidate(gatewayStatusProvider);
+      ref.invalidate(metaProvider);
+    case LiveEventKind.notification:
+      if (event.text != null) ref.read(notificationBusProvider).add(event.text!);
     case LiveEventKind.resync:
-      ref.invalidate(householdsProvider);
-      ref.invalidate(plantsProvider(householdId));
+      ref.invalidate(plantsProvider);
       ref.invalidate(readingsProvider);
       ref.invalidate(commandsProvider);
       ref.invalidate(rulesProvider);
-      ref.invalidate(devicesProvider(householdId));
-      ref.invalidate(alertsProvider(householdId));
-      ref.invalidate(gatewayProvider(householdId));
+      ref.invalidate(ruleExecutionsProvider);
+      ref.invalidate(devicesProvider);
+      ref.invalidate(deviceConfigProvider);
+      ref.invalidate(joinStateProvider);
+      ref.invalidate(alertsProvider);
+      ref.invalidate(installationProvider);
+      ref.invalidate(gatewayStatusProvider);
+      ref.invalidate(metaProvider);
   }
 }

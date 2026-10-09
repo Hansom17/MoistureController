@@ -24,9 +24,6 @@ class AppLocalizationsDe extends AppLocalizations {
   String get navSettings => 'Einstellungen';
 
   @override
-  String get switchHousehold => 'Haushalt wechseln';
-
-  @override
   String get roleViewer => 'Betrachter';
 
   @override
@@ -39,21 +36,7 @@ class AppLocalizationsDe extends AppLocalizations {
   String get roleOwner => 'Eigentümer';
 
   @override
-  String gatewayOfflineBanner(String time) {
-    return 'Gateway offline seit $time. Gießen wird ausgeführt, sobald es wieder da ist.';
-  }
-
-  @override
   String get noPlantsTitle => 'Starte mit deiner ersten Pflanze';
-
-  @override
-  String get noPlantsBody => 'Füge ein Gerät hinzu, um Feuchtigkeit zu messen.';
-
-  @override
-  String get noHouseholdTitle => 'Lege deinen ersten Haushalt an';
-
-  @override
-  String get noHouseholdBody => 'Oder tritt einem per Einladungslink bei.';
 
   @override
   String get retry => 'Erneut versuchen';
@@ -66,12 +49,6 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get errorSafetyLimit => 'Das ist länger als das Limit dieser Pumpe.';
-
-  @override
-  String get errorGatewayOffline => 'Das Gateway ist offline.';
-
-  @override
-  String get errorTooLate => 'Das Gerät hat das bereits übernommen.';
 
   @override
   String get errorBusy =>
@@ -119,9 +96,6 @@ class AppLocalizationsDe extends AppLocalizations {
   String get deviceOnline => 'Online';
 
   @override
-  String get deviceSleeping => 'Schläft';
-
-  @override
   String get deviceLate => 'Verspätet';
 
   @override
@@ -135,11 +109,6 @@ class AppLocalizationsDe extends AppLocalizations {
   @override
   String lastReading(String ago) {
     return 'Letzte Messung $ago';
-  }
-
-  @override
-  String batteryValue(int percent) {
-    return 'Akku $percent %';
   }
 
   @override
@@ -169,7 +138,7 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get waterSheetHint =>
-      'Geräte schlafen zwischen den Messungen. Das Gießen startet beim nächsten Aufwachen.';
+      'Das Gießen startet, sobald das Modul bestätigt. Ist es offline, wird es gesendet, sobald es zurück ist.';
 
   @override
   String pumpLimit(int seconds) {
@@ -178,10 +147,6 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get waterQueued => 'Gießen eingeplant';
-
-  @override
-  String get waterQueuedGatewayOffline =>
-      'Eingeplant. Wird ausgeführt, sobald das Gateway wieder online ist.';
 
   @override
   String get cancel => 'Abbrechen';
@@ -197,14 +162,6 @@ class AppLocalizationsDe extends AppLocalizations {
   String commandTitle(int seconds) {
     return '$seconds s gießen';
   }
-
-  @override
-  String commandQueued(String time) {
-    return 'Eingeplant · Gerät erwartet ~$time';
-  }
-
-  @override
-  String get commandDelivered => 'Zugestellt';
 
   @override
   String commandRunning(String time) {
@@ -228,9 +185,6 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get originRule => 'Regel';
-
-  @override
-  String get originLocal => 'Am Gateway';
 
   @override
   String get historyTitle => 'Feuchtigkeitsverlauf';
@@ -271,11 +225,8 @@ class AppLocalizationsDe extends AppLocalizations {
   String get editRule => 'Regel bearbeiten';
 
   @override
-  String get deleteRule => 'Regel löschen';
-
-  @override
   String ruleSummary(int percent, int seconds, int hours) {
-    return 'Unter $percent % → $seconds s gießen, höchstens alle $hours h';
+    return 'Unter $percent %: $seconds s gießen, höchstens alle $hours h';
   }
 
   @override
@@ -305,11 +256,6 @@ class AppLocalizationsDe extends AppLocalizations {
   }
 
   @override
-  String signalValue(int rssi) {
-    return 'Signal $rssi dBm';
-  }
-
-  @override
   String get configInSync => 'Konfiguration aktuell';
 
   @override
@@ -327,27 +273,11 @@ class AppLocalizationsDe extends AppLocalizations {
   String get board => 'Board';
 
   @override
-  String get wakeInterval => 'Aufwachintervall';
-
-  @override
-  String everyMinutes(int minutes) {
-    return 'alle $minutes Min.';
-  }
-
-  @override
-  String get nextExpected => 'Nächstes Aufwachen erwartet';
-
-  @override
   String get slots => 'Steckplätze';
 
   @override
   String slotLabel(int index) {
     return 'Steckplatz $index';
-  }
-
-  @override
-  String pinLabel(int pin) {
-    return 'GPIO $pin';
   }
 
   @override
@@ -357,11 +287,7 @@ class AppLocalizationsDe extends AppLocalizations {
   String get reboot => 'Neustart';
 
   @override
-  String get serviceMode => 'Servicemodus';
-
-  @override
-  String get deviceActionSent =>
-      'Gesendet. Das Gerät reagiert beim nächsten Aufwachen.';
+  String get deviceActionSent => 'An das Gerät gesendet.';
 
   @override
   String get openAlerts => 'Offen';
@@ -416,13 +342,7 @@ class AppLocalizationsDe extends AppLocalizations {
   String get language => 'Sprache';
 
   @override
-  String get household => 'Haushalt';
-
-  @override
   String get timezone => 'Zeitzone';
-
-  @override
-  String get yourRole => 'Deine Rolle';
 
   @override
   String get demoSection => 'Demo';
@@ -435,9 +355,6 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get notAllowed => 'Deine Rolle erlaubt das nicht.';
-
-  @override
-  String get battery => 'Akku';
 
   @override
   String get signal => 'Signal';
@@ -454,65 +371,6 @@ class AppLocalizationsDe extends AppLocalizations {
   }
 
   @override
-  String get gatewayTitle => 'Gateway';
-
-  @override
-  String get gatewayNoneTitle => 'Pflanzen verbinden';
-
-  @override
-  String get gatewayNoneBody =>
-      'Pflanzengeräte sprechen mit einem Gateway: einem kleinen Rechner zu Hause, etwa einem Raspberry Pi, der deine Gießregeln auch ohne Internet ausführt. Starte die Gateway-Software und gib den angezeigten Code ein.';
-
-  @override
-  String get gatewayAdd => 'Gateway hinzufügen';
-
-  @override
-  String get gatewayCodeLabel => 'Code vom Gateway';
-
-  @override
-  String get gatewayCodeInvalid =>
-      'Gib den 8-stelligen Code ein, etwa K7QM-2XPA.';
-
-  @override
-  String get gatewayClaimNote =>
-      'Bisher gekoppelte Geräte musst du neu mit dem neuen Gateway koppeln.';
-
-  @override
-  String get gatewayAdded => 'Gateway hinzugefügt. Warte auf die Verbindung.';
-
-  @override
-  String get gatewayEnrolling => 'Warte auf die Verbindung des Gateways';
-
-  @override
-  String gatewayOfflineSince(String time) {
-    return 'Offline seit $time';
-  }
-
-  @override
-  String get gatewayInSync => 'Einstellungen aktuell';
-
-  @override
-  String get gatewaySyncing => 'Einstellungen werden übertragen';
-
-  @override
-  String get gatewayVersion => 'Version';
-
-  @override
-  String get gatewayAdapters => 'Gerätetypen';
-
-  @override
-  String gatewayUpdateAvailable(String version) {
-    return 'Update verfügbar: $version';
-  }
-
-  @override
-  String get gatewayUpdateHint =>
-      'Auf dem Gateway ausführen: docker compose pull && docker compose up -d';
-
-  @override
-  String get gatewayOutbox => 'Noch nicht hochgeladene Nachrichten';
-
-  @override
   String get gatewayClock => 'Uhrzeit';
 
   @override
@@ -522,75 +380,10 @@ class AppLocalizationsDe extends AppLocalizations {
   String get gatewayClockBad => 'Nicht synchron: kein automatisches Gießen';
 
   @override
-  String get gatewayLastReport => 'Letzte Meldung';
-
-  @override
-  String get gatewayLanAddress => 'LAN-Adresse';
-
-  @override
-  String get gatewayLanHint =>
-      'Geräte verbinden sich mit dieser Adresse. Überschreibe sie, wenn das Gateway mehrere Netzwerkschnittstellen hat.';
-
-  @override
-  String get gatewayLanReported => 'Vom Gateway gemeldet';
-
-  @override
-  String get gatewayLanOverridden => 'Manuell festgelegt';
-
-  @override
-  String get gatewayLanUnknown => 'Noch nicht gemeldet';
-
-  @override
-  String get gatewayLanReset => 'Gemeldete Adresse verwenden';
-
-  @override
-  String get edit => 'Bearbeiten';
-
-  @override
-  String get gatewayRepairTitle => 'Neu zu koppelnde Geräte';
-
-  @override
-  String get gatewayRepairBody =>
-      'Diese Geräte sind nicht mit diesem Gateway gekoppelt. Kopple jedes mit der Handy-App neu, in der Nähe des Geräts.';
-
-  @override
-  String get deviceNeedsRepair => 'Neu koppeln';
-
-  @override
-  String get gatewayRemove => 'Gateway entfernen';
-
-  @override
-  String get gatewayRemoveTitle => 'Gateway entfernen?';
-
-  @override
-  String get gatewayRemoveBody =>
-      'Seine Geräte melden sich erst wieder, wenn du ein Gateway hinzufügst und sie neu koppelst. Auch automatisches Gießen stoppt. Der Verlauf bleibt erhalten.';
-
-  @override
-  String get gatewayRemoved => 'Gateway entfernt';
-
-  @override
-  String get gatewayNone => 'Kein Gateway';
-
-  @override
-  String get errorInvalidCode =>
-      'Der Code ist ungültig oder abgelaufen. Das Gateway zeigt einen neuen an.';
-
-  @override
-  String get errorGatewayExists => 'Dieser Haushalt hat bereits ein Gateway.';
-
-  @override
-  String get errorNoGateway =>
-      'Füge diesem Haushalt zuerst ein Gateway hinzu (Einstellungen → Gateway).';
-
-  @override
   String get errorReauth => 'Melde dich erneut an, um das zu tun.';
 
   @override
   String get serverTitle => 'Server';
-
-  @override
-  String get serverSubtitle => 'Der Server, mit dem die App spricht';
 
   @override
   String get connSearching => 'Suche den Server in deinem Netzwerk …';
@@ -609,9 +402,6 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get serverFound => 'Server in deinem Netzwerk';
-
-  @override
-  String get serverNone => 'Noch kein Server gefunden.';
 
   @override
   String get serverSearchAgain => 'Erneut suchen';
@@ -650,4 +440,696 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get serverUseThis => 'Diesen Server verwenden';
+
+  @override
+  String get commandQueued => 'Eingeplant';
+
+  @override
+  String signalValue(int quality) {
+    return 'Verbindungsqualität $quality';
+  }
+
+  @override
+  String get noPlantsBody =>
+      'Lege eine Pflanze für einen Sensor eines deiner Geräte an.';
+
+  @override
+  String get serverSubtitle => 'Das Gateway, mit dem die App spricht';
+
+  @override
+  String get gatewayTitle => 'Gateway';
+
+  @override
+  String get commandDelivered => 'Läuft';
+
+  @override
+  String get account => 'Konto';
+
+  @override
+  String get addDevice => 'Gerät hinzufügen';
+
+  @override
+  String get addPlant => 'Pflanze hinzufügen';
+
+  @override
+  String get editPlant => 'Pflanze bearbeiten';
+
+  @override
+  String get plantName => 'Name';
+
+  @override
+  String get plantSensor => 'Feuchtesensor';
+
+  @override
+  String get plantPump => 'Pumpe';
+
+  @override
+  String get plantNoSlots =>
+      'Noch kein Gerät hat einen Sensor oder eine Pumpe eingerichtet. Richte zuerst ein Gerät ein.';
+
+  @override
+  String alertSafeMode(String subject) {
+    return '$subject ist im abgesicherten Modus';
+  }
+
+  @override
+  String get alertZigbeeOffline => 'Zigbee läuft nicht';
+
+  @override
+  String get auditTitle => 'Aktivität';
+
+  @override
+  String get noAudit => 'Noch nichts.';
+
+  @override
+  String get backupTitle => 'Sicherung';
+
+  @override
+  String get backupBody =>
+      'Legt eine konsistente Kopie der Datenbanken auf dem Gateway an. Die Zigbee-Netzwerkdaten müssen separat gesichert werden (scripts/backup.sh).';
+
+  @override
+  String get backupNow => 'Jetzt sichern';
+
+  @override
+  String get backupDone => 'Sicherung auf dem Gateway angelegt.';
+
+  @override
+  String get bannerHubDown =>
+      'Der Gießdienst ist nicht erreichbar. Du siehst die letzten bekannten Daten; Änderungen sind nicht möglich.';
+
+  @override
+  String get bannerZigbeeDown =>
+      'Zigbee läuft nicht. Daten und Befehle sind pausiert.';
+
+  @override
+  String get batteryThreshold => 'Batteriewarnung unter';
+
+  @override
+  String get calDry => 'Trockenwert (roh)';
+
+  @override
+  String get calWet => 'Nasswert (roh)';
+
+  @override
+  String get changePassword => 'Passwort ändern';
+
+  @override
+  String get currentPassword => 'Aktuelles Passwort';
+
+  @override
+  String get newPassword => 'Neues Passwort';
+
+  @override
+  String get passwordChangeHint =>
+      'Beim Ändern werden deine anderen Geräte abgemeldet.';
+
+  @override
+  String get passwordChanged => 'Passwort geändert.';
+
+  @override
+  String get changeRole => 'Rolle ändern';
+
+  @override
+  String get channelApp => 'In der App';
+
+  @override
+  String get channelTelegram => 'Telegram';
+
+  @override
+  String get clearSafeMode => 'Abgesicherten Modus beenden';
+
+  @override
+  String get commandQueuedOffline => 'Eingeplant · Gerät offline';
+
+  @override
+  String get configApplyNote =>
+      'Die Änderung wird übernommen, sobald das Gerät sie bestätigt.';
+
+  @override
+  String get configConflict =>
+      'Jemand hat dieses Gerät inzwischen geändert. Die aktuelle Konfiguration wurde geladen; bitte prüfen und erneut speichern.';
+
+  @override
+  String get configNoBoard =>
+      'Dieses Gerät hat seine Platine noch nicht gemeldet.';
+
+  @override
+  String configPendingBody(int rev) {
+    return 'Revision $rev wartet auf die Bestätigung des Geräts.';
+  }
+
+  @override
+  String configRejectedBody(String error) {
+    return 'Das Gerät hat die Konfiguration abgelehnt: $error';
+  }
+
+  @override
+  String get configRevert => 'Laufende Konfiguration übernehmen';
+
+  @override
+  String get configRevision => 'Konfiguration (läuft / gesendet)';
+
+  @override
+  String get configSaved => 'Konfiguration an das Gerät gesendet.';
+
+  @override
+  String get confirm => 'Bestätigen';
+
+  @override
+  String get copied => 'Kopiert.';
+
+  @override
+  String get copyLink => 'Link kopieren';
+
+  @override
+  String get createInvite => 'Einladung erstellen';
+
+  @override
+  String get dataTitle => 'Sicherung und Export';
+
+  @override
+  String get deviceJoinFailed => 'Beitritt fehlgeschlagen';
+
+  @override
+  String get deviceJoining => 'Tritt bei';
+
+  @override
+  String get deviceName => 'Gerätename';
+
+  @override
+  String get deviceReady => 'Wartet auf ersten Bericht';
+
+  @override
+  String get deviceSafeMode => 'Abgesicherter Modus';
+
+  @override
+  String get deviceUnsupported => 'Nicht unterstütztes Gerät';
+
+  @override
+  String get diagBootReason => 'Letzter Start';
+
+  @override
+  String get diagFreeHeap => 'Freier Speicher';
+
+  @override
+  String get diagLastError => 'Letzter Fehlercode';
+
+  @override
+  String get diagRejoins => 'Netzwerk-Wiederbeitritte';
+
+  @override
+  String get diagResets => 'Neustarts';
+
+  @override
+  String get diagUptime => 'Läuft seit';
+
+  @override
+  String get diagnostics => 'Diagnose';
+
+  @override
+  String get disableUser => 'Sperren';
+
+  @override
+  String get enableUser => 'Entsperren';
+
+  @override
+  String get userDisabled => 'gesperrt';
+
+  @override
+  String get displayName => 'Anzeigename';
+
+  @override
+  String get done => 'Fertig';
+
+  @override
+  String get editConfig => 'Konfiguration bearbeiten';
+
+  @override
+  String get errorAlreadySetUp => 'Dieses Gateway ist schon eingerichtet.';
+
+  @override
+  String get errorConflict => 'Das ist gerade nicht möglich.';
+
+  @override
+  String get errorDeviceNotReady => 'Das Gerät ist noch nicht bereit.';
+
+  @override
+  String get errorDeviceSafeMode =>
+      'Das Gerät ist im abgesicherten Modus und gießt nicht.';
+
+  @override
+  String get errorHubTimeout =>
+      'Das Gateway hat nicht rechtzeitig geantwortet. Es kann trotzdem geklappt haben; prüfe es gleich noch einmal.';
+
+  @override
+  String get errorHubUnavailable =>
+      'Der Gießdienst ist gerade nicht erreichbar.';
+
+  @override
+  String get errorIncompatibleHub =>
+      'Die Teile des Gateways passen nicht zusammen. Aktualisiere das Gateway.';
+
+  @override
+  String get errorInvalidCredentials => 'Benutzername oder Passwort falsch.';
+
+  @override
+  String get errorInvalidInvite => 'Diese Einladung ist nicht (mehr) gültig.';
+
+  @override
+  String get errorInvalidSetupCode => 'Der Einrichtungscode ist falsch.';
+
+  @override
+  String get errorNetwork => 'Das Gateway ist nicht erreichbar.';
+
+  @override
+  String get errorRateLimited =>
+      'Zu viele Versuche. Warte einen Moment und versuche es erneut.';
+
+  @override
+  String get errorSlotNotActuator => 'Dieser Steckplatz ist keine Pumpe.';
+
+  @override
+  String get eventsTitle => 'Ereignisse';
+
+  @override
+  String get noEvents => 'Noch keine Ereignisse.';
+
+  @override
+  String get executionsTitle => 'Letzte Entscheidungen';
+
+  @override
+  String get noExecutions => 'Die Regel hat noch nichts entschieden.';
+
+  @override
+  String get executionWatered => 'Gegossen';
+
+  @override
+  String executionSkipped(String reason) {
+    return 'Übersprungen: $reason';
+  }
+
+  @override
+  String get skipClock => 'Uhr nicht synchron';
+
+  @override
+  String get skipCooldown => 'zu kurz nach dem letzten Gießen';
+
+  @override
+  String get skipDailyLimit => 'Tageslimit erreicht';
+
+  @override
+  String get skipNoPump => 'keine Pumpe verfügbar';
+
+  @override
+  String get skipPending => 'ein Gießen ist schon offen';
+
+  @override
+  String get skipQuietHours => 'Ruhezeit';
+
+  @override
+  String get skipSensorError => 'Sensorproblem';
+
+  @override
+  String get exportTitle => 'Export';
+
+  @override
+  String get exportBody =>
+      'Eine ZIP-Datei mit allen Pflanzen, Geräten, Messwerten, Befehlen und Benutzern (ohne Passwörter). Dein Passwort wird benötigt.';
+
+  @override
+  String get exportStart => 'Daten exportieren';
+
+  @override
+  String get exportDone => 'Export heruntergeladen.';
+
+  @override
+  String get exportUnsupported =>
+      'Der Download wird vorerst nur in der Web-App unterstützt.';
+
+  @override
+  String get fastReportHold => 'Schnelle Berichte nach dem Gießen';
+
+  @override
+  String get fastReportInterval => 'Berichtsintervall beim Gießen';
+
+  @override
+  String get reportInterval => 'Berichtsintervall';
+
+  @override
+  String get reportIntervals => 'Berichte';
+
+  @override
+  String get gatewayApiVersion => 'Version Webdienst';
+
+  @override
+  String get gatewayCoordinator => 'Zigbee-Koordinator';
+
+  @override
+  String get gatewayDatabase => 'Größe der Datenbank';
+
+  @override
+  String get gatewayHub => 'Gießdienst';
+
+  @override
+  String get gatewayHubVersion => 'Version Gießdienst';
+
+  @override
+  String get gatewayServices => 'Dienste';
+
+  @override
+  String get gatewayZigbee => 'Zigbee';
+
+  @override
+  String get statusUnknown => 'Unbekannt';
+
+  @override
+  String get installCode => 'Installationscode (optional)';
+
+  @override
+  String get installCodeHint =>
+      'Vom Aufkleber auf dem Modul. Bei fertigen Modulen erforderlich.';
+
+  @override
+  String get installation => 'Installation';
+
+  @override
+  String get installationName => 'Name dieser Installation';
+
+  @override
+  String get installationSettings => 'Einstellungen der Installation';
+
+  @override
+  String get inviteAs => 'Einladen als';
+
+  @override
+  String get inviteCreated => 'Einladung erstellt';
+
+  @override
+  String inviteExpires(String time) {
+    return 'gültig bis $time';
+  }
+
+  @override
+  String get inviteShownOnce =>
+      'Schicke diesen Link an die Person. Er wird nur einmal angezeigt.';
+
+  @override
+  String get invitesTitle => 'Einladungen';
+
+  @override
+  String get noInvites => 'Keine offenen Einladungen.';
+
+  @override
+  String get revokeInvite => 'Einladung zurückziehen';
+
+  @override
+  String get joinAccept => 'Konto erstellen';
+
+  @override
+  String get joinClose => 'Schließen';
+
+  @override
+  String get joinConfigure => 'Benennen und konfigurieren';
+
+  @override
+  String joinCountdown(String time) {
+    return 'Noch offen: $time';
+  }
+
+  @override
+  String get joinFailedBody =>
+      'Das Modul konnte nicht eingerichtet werden. Entferne es, schalte das Modul aus und wieder ein und versuche es erneut.';
+
+  @override
+  String get joinIdleTitle => 'Ein Gerät hinzufügen';
+
+  @override
+  String joinInstallation(String name) {
+    return '$name beitreten';
+  }
+
+  @override
+  String get joinInstructions =>
+      'Öffne das Beitrittsfenster und schalte dann das Modul ein oder halte seinen Knopf 3 Sekunden gedrückt.';
+
+  @override
+  String get joinOpen => 'Beitrittsfenster öffnen';
+
+  @override
+  String get joinOpenTitle => 'Warte auf das Modul…';
+
+  @override
+  String get joinRemoveRetry => 'Entfernen und erneut versuchen';
+
+  @override
+  String joinRole(String role) {
+    return 'Du wurdest als $role eingeladen.';
+  }
+
+  @override
+  String get joinTitle => 'Beitreten';
+
+  @override
+  String joinUnsupportedBody(String model) {
+    return 'Das ist kein PlantModule ($model). Entferne es.';
+  }
+
+  @override
+  String get stepJoined => 'Im Netzwerk';
+
+  @override
+  String get stepInterviewing => 'Wird abgefragt';
+
+  @override
+  String get stepConfiguring => 'Wird eingerichtet';
+
+  @override
+  String get stepReady => 'Bereit';
+
+  @override
+  String get lastSeenLabel => 'Zuletzt gesehen';
+
+  @override
+  String lastUsedAgo(String ago) {
+    return 'zuletzt benutzt $ago';
+  }
+
+  @override
+  String get neverUsed => 'nie benutzt';
+
+  @override
+  String get loginSubtitle => 'Melde dich an, um fortzufahren';
+
+  @override
+  String get username => 'Benutzername';
+
+  @override
+  String get password => 'Passwort';
+
+  @override
+  String get passwordHint => 'Mindestens 8 Zeichen';
+
+  @override
+  String get signIn => 'Anmelden';
+
+  @override
+  String get signOut => 'Abmelden';
+
+  @override
+  String get thisDevice => 'dieses Gerät';
+
+  @override
+  String get thisDeviceName => 'Name dieses Geräts';
+
+  @override
+  String get thisDeviceHint => 'Wird in der Liste deiner Anmeldungen angezeigt';
+
+  @override
+  String get moduleEmpty => 'Leer';
+
+  @override
+  String get moduleMoisture => 'Feuchtesensor';
+
+  @override
+  String get modulePump => 'Pumpe';
+
+  @override
+  String get slotModule => 'Modul';
+
+  @override
+  String get slotPort => 'Anschluss';
+
+  @override
+  String portLabel(String port) {
+    return 'Anschluss $port';
+  }
+
+  @override
+  String get myDevices => 'Meine Geräte';
+
+  @override
+  String get revokeToken => 'Dieses Gerät abmelden';
+
+  @override
+  String get noDevicesBody =>
+      'Öffne das Beitrittsfenster und schalte ein Modul ein.';
+
+  @override
+  String get noPlantsNoDevices =>
+      'Füge zuerst ein Gerät hinzu und lege dann deine Pflanzen an.';
+
+  @override
+  String get noRulesNoPump =>
+      'Diese Pflanze hat keine Pumpe und kann daher nicht per Regel gegossen werden.';
+
+  @override
+  String get noSlots => 'Noch nichts eingerichtet.';
+
+  @override
+  String get notifyFailed => 'Bei Fehlern';
+
+  @override
+  String get notifySkipped => 'Wenn sie nicht entscheiden kann';
+
+  @override
+  String get notifyWatered => 'Wenn sie gießt';
+
+  @override
+  String get ruleNotify => 'Benachrichtigen';
+
+  @override
+  String get outOfRange => 'Außerhalb des Bereichs';
+
+  @override
+  String get pumpActiveHigh => 'Pumpe schaltet bei hohem Signal ein';
+
+  @override
+  String get pumpMaxRun => 'Längste Laufzeit';
+
+  @override
+  String get pumpMinPause => 'Kürzeste Pause zwischen Läufen';
+
+  @override
+  String quietFrom(String time) {
+    return 'Ab $time';
+  }
+
+  @override
+  String quietTo(String time) {
+    return 'Bis $time';
+  }
+
+  @override
+  String get reauthBody => 'Gib dein Passwort ein, um fortzufahren.';
+
+  @override
+  String get reauthTitle => 'Mit Passwort bestätigen';
+
+  @override
+  String get removeDevice => 'Gerät entfernen';
+
+  @override
+  String removeDeviceBody(String name) {
+    return '$name wird aus dem Netzwerk entfernt und seine Pflanzen verlieren Sensor und Pumpe. Der Verlauf bleibt erhalten.';
+  }
+
+  @override
+  String get removeUser => 'Benutzer entfernen';
+
+  @override
+  String removeUserBody(String name) {
+    return '$name verliert sofort den Zugang.';
+  }
+
+  @override
+  String get renameDevice => 'Umbenennen';
+
+  @override
+  String get ruleMaxPerDay => 'Höchstens pro Tag';
+
+  @override
+  String ruleMaxPerDayValue(int count) {
+    return 'höchstens $count pro Tag';
+  }
+
+  @override
+  String get ruleQuietHours => 'Ruhezeit';
+
+  @override
+  String ruleQuietValue(String from, String to) {
+    return 'Ruhe $from – $to';
+  }
+
+  @override
+  String safeModeBody(String reason) {
+    return 'Das Modul hat sich selbst gestoppt ($reason) und gießt nicht, bis es zurückgesetzt wird.';
+  }
+
+  @override
+  String get safeModeTitle => 'Abgesicherter Modus';
+
+  @override
+  String get saved => 'Gespeichert.';
+
+  @override
+  String get setupCode => 'Einrichtungscode';
+
+  @override
+  String get setupCodeHint =>
+      'Steht im Log des Webdienstes: docker compose logs api';
+
+  @override
+  String get setupCreate => 'Dieses Gateway einrichten';
+
+  @override
+  String get setupNeedsHub =>
+      'Der Gießdienst läuft noch nicht. Die Einrichtung braucht ihn.';
+
+  @override
+  String get setupSubtitle =>
+      'Lege das Besitzerkonto an. Das ist nur einmal nötig.';
+
+  @override
+  String get setupTitle => 'Dieses Gateway einrichten';
+
+  @override
+  String get telegramChat => 'Chat-ID';
+
+  @override
+  String get telegramConfigured => 'Telegram ist eingerichtet.';
+
+  @override
+  String get telegramNotConfigured => 'Telegram ist nicht eingerichtet.';
+
+  @override
+  String get telegramTitle => 'Telegram';
+
+  @override
+  String get telegramToken => 'Bot-Token';
+
+  @override
+  String get telegramTokenHint =>
+      'Leer lassen, um den gespeicherten Token zu behalten';
+
+  @override
+  String get timezoneHint => 'Zum Beispiel Europe/Berlin';
+
+  @override
+  String get transferOwnership => 'Zum Besitzer machen';
+
+  @override
+  String transferOwnershipBody(String name) {
+    return '$name wird Besitzer. Du wirst Admin.';
+  }
+
+  @override
+  String get usersTitle => 'Benutzer';
+
+  @override
+  String get waterQueuedDeviceOffline =>
+      'Gießen eingeplant. Das Gerät ist offline und bekommt es, sobald es zurück ist.';
+
+  @override
+  String get noReadings => 'In diesem Zeitraum gibt es noch keine Messwerte.';
 }

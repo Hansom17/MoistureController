@@ -5,22 +5,15 @@
   "navDevices": "Geräte",
   "navAlerts": "Hinweise",
   "navSettings": "Einstellungen",
-  "switchHousehold": "Haushalt wechseln",
   "roleViewer": "Betrachter",
   "roleMember": "Mitglied",
   "roleAdmin": "Admin",
   "roleOwner": "Eigentümer",
-  "gatewayOfflineBanner": "Gateway offline seit {time}. Gießen wird ausgeführt, sobald es wieder da ist.",
   "noPlantsTitle": "Starte mit deiner ersten Pflanze",
-  "noPlantsBody": "Füge ein Gerät hinzu, um Feuchtigkeit zu messen.",
-  "noHouseholdTitle": "Lege deinen ersten Haushalt an",
-  "noHouseholdBody": "Oder tritt einem per Einladungslink bei.",
   "retry": "Erneut versuchen",
   "errorGeneric": "Etwas ist schiefgelaufen.",
   "errorForbidden": "Deine Rolle erlaubt das nicht mehr.",
   "errorSafetyLimit": "Das ist länger als das Limit dieser Pumpe.",
-  "errorGatewayOffline": "Das Gateway ist offline.",
-  "errorTooLate": "Das Gerät hat das bereits übernommen.",
   "errorBusy": "Das Gerät ist beschäftigt. Versuch es gleich noch einmal.",
   "moistureSemantics": "Feuchtigkeit {percent} Prozent",
   "percentValue": "{value} %",
@@ -31,12 +24,10 @@
   "hoursAgo": "vor {n} Std.",
   "daysAgo": "vor {n} T.",
   "deviceOnline": "Online",
-  "deviceSleeping": "Schläft",
   "deviceLate": "Verspätet",
   "deviceOffline": "Offline",
   "lastSeen": "zuletzt {ago}",
   "lastReading": "Letzte Messung {ago}",
-  "batteryValue": "Akku {percent} %",
   "trendFalling": "Trocknet",
   "trendSteady": "Stabil",
   "trendRising": "Steigt",
@@ -44,16 +35,13 @@
   "waterNow": "Jetzt gießen",
   "waterFor": "{seconds} s gießen",
   "waterSheetTitle": "{plant} gießen",
-  "waterSheetHint": "Geräte schlafen zwischen den Messungen. Das Gießen startet beim nächsten Aufwachen.",
+  "waterSheetHint": "Das Gießen startet, sobald das Modul bestätigt. Ist es offline, wird es gesendet, sobald es zurück ist.",
   "pumpLimit": "Pumpenlimit: {seconds} s",
   "waterQueued": "Gießen eingeplant",
-  "waterQueuedGatewayOffline": "Eingeplant. Wird ausgeführt, sobald das Gateway wieder online ist.",
   "cancel": "Abbrechen",
   "cancelCommand": "Gießen abbrechen",
   "cancelCommandHint": "Ohne Gewähr — es kann bereits gelaufen sein.",
   "commandTitle": "{seconds} s gießen",
-  "commandQueued": "Eingeplant · Gerät erwartet ~{time}",
-  "commandDelivered": "Zugestellt",
   "commandRunning": "Läuft bis {time}",
   "commandDone": "Fertig",
   "commandFailed": "Fehlgeschlagen",
@@ -61,7 +49,6 @@
   "commandCancelled": "Abgebrochen",
   "originUser": "Manuell",
   "originRule": "Regel",
-  "originLocal": "Am Gateway",
   "historyTitle": "Feuchtigkeitsverlauf",
   "range24h": "24 h",
   "range7d": "7 T",
@@ -74,8 +61,7 @@
   "noRules": "Füge eine Regel hinzu, um automatisch zu gießen.",
   "addRule": "Regel hinzufügen",
   "editRule": "Regel bearbeiten",
-  "deleteRule": "Regel löschen",
-  "ruleSummary": "Unter {percent} % → {seconds} s gießen, höchstens alle {hours} h",
+  "ruleSummary": "Unter {percent} %: {seconds} s gießen, höchstens alle {hours} h",
   "ruleBelow": "Gießen, wenn Feuchtigkeit unter",
   "ruleDuration": "Gießdauer",
   "ruleInterval": "Höchstens alle",
@@ -84,22 +70,16 @@
   "delete": "Löschen",
   "noDevices": "Füge dein erstes Gerät hinzu",
   "firmwareValue": "Firmware {version}",
-  "signalValue": "Signal {rssi} dBm",
   "configInSync": "Konfiguration aktuell",
   "configPending": "Konfiguration ausstehend (Rev. {rev})",
   "configRejected": "Konfiguration abgelehnt",
   "deviceDetails": "Details",
   "board": "Board",
-  "wakeInterval": "Aufwachintervall",
-  "everyMinutes": "alle {minutes} Min.",
-  "nextExpected": "Nächstes Aufwachen erwartet",
   "slots": "Steckplätze",
   "slotLabel": "Steckplatz {index}",
-  "pinLabel": "GPIO {pin}",
   "identify": "Identifizieren",
   "reboot": "Neustart",
-  "serviceMode": "Servicemodus",
-  "deviceActionSent": "Gesendet. Das Gerät reagiert beim nächsten Aufwachen.",
+  "deviceActionSent": "An das Gerät gesendet.",
   "openAlerts": "Offen",
   "closedAlerts": "Erledigt",
   "noAlerts": "Allen Pflanzen geht es gut",
@@ -114,67 +94,26 @@
   "themeLight": "Hell",
   "themeDark": "Dunkel",
   "language": "Sprache",
-  "household": "Haushalt",
   "timezone": "Zeitzone",
-  "yourRole": "Deine Rolle",
   "demoSection": "Demo",
   "demoRole": "Demo-Rolle in diesem Haushalt",
   "demoRoleHint": "Nur im Dev-Build ohne Backend.",
   "notAllowed": "Deine Rolle erlaubt das nicht.",
-  "battery": "Akku",
   "signal": "Signal",
   "firmware": "Firmware",
   "noReading": "Noch keine Messung",
   "alertOther": "{subject}: {kind}",
-  "gatewayTitle": "Gateway",
-  "gatewayNoneTitle": "Pflanzen verbinden",
-  "gatewayNoneBody": "Pflanzengeräte sprechen mit einem Gateway: einem kleinen Rechner zu Hause, etwa einem Raspberry Pi, der deine Gießregeln auch ohne Internet ausführt. Starte die Gateway-Software und gib den angezeigten Code ein.",
-  "gatewayAdd": "Gateway hinzufügen",
-  "gatewayCodeLabel": "Code vom Gateway",
-  "gatewayCodeInvalid": "Gib den 8-stelligen Code ein, etwa K7QM-2XPA.",
-  "gatewayClaimNote": "Bisher gekoppelte Geräte musst du neu mit dem neuen Gateway koppeln.",
-  "gatewayAdded": "Gateway hinzugefügt. Warte auf die Verbindung.",
-  "gatewayEnrolling": "Warte auf die Verbindung des Gateways",
-  "gatewayOfflineSince": "Offline seit {time}",
-  "gatewayInSync": "Einstellungen aktuell",
-  "gatewaySyncing": "Einstellungen werden übertragen",
-  "gatewayVersion": "Version",
-  "gatewayAdapters": "Gerätetypen",
-  "gatewayUpdateAvailable": "Update verfügbar: {version}",
-  "gatewayUpdateHint": "Auf dem Gateway ausführen: docker compose pull && docker compose up -d",
-  "gatewayOutbox": "Noch nicht hochgeladene Nachrichten",
   "gatewayClock": "Uhrzeit",
   "gatewayClockOk": "Synchron",
   "gatewayClockBad": "Nicht synchron: kein automatisches Gießen",
-  "gatewayLastReport": "Letzte Meldung",
-  "gatewayLanAddress": "LAN-Adresse",
-  "gatewayLanHint": "Geräte verbinden sich mit dieser Adresse. Überschreibe sie, wenn das Gateway mehrere Netzwerkschnittstellen hat.",
-  "gatewayLanReported": "Vom Gateway gemeldet",
-  "gatewayLanOverridden": "Manuell festgelegt",
-  "gatewayLanUnknown": "Noch nicht gemeldet",
-  "gatewayLanReset": "Gemeldete Adresse verwenden",
-  "edit": "Bearbeiten",
-  "gatewayRepairTitle": "Neu zu koppelnde Geräte",
-  "gatewayRepairBody": "Diese Geräte sind nicht mit diesem Gateway gekoppelt. Kopple jedes mit der Handy-App neu, in der Nähe des Geräts.",
-  "deviceNeedsRepair": "Neu koppeln",
-  "gatewayRemove": "Gateway entfernen",
-  "gatewayRemoveTitle": "Gateway entfernen?",
-  "gatewayRemoveBody": "Seine Geräte melden sich erst wieder, wenn du ein Gateway hinzufügst und sie neu koppelst. Auch automatisches Gießen stoppt. Der Verlauf bleibt erhalten.",
-  "gatewayRemoved": "Gateway entfernt",
-  "gatewayNone": "Kein Gateway",
-  "errorInvalidCode": "Der Code ist ungültig oder abgelaufen. Das Gateway zeigt einen neuen an.",
-  "errorGatewayExists": "Dieser Haushalt hat bereits ein Gateway.",
-  "errorNoGateway": "Füge diesem Haushalt zuerst ein Gateway hinzu (Einstellungen → Gateway).",
   "errorReauth": "Melde dich erneut an, um das zu tun.",
   "serverTitle": "Server",
-  "serverSubtitle": "Der Server, mit dem die App spricht",
   "connSearching": "Suche den Server in deinem Netzwerk …",
   "connUnreachable": "Der Server ist nicht erreichbar.",
   "connChoose": "Mehrere Server gefunden. Wähle einen aus.",
   "connEnterAddress": "Adresse eingeben",
   "serverCurrent": "Verbunden mit",
   "serverFound": "Server in deinem Netzwerk",
-  "serverNone": "Noch kein Server gefunden.",
   "serverSearchAgain": "Erneut suchen",
   "serverAddress": "Serveradresse",
   "serverAddressHint": "192.168.1.10:8000",
@@ -186,5 +125,356 @@
   "serverDevWarningTitle": "Ungesicherter Dev-Login",
   "serverDevWarningBody": "Dieser Server akzeptiert Logins ohne Passwort. Verbinde dich nur, wenn es dein eigener Entwicklungsserver ist.",
   "serverContinue": "Verbinden",
-  "serverUseThis": "Diesen Server verwenden"
+  "serverUseThis": "Diesen Server verwenden",
+  "commandQueued": "Eingeplant",
+  "signalValue": "Verbindungsqualität {quality}",
+  "@signalValue": {
+    "placeholders": {
+      "quality": {
+        "type": "int"
+      }
+    }
+  },
+  "noPlantsBody": "Lege eine Pflanze für einen Sensor eines deiner Geräte an.",
+  "serverSubtitle": "Das Gateway, mit dem die App spricht",
+  "gatewayTitle": "Gateway",
+  "commandDelivered": "Läuft",
+  "account": "Konto",
+  "addDevice": "Gerät hinzufügen",
+  "addPlant": "Pflanze hinzufügen",
+  "editPlant": "Pflanze bearbeiten",
+  "plantName": "Name",
+  "plantSensor": "Feuchtesensor",
+  "plantPump": "Pumpe",
+  "plantNoSlots": "Noch kein Gerät hat einen Sensor oder eine Pumpe eingerichtet. Richte zuerst ein Gerät ein.",
+  "alertSafeMode": "{subject} ist im abgesicherten Modus",
+  "@alertSafeMode": {
+    "placeholders": {
+      "subject": {
+        "type": "String"
+      }
+    }
+  },
+  "alertZigbeeOffline": "Zigbee läuft nicht",
+  "auditTitle": "Aktivität",
+  "noAudit": "Noch nichts.",
+  "backupTitle": "Sicherung",
+  "backupBody": "Legt eine konsistente Kopie der Datenbanken auf dem Gateway an. Die Zigbee-Netzwerkdaten müssen separat gesichert werden (scripts/backup.sh).",
+  "backupNow": "Jetzt sichern",
+  "backupDone": "Sicherung auf dem Gateway angelegt.",
+  "bannerHubDown": "Der Gießdienst ist nicht erreichbar. Du siehst die letzten bekannten Daten; Änderungen sind nicht möglich.",
+  "bannerZigbeeDown": "Zigbee läuft nicht. Daten und Befehle sind pausiert.",
+  "batteryThreshold": "Batteriewarnung unter",
+  "calDry": "Trockenwert (roh)",
+  "calWet": "Nasswert (roh)",
+  "changePassword": "Passwort ändern",
+  "currentPassword": "Aktuelles Passwort",
+  "newPassword": "Neues Passwort",
+  "passwordChangeHint": "Beim Ändern werden deine anderen Geräte abgemeldet.",
+  "passwordChanged": "Passwort geändert.",
+  "changeRole": "Rolle ändern",
+  "channelApp": "In der App",
+  "channelTelegram": "Telegram",
+  "clearSafeMode": "Abgesicherten Modus beenden",
+  "commandQueuedOffline": "Eingeplant · Gerät offline",
+  "configApplyNote": "Die Änderung wird übernommen, sobald das Gerät sie bestätigt.",
+  "configConflict": "Jemand hat dieses Gerät inzwischen geändert. Die aktuelle Konfiguration wurde geladen; bitte prüfen und erneut speichern.",
+  "configNoBoard": "Dieses Gerät hat seine Platine noch nicht gemeldet.",
+  "configPendingBody": "Revision {rev} wartet auf die Bestätigung des Geräts.",
+  "@configPendingBody": {
+    "placeholders": {
+      "rev": {
+        "type": "int"
+      }
+    }
+  },
+  "configRejectedBody": "Das Gerät hat die Konfiguration abgelehnt: {error}",
+  "@configRejectedBody": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "configRevert": "Laufende Konfiguration übernehmen",
+  "configRevision": "Konfiguration (läuft / gesendet)",
+  "configSaved": "Konfiguration an das Gerät gesendet.",
+  "confirm": "Bestätigen",
+  "copied": "Kopiert.",
+  "copyLink": "Link kopieren",
+  "createInvite": "Einladung erstellen",
+  "dataTitle": "Sicherung und Export",
+  "deviceJoinFailed": "Beitritt fehlgeschlagen",
+  "deviceJoining": "Tritt bei",
+  "deviceName": "Gerätename",
+  "deviceReady": "Wartet auf ersten Bericht",
+  "deviceSafeMode": "Abgesicherter Modus",
+  "deviceUnsupported": "Nicht unterstütztes Gerät",
+  "diagBootReason": "Letzter Start",
+  "diagFreeHeap": "Freier Speicher",
+  "diagLastError": "Letzter Fehlercode",
+  "diagRejoins": "Netzwerk-Wiederbeitritte",
+  "diagResets": "Neustarts",
+  "diagUptime": "Läuft seit",
+  "diagnostics": "Diagnose",
+  "disableUser": "Sperren",
+  "enableUser": "Entsperren",
+  "userDisabled": "gesperrt",
+  "displayName": "Anzeigename",
+  "done": "Fertig",
+  "editConfig": "Konfiguration bearbeiten",
+  "errorAlreadySetUp": "Dieses Gateway ist schon eingerichtet.",
+  "errorConflict": "Das ist gerade nicht möglich.",
+  "errorDeviceNotReady": "Das Gerät ist noch nicht bereit.",
+  "errorDeviceSafeMode": "Das Gerät ist im abgesicherten Modus und gießt nicht.",
+  "errorHubTimeout": "Das Gateway hat nicht rechtzeitig geantwortet. Es kann trotzdem geklappt haben; prüfe es gleich noch einmal.",
+  "errorHubUnavailable": "Der Gießdienst ist gerade nicht erreichbar.",
+  "errorIncompatibleHub": "Die Teile des Gateways passen nicht zusammen. Aktualisiere das Gateway.",
+  "errorInvalidCredentials": "Benutzername oder Passwort falsch.",
+  "errorInvalidInvite": "Diese Einladung ist nicht (mehr) gültig.",
+  "errorInvalidSetupCode": "Der Einrichtungscode ist falsch.",
+  "errorNetwork": "Das Gateway ist nicht erreichbar.",
+  "errorRateLimited": "Zu viele Versuche. Warte einen Moment und versuche es erneut.",
+  "errorSlotNotActuator": "Dieser Steckplatz ist keine Pumpe.",
+  "eventsTitle": "Ereignisse",
+  "noEvents": "Noch keine Ereignisse.",
+  "executionsTitle": "Letzte Entscheidungen",
+  "noExecutions": "Die Regel hat noch nichts entschieden.",
+  "executionWatered": "Gegossen",
+  "executionSkipped": "Übersprungen: {reason}",
+  "@executionSkipped": {
+    "placeholders": {
+      "reason": {
+        "type": "String"
+      }
+    }
+  },
+  "skipClock": "Uhr nicht synchron",
+  "skipCooldown": "zu kurz nach dem letzten Gießen",
+  "skipDailyLimit": "Tageslimit erreicht",
+  "skipNoPump": "keine Pumpe verfügbar",
+  "skipPending": "ein Gießen ist schon offen",
+  "skipQuietHours": "Ruhezeit",
+  "skipSensorError": "Sensorproblem",
+  "exportTitle": "Export",
+  "exportBody": "Eine ZIP-Datei mit allen Pflanzen, Geräten, Messwerten, Befehlen und Benutzern (ohne Passwörter). Dein Passwort wird benötigt.",
+  "exportStart": "Daten exportieren",
+  "exportDone": "Export heruntergeladen.",
+  "exportUnsupported": "Der Download wird vorerst nur in der Web-App unterstützt.",
+  "fastReportHold": "Schnelle Berichte nach dem Gießen",
+  "fastReportInterval": "Berichtsintervall beim Gießen",
+  "reportInterval": "Berichtsintervall",
+  "reportIntervals": "Berichte",
+  "gatewayApiVersion": "Version Webdienst",
+  "gatewayCoordinator": "Zigbee-Koordinator",
+  "gatewayDatabase": "Größe der Datenbank",
+  "gatewayHub": "Gießdienst",
+  "gatewayHubVersion": "Version Gießdienst",
+  "gatewayServices": "Dienste",
+  "gatewayZigbee": "Zigbee",
+  "statusUnknown": "Unbekannt",
+  "installCode": "Installationscode (optional)",
+  "installCodeHint": "Vom Aufkleber auf dem Modul. Bei fertigen Modulen erforderlich.",
+  "installation": "Installation",
+  "installationName": "Name dieser Installation",
+  "installationSettings": "Einstellungen der Installation",
+  "inviteAs": "Einladen als",
+  "inviteCreated": "Einladung erstellt",
+  "inviteExpires": "gültig bis {time}",
+  "@inviteExpires": {
+    "placeholders": {
+      "time": {
+        "type": "String"
+      }
+    }
+  },
+  "inviteShownOnce": "Schicke diesen Link an die Person. Er wird nur einmal angezeigt.",
+  "invitesTitle": "Einladungen",
+  "noInvites": "Keine offenen Einladungen.",
+  "revokeInvite": "Einladung zurückziehen",
+  "joinAccept": "Konto erstellen",
+  "joinClose": "Schließen",
+  "joinConfigure": "Benennen und konfigurieren",
+  "joinCountdown": "Noch offen: {time}",
+  "@joinCountdown": {
+    "placeholders": {
+      "time": {
+        "type": "String"
+      }
+    }
+  },
+  "joinFailedBody": "Das Modul konnte nicht eingerichtet werden. Entferne es, schalte das Modul aus und wieder ein und versuche es erneut.",
+  "joinIdleTitle": "Ein Gerät hinzufügen",
+  "joinInstallation": "{name} beitreten",
+  "@joinInstallation": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "joinInstructions": "Öffne das Beitrittsfenster und schalte dann das Modul ein oder halte seinen Knopf 3 Sekunden gedrückt.",
+  "joinOpen": "Beitrittsfenster öffnen",
+  "joinOpenTitle": "Warte auf das Modul…",
+  "joinRemoveRetry": "Entfernen und erneut versuchen",
+  "joinRole": "Du wurdest als {role} eingeladen.",
+  "@joinRole": {
+    "placeholders": {
+      "role": {
+        "type": "String"
+      }
+    }
+  },
+  "joinTitle": "Beitreten",
+  "joinUnsupportedBody": "Das ist kein PlantModule ({model}). Entferne es.",
+  "@joinUnsupportedBody": {
+    "placeholders": {
+      "model": {
+        "type": "String"
+      }
+    }
+  },
+  "stepJoined": "Im Netzwerk",
+  "stepInterviewing": "Wird abgefragt",
+  "stepConfiguring": "Wird eingerichtet",
+  "stepReady": "Bereit",
+  "lastSeenLabel": "Zuletzt gesehen",
+  "lastUsedAgo": "zuletzt benutzt {ago}",
+  "@lastUsedAgo": {
+    "placeholders": {
+      "ago": {
+        "type": "String"
+      }
+    }
+  },
+  "neverUsed": "nie benutzt",
+  "loginSubtitle": "Melde dich an, um fortzufahren",
+  "username": "Benutzername",
+  "password": "Passwort",
+  "passwordHint": "Mindestens 8 Zeichen",
+  "signIn": "Anmelden",
+  "signOut": "Abmelden",
+  "thisDevice": "dieses Gerät",
+  "thisDeviceName": "Name dieses Geräts",
+  "thisDeviceHint": "Wird in der Liste deiner Anmeldungen angezeigt",
+  "moduleEmpty": "Leer",
+  "moduleMoisture": "Feuchtesensor",
+  "modulePump": "Pumpe",
+  "slotModule": "Modul",
+  "slotPort": "Anschluss",
+  "portLabel": "Anschluss {port}",
+  "@portLabel": {
+    "placeholders": {
+      "port": {
+        "type": "String"
+      }
+    }
+  },
+  "myDevices": "Meine Geräte",
+  "revokeToken": "Dieses Gerät abmelden",
+  "noDevicesBody": "Öffne das Beitrittsfenster und schalte ein Modul ein.",
+  "noPlantsNoDevices": "Füge zuerst ein Gerät hinzu und lege dann deine Pflanzen an.",
+  "noRulesNoPump": "Diese Pflanze hat keine Pumpe und kann daher nicht per Regel gegossen werden.",
+  "noSlots": "Noch nichts eingerichtet.",
+  "notifyFailed": "Bei Fehlern",
+  "notifySkipped": "Wenn sie nicht entscheiden kann",
+  "notifyWatered": "Wenn sie gießt",
+  "ruleNotify": "Benachrichtigen",
+  "outOfRange": "Außerhalb des Bereichs",
+  "pumpActiveHigh": "Pumpe schaltet bei hohem Signal ein",
+  "pumpMaxRun": "Längste Laufzeit",
+  "pumpMinPause": "Kürzeste Pause zwischen Läufen",
+  "quietFrom": "Ab {time}",
+  "@quietFrom": {
+    "placeholders": {
+      "time": {
+        "type": "String"
+      }
+    }
+  },
+  "quietTo": "Bis {time}",
+  "@quietTo": {
+    "placeholders": {
+      "time": {
+        "type": "String"
+      }
+    }
+  },
+  "reauthBody": "Gib dein Passwort ein, um fortzufahren.",
+  "reauthTitle": "Mit Passwort bestätigen",
+  "removeDevice": "Gerät entfernen",
+  "removeDeviceBody": "{name} wird aus dem Netzwerk entfernt und seine Pflanzen verlieren Sensor und Pumpe. Der Verlauf bleibt erhalten.",
+  "@removeDeviceBody": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "removeUser": "Benutzer entfernen",
+  "removeUserBody": "{name} verliert sofort den Zugang.",
+  "@removeUserBody": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "renameDevice": "Umbenennen",
+  "ruleMaxPerDay": "Höchstens pro Tag",
+  "ruleMaxPerDayValue": "höchstens {count} pro Tag",
+  "@ruleMaxPerDayValue": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "ruleQuietHours": "Ruhezeit",
+  "ruleQuietValue": "Ruhe {from} – {to}",
+  "@ruleQuietValue": {
+    "placeholders": {
+      "from": {
+        "type": "String"
+      },
+      "to": {
+        "type": "String"
+      }
+    }
+  },
+  "safeModeBody": "Das Modul hat sich selbst gestoppt ({reason}) und gießt nicht, bis es zurückgesetzt wird.",
+  "@safeModeBody": {
+    "placeholders": {
+      "reason": {
+        "type": "String"
+      }
+    }
+  },
+  "safeModeTitle": "Abgesicherter Modus",
+  "saved": "Gespeichert.",
+  "setupCode": "Einrichtungscode",
+  "setupCodeHint": "Steht im Log des Webdienstes: docker compose logs api",
+  "setupCreate": "Dieses Gateway einrichten",
+  "setupNeedsHub": "Der Gießdienst läuft noch nicht. Die Einrichtung braucht ihn.",
+  "setupSubtitle": "Lege das Besitzerkonto an. Das ist nur einmal nötig.",
+  "setupTitle": "Dieses Gateway einrichten",
+  "telegramChat": "Chat-ID",
+  "telegramConfigured": "Telegram ist eingerichtet.",
+  "telegramNotConfigured": "Telegram ist nicht eingerichtet.",
+  "telegramTitle": "Telegram",
+  "telegramToken": "Bot-Token",
+  "telegramTokenHint": "Leer lassen, um den gespeicherten Token zu behalten",
+  "timezoneHint": "Zum Beispiel Europe/Berlin",
+  "transferOwnership": "Zum Besitzer machen",
+  "transferOwnershipBody": "{name} wird Besitzer. Du wirst Admin.",
+  "@transferOwnershipBody": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "usersTitle": "Benutzer",
+  "waterQueuedDeviceOffline": "Gießen eingeplant. Das Gerät ist offline und bekommt es, sobald es zurück ist.",
+  "noReadings": "In diesem Zeitraum gibt es noch keine Messwerte."
 }

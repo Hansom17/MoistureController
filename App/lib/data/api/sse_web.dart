@@ -5,20 +5,21 @@ import 'package:web/web.dart' as web;
 
 import 'sse.dart';
 
-/// Event names the backend sends (Server/specs.md Part A §6.2 + ping).
+/// Event names the api sends (Gateway/specs.md 6.1 + hello and ping).
 const _kinds = [
   'reading',
   'command',
   'device',
   'config',
-  'alert',
-  'gateway',
-  'household',
-  'resync',
   'plant',
   'rule',
-  'rule_execution',
-  'ping',
+  'alert',
+  'installation',
+  'join',
+  'notification',
+  'status',
+  'resync',
+  'hello',
 ];
 
 Stream<SseEvent> connectSse(Uri url, {String? lastEventId}) {

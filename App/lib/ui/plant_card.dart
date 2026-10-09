@@ -83,8 +83,7 @@ class PlantCard extends StatelessWidget {
                             kind: StatusKind.pending,
                             label: l.pendingCommand,
                           ),
-                        if (device != null)
-                          _Battery(percent: device!.batteryPercent),
+                        if (device?.linkQuality != null) _Signal(quality: device!.linkQuality!),
                       ],
                     ),
                   ],
@@ -98,38 +97,25 @@ class PlantCard extends StatelessWidget {
   }
 }
 
-class _Battery extends StatelessWidget {
-  const _Battery({required this.percent});
+/// Zigbee link quality (0..255) as a small signal icon.
+class _Signal extends StatelessWidget {
+  const _Signal({required this.quality});
 
-  final int percent;
+  final int quality;
 
   @override
   Widget build(BuildContext context) {
-    final low = percent < 20;
-    final color = low
-        ? StatusColors.of(context).warning
-        : Theme.of(context).colorScheme.onSurfaceVariant;
-    final icon = switch (percent) {
-      < 20 => Icons.battery_alert,
-      < 50 => Icons.battery_3_bar,
-      < 80 => Icons.battery_5_bar,
-      _ => Icons.battery_full,
+    final weak = quality < 60;
+    final color = weak ? StatusColors.of(context).warning : Theme.of(context).colorScheme.onSurfaceVariant;
+    final icon = switch (quality) {
+      < 60 => Icons.signal_cellular_alt_1_bar,
+      < 130 => Icons.signal_cellular_alt_2_bar,
+      _ => Icons.signal_cellular_alt,
     };
     return Semantics(
-      label: context.l10n.batteryValue(percent),
+      label: context.l10n.signalValue(quality),
       excludeSemantics: true,
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 16, color: color),
-          Text(
-            '$percent%',
-            style: Theme.of(
-              context,
-            ).textTheme.labelMedium?.copyWith(color: color),
-          ),
-        ],
-      ),
+      child: Icon(icon, size: 16, color: color),
     );
   }
 }

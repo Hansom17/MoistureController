@@ -7,11 +7,19 @@ import 'status_chip.dart';
 
 /// One watering command with its live state (App/specs.md Part A §7).
 class CommandStateTile extends StatelessWidget {
-  const CommandStateTile({super.key, required this.command, this.onCancel});
+  const CommandStateTile({
+    super.key,
+    required this.command,
+    this.onCancel,
+    this.deviceOffline = false,
+  });
 
   final Command command;
 
-  /// Shown only for queued commands; null hides the cancel button.
+  /// The module is offline, so a queued command waits for it.
+  final bool deviceOffline;
+
+  /// Shown for queued and running commands; null hides the cancel button.
   final VoidCallback? onCancel;
 
   @override
@@ -21,12 +29,11 @@ class CommandStateTile extends StatelessWidget {
     final (kind, label) = switch (c.state) {
       CommandState.queued => (
         StatusKind.pending,
-        l.commandQueued(formatTime(context, c.expectedAt)),
+        deviceOffline ? l.commandQueuedOffline : l.commandQueued,
       ),
-      CommandState.delivered => (StatusKind.pending, l.commandDelivered),
       CommandState.running => (
         StatusKind.pending,
-        l.commandRunning(formatTime(context, c.runningUntil ?? c.expectedAt)),
+        c.runningUntil == null ? l.commandDelivered : l.commandRunning(formatTime(context, c.runningUntil!)),
       ),
       CommandState.done => (StatusKind.ok, l.commandDone),
       CommandState.failed => (StatusKind.error, l.commandFailed),
@@ -36,7 +43,6 @@ class CommandStateTile extends StatelessWidget {
     final origin = switch (c.origin) {
       CommandOrigin.user => l.originUser,
       CommandOrigin.rule => l.originRule,
-      CommandOrigin.local => l.originLocal,
     };
     return ListTile(
       contentPadding: EdgeInsets.zero,
@@ -62,7 +68,7 @@ class CommandStateTile extends StatelessWidget {
           ],
         ),
       ),
-      trailing: c.state == CommandState.queued && onCancel != null
+      trailing: !c.state.isFinal && !c.cancelling && onCancel != null
           ? IconButton(
               tooltip: l.cancelCommand,
               icon: const Icon(Icons.close),

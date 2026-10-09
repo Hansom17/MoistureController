@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../data/api_problem.dart';
 import '../data/models.dart';
 import '../data/repositories/moisture_repository.dart';
 
@@ -15,40 +16,87 @@ final sharedPreferencesProvider = Provider<SharedPreferences>(
       throw UnimplementedError('sharedPreferencesProvider must be overridden'),
 );
 
-/// `GET /me/households` with the user's role in each.
-final householdsProvider = FutureProvider<List<Household>>(
-  (ref) => ref.watch(repositoryProvider).households(),
+/// The address pages and invite links are served from; overridden by the flavor. On web: the page's origin.
+final originProvider = Provider<String>((ref) => 'http://moisture.local');
+
+/// `GET /meta`: is this gateway set up, is the hub reachable (App/specs.md Part A §5).
+final metaProvider = FutureProvider<GatewayMeta>(
+  (ref) => ref.watch(repositoryProvider).meta(),
 );
 
-const _lastHouseholdKey = 'last_household_id';
+const _tokenKey = 'token';
 
-/// The household the user last opened (persisted, UI preference only).
-final selectedHouseholdIdProvider =
-    NotifierProvider<SelectedHouseholdId, String?>(SelectedHouseholdId.new);
+/// Who is signed in. `null` = nobody. The token lives in the browser's storage (App/specs.md Part A §2).
+final sessionProvider = AsyncNotifierProvider<SessionController, AppUser?>(
+  SessionController.new,
+);
 
-class SelectedHouseholdId extends Notifier<String?> {
+class SessionController extends AsyncNotifier<AppUser?> {
   @override
-  String? build() =>
-      ref.watch(sharedPreferencesProvider).getString(_lastHouseholdKey);
+  Future<AppUser?> build() async {
+    final prefs = ref.watch(sharedPreferencesProvider);
+    final repo = ref.watch(repositoryProvider);
+    final token = prefs.getString(_tokenKey);
+    if (token == null) return null;
+    repo.useToken(token);
+    try {
+      return await repo.me();
+    } on ApiProblem catch (e) {
+      // A token the api no longer knows ends the session; a network error leaves it for a retry.
+      if (e.type == ApiProblem.unauthorized) {
+        await _forget();
+        return null;
+      }
+      rethrow;
+    }
+  }
 
-  void select(String id) {
-    state = id;
-    ref.read(sharedPreferencesProvider).setString(_lastHouseholdKey, id);
+  Future<void> _forget() async {
+    ref.read(repositoryProvider).useToken(null);
+    await ref.read(sharedPreferencesProvider).remove(_tokenKey);
+  }
+
+  /// After setup, login or accepting an invite.
+  Future<void> signIn(Session session) async {
+    ref.read(repositoryProvider).useToken(session.token);
+    await ref.read(sharedPreferencesProvider).setString(_tokenKey, session.token);
+    ref.invalidate(metaProvider);
+    state = AsyncData(session.user);
+  }
+
+  Future<void> signOut() async {
+    try {
+      await ref.read(repositoryProvider).logout();
+    } on Object {
+      // sign out locally even when the gateway cannot be reached
+    }
+    await _forget();
+    state = const AsyncData(null);
+  }
+
+  /// The api rejected the token (401): back to the login screen.
+  Future<void> expired() async {
+    await _forget();
+    state = const AsyncData(null);
+  }
+
+  /// The role or name changed (an `installation` event, a role change by an admin).
+  Future<void> refresh() async {
+    try {
+      final user = await ref.read(repositoryProvider).me();
+      state = AsyncData(user);
+    } on ApiProblem catch (e) {
+      if (e.type == ApiProblem.unauthorized) await expired();
+    }
   }
 }
 
-/// The current household; falls back to the first one when the stored id is
-/// unknown. Errors with [NoHouseholdException] when the user has none.
-final currentHouseholdProvider = FutureProvider<Household>((ref) async {
-  final households = await ref.watch(householdsProvider.future);
-  if (households.isEmpty) throw const NoHouseholdException();
-  final id = ref.watch(selectedHouseholdIdProvider);
-  return households.firstWhere(
-    (h) => h.id == id,
-    orElse: () => households.first,
-  );
-});
+/// The signed-in user (null while loading or signed out).
+final currentUserProvider = Provider<AppUser?>(
+  (ref) => ref.watch(sessionProvider).value,
+);
 
-class NoHouseholdException implements Exception {
-  const NoHouseholdException();
-}
+/// The signed-in user's role; the least privileged one while nobody is known yet.
+final currentUserProviderRole = Provider<Role>(
+  (ref) => ref.watch(currentUserProvider)?.role ?? Role.viewer,
+);

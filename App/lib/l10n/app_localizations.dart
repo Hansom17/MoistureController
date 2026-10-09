@@ -128,12 +128,6 @@ abstract class AppLocalizations {
   /// **'Settings'**
   String get navSettings;
 
-  /// No description provided for @switchHousehold.
-  ///
-  /// In en, this message translates to:
-  /// **'Switch household'**
-  String get switchHousehold;
-
   /// No description provided for @roleViewer.
   ///
   /// In en, this message translates to:
@@ -158,35 +152,11 @@ abstract class AppLocalizations {
   /// **'Owner'**
   String get roleOwner;
 
-  /// No description provided for @gatewayOfflineBanner.
-  ///
-  /// In en, this message translates to:
-  /// **'Gateway offline since {time}. Watering is delivered when it\'s back.'**
-  String gatewayOfflineBanner(String time);
-
   /// No description provided for @noPlantsTitle.
   ///
   /// In en, this message translates to:
   /// **'Start with your first plant'**
   String get noPlantsTitle;
-
-  /// No description provided for @noPlantsBody.
-  ///
-  /// In en, this message translates to:
-  /// **'Add a device to start measuring moisture.'**
-  String get noPlantsBody;
-
-  /// No description provided for @noHouseholdTitle.
-  ///
-  /// In en, this message translates to:
-  /// **'Create your first household'**
-  String get noHouseholdTitle;
-
-  /// No description provided for @noHouseholdBody.
-  ///
-  /// In en, this message translates to:
-  /// **'Or join one with an invite link.'**
-  String get noHouseholdBody;
 
   /// No description provided for @retry.
   ///
@@ -211,18 +181,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'That\'s longer than this pump\'s limit.'**
   String get errorSafetyLimit;
-
-  /// No description provided for @errorGatewayOffline.
-  ///
-  /// In en, this message translates to:
-  /// **'The gateway is offline.'**
-  String get errorGatewayOffline;
-
-  /// No description provided for @errorTooLate.
-  ///
-  /// In en, this message translates to:
-  /// **'The device already picked this up.'**
-  String get errorTooLate;
 
   /// No description provided for @errorBusy.
   ///
@@ -284,12 +242,6 @@ abstract class AppLocalizations {
   /// **'Online'**
   String get deviceOnline;
 
-  /// No description provided for @deviceSleeping.
-  ///
-  /// In en, this message translates to:
-  /// **'Sleeping'**
-  String get deviceSleeping;
-
   /// No description provided for @deviceLate.
   ///
   /// In en, this message translates to:
@@ -313,12 +265,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Last reading {ago}'**
   String lastReading(String ago);
-
-  /// No description provided for @batteryValue.
-  ///
-  /// In en, this message translates to:
-  /// **'Battery {percent} %'**
-  String batteryValue(int percent);
 
   /// No description provided for @trendFalling.
   ///
@@ -365,7 +311,7 @@ abstract class AppLocalizations {
   /// No description provided for @waterSheetHint.
   ///
   /// In en, this message translates to:
-  /// **'Devices sleep between readings. Watering starts on the next wake.'**
+  /// **'Watering starts as soon as the module confirms. If it is offline, it is sent when it is back.'**
   String get waterSheetHint;
 
   /// No description provided for @pumpLimit.
@@ -379,12 +325,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Watering queued'**
   String get waterQueued;
-
-  /// No description provided for @waterQueuedGatewayOffline.
-  ///
-  /// In en, this message translates to:
-  /// **'Queued. It\'s delivered when the gateway is back online.'**
-  String get waterQueuedGatewayOffline;
 
   /// No description provided for @cancel.
   ///
@@ -409,18 +349,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'{seconds} s watering'**
   String commandTitle(int seconds);
-
-  /// No description provided for @commandQueued.
-  ///
-  /// In en, this message translates to:
-  /// **'Queued · device expected ~{time}'**
-  String commandQueued(String time);
-
-  /// No description provided for @commandDelivered.
-  ///
-  /// In en, this message translates to:
-  /// **'Delivered'**
-  String get commandDelivered;
 
   /// No description provided for @commandRunning.
   ///
@@ -463,12 +391,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Rule'**
   String get originRule;
-
-  /// No description provided for @originLocal.
-  ///
-  /// In en, this message translates to:
-  /// **'On the gateway'**
-  String get originLocal;
 
   /// No description provided for @historyTitle.
   ///
@@ -542,16 +464,10 @@ abstract class AppLocalizations {
   /// **'Edit rule'**
   String get editRule;
 
-  /// No description provided for @deleteRule.
-  ///
-  /// In en, this message translates to:
-  /// **'Delete rule'**
-  String get deleteRule;
-
   /// No description provided for @ruleSummary.
   ///
   /// In en, this message translates to:
-  /// **'Below {percent} % → water {seconds} s, at most every {hours} h'**
+  /// **'Below {percent} %: water {seconds} s, at most every {hours} h'**
   String ruleSummary(int percent, int seconds, int hours);
 
   /// No description provided for @ruleBelow.
@@ -602,12 +518,6 @@ abstract class AppLocalizations {
   /// **'Firmware {version}'**
   String firmwareValue(String version);
 
-  /// No description provided for @signalValue.
-  ///
-  /// In en, this message translates to:
-  /// **'Signal {rssi} dBm'**
-  String signalValue(int rssi);
-
   /// No description provided for @configInSync.
   ///
   /// In en, this message translates to:
@@ -638,24 +548,6 @@ abstract class AppLocalizations {
   /// **'Board'**
   String get board;
 
-  /// No description provided for @wakeInterval.
-  ///
-  /// In en, this message translates to:
-  /// **'Wake interval'**
-  String get wakeInterval;
-
-  /// No description provided for @everyMinutes.
-  ///
-  /// In en, this message translates to:
-  /// **'every {minutes} min'**
-  String everyMinutes(int minutes);
-
-  /// No description provided for @nextExpected.
-  ///
-  /// In en, this message translates to:
-  /// **'Next wake expected'**
-  String get nextExpected;
-
   /// No description provided for @slots.
   ///
   /// In en, this message translates to:
@@ -667,12 +559,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Slot {index}'**
   String slotLabel(int index);
-
-  /// No description provided for @pinLabel.
-  ///
-  /// In en, this message translates to:
-  /// **'GPIO {pin}'**
-  String pinLabel(int pin);
 
   /// No description provided for @identify.
   ///
@@ -686,16 +572,10 @@ abstract class AppLocalizations {
   /// **'Reboot'**
   String get reboot;
 
-  /// No description provided for @serviceMode.
-  ///
-  /// In en, this message translates to:
-  /// **'Service mode'**
-  String get serviceMode;
-
   /// No description provided for @deviceActionSent.
   ///
   /// In en, this message translates to:
-  /// **'Sent. The device acts on its next wake.'**
+  /// **'Sent to the device.'**
   String get deviceActionSent;
 
   /// No description provided for @openAlerts.
@@ -782,23 +662,11 @@ abstract class AppLocalizations {
   /// **'Language'**
   String get language;
 
-  /// No description provided for @household.
-  ///
-  /// In en, this message translates to:
-  /// **'Household'**
-  String get household;
-
   /// No description provided for @timezone.
   ///
   /// In en, this message translates to:
   /// **'Time zone'**
   String get timezone;
-
-  /// No description provided for @yourRole.
-  ///
-  /// In en, this message translates to:
-  /// **'Your role'**
-  String get yourRole;
 
   /// No description provided for @demoSection.
   ///
@@ -824,12 +692,6 @@ abstract class AppLocalizations {
   /// **'Your role doesn\'t allow this.'**
   String get notAllowed;
 
-  /// No description provided for @battery.
-  ///
-  /// In en, this message translates to:
-  /// **'Battery'**
-  String get battery;
-
   /// No description provided for @signal.
   ///
   /// In en, this message translates to:
@@ -854,108 +716,6 @@ abstract class AppLocalizations {
   /// **'{subject}: {kind}'**
   String alertOther(String subject, String kind);
 
-  /// No description provided for @gatewayTitle.
-  ///
-  /// In en, this message translates to:
-  /// **'Gateway'**
-  String get gatewayTitle;
-
-  /// No description provided for @gatewayNoneTitle.
-  ///
-  /// In en, this message translates to:
-  /// **'Connect your plants'**
-  String get gatewayNoneTitle;
-
-  /// No description provided for @gatewayNoneBody.
-  ///
-  /// In en, this message translates to:
-  /// **'Plant devices talk to a gateway: a small computer at home, like a Raspberry Pi, that also runs your watering rules when the internet is down. Start the gateway software, then enter the code it shows.'**
-  String get gatewayNoneBody;
-
-  /// No description provided for @gatewayAdd.
-  ///
-  /// In en, this message translates to:
-  /// **'Add gateway'**
-  String get gatewayAdd;
-
-  /// No description provided for @gatewayCodeLabel.
-  ///
-  /// In en, this message translates to:
-  /// **'Code shown by the gateway'**
-  String get gatewayCodeLabel;
-
-  /// No description provided for @gatewayCodeInvalid.
-  ///
-  /// In en, this message translates to:
-  /// **'Enter the 8-character code, like K7QM-2XPA.'**
-  String get gatewayCodeInvalid;
-
-  /// No description provided for @gatewayClaimNote.
-  ///
-  /// In en, this message translates to:
-  /// **'Devices paired before have to be re-paired to the new gateway.'**
-  String get gatewayClaimNote;
-
-  /// No description provided for @gatewayAdded.
-  ///
-  /// In en, this message translates to:
-  /// **'Gateway added. Waiting for it to connect.'**
-  String get gatewayAdded;
-
-  /// No description provided for @gatewayEnrolling.
-  ///
-  /// In en, this message translates to:
-  /// **'Waiting for the gateway to connect'**
-  String get gatewayEnrolling;
-
-  /// No description provided for @gatewayOfflineSince.
-  ///
-  /// In en, this message translates to:
-  /// **'Offline since {time}'**
-  String gatewayOfflineSince(String time);
-
-  /// No description provided for @gatewayInSync.
-  ///
-  /// In en, this message translates to:
-  /// **'Settings in sync'**
-  String get gatewayInSync;
-
-  /// No description provided for @gatewaySyncing.
-  ///
-  /// In en, this message translates to:
-  /// **'Syncing settings'**
-  String get gatewaySyncing;
-
-  /// No description provided for @gatewayVersion.
-  ///
-  /// In en, this message translates to:
-  /// **'Version'**
-  String get gatewayVersion;
-
-  /// No description provided for @gatewayAdapters.
-  ///
-  /// In en, this message translates to:
-  /// **'Device types'**
-  String get gatewayAdapters;
-
-  /// No description provided for @gatewayUpdateAvailable.
-  ///
-  /// In en, this message translates to:
-  /// **'Update available: {version}'**
-  String gatewayUpdateAvailable(String version);
-
-  /// No description provided for @gatewayUpdateHint.
-  ///
-  /// In en, this message translates to:
-  /// **'On the gateway, run: docker compose pull && docker compose up -d'**
-  String get gatewayUpdateHint;
-
-  /// No description provided for @gatewayOutbox.
-  ///
-  /// In en, this message translates to:
-  /// **'Messages not uploaded yet'**
-  String get gatewayOutbox;
-
   /// No description provided for @gatewayClock.
   ///
   /// In en, this message translates to:
@@ -974,120 +734,6 @@ abstract class AppLocalizations {
   /// **'Not synced: no automatic watering'**
   String get gatewayClockBad;
 
-  /// No description provided for @gatewayLastReport.
-  ///
-  /// In en, this message translates to:
-  /// **'Last report'**
-  String get gatewayLastReport;
-
-  /// No description provided for @gatewayLanAddress.
-  ///
-  /// In en, this message translates to:
-  /// **'LAN address'**
-  String get gatewayLanAddress;
-
-  /// No description provided for @gatewayLanHint.
-  ///
-  /// In en, this message translates to:
-  /// **'Devices connect to this address. Override it if the gateway has several network interfaces.'**
-  String get gatewayLanHint;
-
-  /// No description provided for @gatewayLanReported.
-  ///
-  /// In en, this message translates to:
-  /// **'Reported by the gateway'**
-  String get gatewayLanReported;
-
-  /// No description provided for @gatewayLanOverridden.
-  ///
-  /// In en, this message translates to:
-  /// **'Set manually'**
-  String get gatewayLanOverridden;
-
-  /// No description provided for @gatewayLanUnknown.
-  ///
-  /// In en, this message translates to:
-  /// **'Not reported yet'**
-  String get gatewayLanUnknown;
-
-  /// No description provided for @gatewayLanReset.
-  ///
-  /// In en, this message translates to:
-  /// **'Use reported address'**
-  String get gatewayLanReset;
-
-  /// No description provided for @edit.
-  ///
-  /// In en, this message translates to:
-  /// **'Edit'**
-  String get edit;
-
-  /// No description provided for @gatewayRepairTitle.
-  ///
-  /// In en, this message translates to:
-  /// **'Devices to re-pair'**
-  String get gatewayRepairTitle;
-
-  /// No description provided for @gatewayRepairBody.
-  ///
-  /// In en, this message translates to:
-  /// **'These devices aren\'t paired to this gateway. Re-pair each one with the phone app, close to the device.'**
-  String get gatewayRepairBody;
-
-  /// No description provided for @deviceNeedsRepair.
-  ///
-  /// In en, this message translates to:
-  /// **'Needs re-pairing'**
-  String get deviceNeedsRepair;
-
-  /// No description provided for @gatewayRemove.
-  ///
-  /// In en, this message translates to:
-  /// **'Remove gateway'**
-  String get gatewayRemove;
-
-  /// No description provided for @gatewayRemoveTitle.
-  ///
-  /// In en, this message translates to:
-  /// **'Remove the gateway?'**
-  String get gatewayRemoveTitle;
-
-  /// No description provided for @gatewayRemoveBody.
-  ///
-  /// In en, this message translates to:
-  /// **'Its devices stop reporting until you add a gateway again and re-pair them. Automatic watering stops too. History is kept.'**
-  String get gatewayRemoveBody;
-
-  /// No description provided for @gatewayRemoved.
-  ///
-  /// In en, this message translates to:
-  /// **'Gateway removed'**
-  String get gatewayRemoved;
-
-  /// No description provided for @gatewayNone.
-  ///
-  /// In en, this message translates to:
-  /// **'No gateway'**
-  String get gatewayNone;
-
-  /// No description provided for @errorInvalidCode.
-  ///
-  /// In en, this message translates to:
-  /// **'That code isn\'t valid or has expired. The gateway shows a new one.'**
-  String get errorInvalidCode;
-
-  /// No description provided for @errorGatewayExists.
-  ///
-  /// In en, this message translates to:
-  /// **'This household already has a gateway.'**
-  String get errorGatewayExists;
-
-  /// No description provided for @errorNoGateway.
-  ///
-  /// In en, this message translates to:
-  /// **'Add a gateway to this household first (Settings → Gateway).'**
-  String get errorNoGateway;
-
   /// No description provided for @errorReauth.
   ///
   /// In en, this message translates to:
@@ -1099,12 +745,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Server'**
   String get serverTitle;
-
-  /// No description provided for @serverSubtitle.
-  ///
-  /// In en, this message translates to:
-  /// **'The server this app talks to'**
-  String get serverSubtitle;
 
   /// No description provided for @connSearching.
   ///
@@ -1141,12 +781,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Servers on your network'**
   String get serverFound;
-
-  /// No description provided for @serverNone.
-  ///
-  /// In en, this message translates to:
-  /// **'No server found yet.'**
-  String get serverNone;
 
   /// No description provided for @serverSearchAgain.
   ///
@@ -1219,6 +853,1254 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Use this server'**
   String get serverUseThis;
+
+  /// No description provided for @commandQueued.
+  ///
+  /// In en, this message translates to:
+  /// **'Queued'**
+  String get commandQueued;
+
+  /// No description provided for @signalValue.
+  ///
+  /// In en, this message translates to:
+  /// **'Link quality {quality}'**
+  String signalValue(int quality);
+
+  /// No description provided for @noPlantsBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Create a plant for a sensor of one of your devices.'**
+  String get noPlantsBody;
+
+  /// No description provided for @serverSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'The gateway this app talks to'**
+  String get serverSubtitle;
+
+  /// No description provided for @gatewayTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Gateway'**
+  String get gatewayTitle;
+
+  /// No description provided for @commandDelivered.
+  ///
+  /// In en, this message translates to:
+  /// **'Running'**
+  String get commandDelivered;
+
+  /// No description provided for @account.
+  ///
+  /// In en, this message translates to:
+  /// **'Account'**
+  String get account;
+
+  /// No description provided for @addDevice.
+  ///
+  /// In en, this message translates to:
+  /// **'Add device'**
+  String get addDevice;
+
+  /// No description provided for @addPlant.
+  ///
+  /// In en, this message translates to:
+  /// **'Add plant'**
+  String get addPlant;
+
+  /// No description provided for @editPlant.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit plant'**
+  String get editPlant;
+
+  /// No description provided for @plantName.
+  ///
+  /// In en, this message translates to:
+  /// **'Name'**
+  String get plantName;
+
+  /// No description provided for @plantSensor.
+  ///
+  /// In en, this message translates to:
+  /// **'Moisture sensor'**
+  String get plantSensor;
+
+  /// No description provided for @plantPump.
+  ///
+  /// In en, this message translates to:
+  /// **'Pump'**
+  String get plantPump;
+
+  /// No description provided for @plantNoSlots.
+  ///
+  /// In en, this message translates to:
+  /// **'No device has a sensor or pump configured yet. Set up a device first.'**
+  String get plantNoSlots;
+
+  /// No description provided for @alertSafeMode.
+  ///
+  /// In en, this message translates to:
+  /// **'{subject} is in safe mode'**
+  String alertSafeMode(String subject);
+
+  /// No description provided for @alertZigbeeOffline.
+  ///
+  /// In en, this message translates to:
+  /// **'Zigbee is not running'**
+  String get alertZigbeeOffline;
+
+  /// No description provided for @auditTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Activity'**
+  String get auditTitle;
+
+  /// No description provided for @noAudit.
+  ///
+  /// In en, this message translates to:
+  /// **'Nothing yet.'**
+  String get noAudit;
+
+  /// No description provided for @backupTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Backup'**
+  String get backupTitle;
+
+  /// No description provided for @backupBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Makes a consistent copy of the gateway databases on the gateway. The Zigbee network data has to be copied separately (scripts/backup.sh).'**
+  String get backupBody;
+
+  /// No description provided for @backupNow.
+  ///
+  /// In en, this message translates to:
+  /// **'Back up now'**
+  String get backupNow;
+
+  /// No description provided for @backupDone.
+  ///
+  /// In en, this message translates to:
+  /// **'Backup written on the gateway.'**
+  String get backupDone;
+
+  /// No description provided for @bannerHubDown.
+  ///
+  /// In en, this message translates to:
+  /// **'The watering service is not reachable. You see the last known data; changes are not possible.'**
+  String get bannerHubDown;
+
+  /// No description provided for @bannerZigbeeDown.
+  ///
+  /// In en, this message translates to:
+  /// **'Zigbee is not running. Data and commands are paused.'**
+  String get bannerZigbeeDown;
+
+  /// No description provided for @batteryThreshold.
+  ///
+  /// In en, this message translates to:
+  /// **'Low battery warning below'**
+  String get batteryThreshold;
+
+  /// No description provided for @calDry.
+  ///
+  /// In en, this message translates to:
+  /// **'Dry value (raw)'**
+  String get calDry;
+
+  /// No description provided for @calWet.
+  ///
+  /// In en, this message translates to:
+  /// **'Wet value (raw)'**
+  String get calWet;
+
+  /// No description provided for @changePassword.
+  ///
+  /// In en, this message translates to:
+  /// **'Change password'**
+  String get changePassword;
+
+  /// No description provided for @currentPassword.
+  ///
+  /// In en, this message translates to:
+  /// **'Current password'**
+  String get currentPassword;
+
+  /// No description provided for @newPassword.
+  ///
+  /// In en, this message translates to:
+  /// **'New password'**
+  String get newPassword;
+
+  /// No description provided for @passwordChangeHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Changing it signs out your other devices.'**
+  String get passwordChangeHint;
+
+  /// No description provided for @passwordChanged.
+  ///
+  /// In en, this message translates to:
+  /// **'Password changed.'**
+  String get passwordChanged;
+
+  /// No description provided for @changeRole.
+  ///
+  /// In en, this message translates to:
+  /// **'Change role'**
+  String get changeRole;
+
+  /// No description provided for @channelApp.
+  ///
+  /// In en, this message translates to:
+  /// **'In the app'**
+  String get channelApp;
+
+  /// No description provided for @channelTelegram.
+  ///
+  /// In en, this message translates to:
+  /// **'Telegram'**
+  String get channelTelegram;
+
+  /// No description provided for @clearSafeMode.
+  ///
+  /// In en, this message translates to:
+  /// **'Clear safe mode'**
+  String get clearSafeMode;
+
+  /// No description provided for @commandQueuedOffline.
+  ///
+  /// In en, this message translates to:
+  /// **'Queued · device offline'**
+  String get commandQueuedOffline;
+
+  /// No description provided for @configApplyNote.
+  ///
+  /// In en, this message translates to:
+  /// **'The change is applied as soon as the device confirms it.'**
+  String get configApplyNote;
+
+  /// No description provided for @configConflict.
+  ///
+  /// In en, this message translates to:
+  /// **'Someone else changed this device meanwhile. The current configuration was loaded; please check and save again.'**
+  String get configConflict;
+
+  /// No description provided for @configNoBoard.
+  ///
+  /// In en, this message translates to:
+  /// **'This device has not reported its board yet.'**
+  String get configNoBoard;
+
+  /// No description provided for @configPendingBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Revision {rev} is waiting for the device to confirm it.'**
+  String configPendingBody(int rev);
+
+  /// No description provided for @configRejectedBody.
+  ///
+  /// In en, this message translates to:
+  /// **'The device rejected the configuration: {error}'**
+  String configRejectedBody(String error);
+
+  /// No description provided for @configRevert.
+  ///
+  /// In en, this message translates to:
+  /// **'Use the running configuration'**
+  String get configRevert;
+
+  /// No description provided for @configRevision.
+  ///
+  /// In en, this message translates to:
+  /// **'Configuration (running / sent)'**
+  String get configRevision;
+
+  /// No description provided for @configSaved.
+  ///
+  /// In en, this message translates to:
+  /// **'Configuration sent to the device.'**
+  String get configSaved;
+
+  /// No description provided for @confirm.
+  ///
+  /// In en, this message translates to:
+  /// **'Confirm'**
+  String get confirm;
+
+  /// No description provided for @copied.
+  ///
+  /// In en, this message translates to:
+  /// **'Copied.'**
+  String get copied;
+
+  /// No description provided for @copyLink.
+  ///
+  /// In en, this message translates to:
+  /// **'Copy link'**
+  String get copyLink;
+
+  /// No description provided for @createInvite.
+  ///
+  /// In en, this message translates to:
+  /// **'Create invite'**
+  String get createInvite;
+
+  /// No description provided for @dataTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Backup and export'**
+  String get dataTitle;
+
+  /// No description provided for @deviceJoinFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Join failed'**
+  String get deviceJoinFailed;
+
+  /// No description provided for @deviceJoining.
+  ///
+  /// In en, this message translates to:
+  /// **'Joining'**
+  String get deviceJoining;
+
+  /// No description provided for @deviceName.
+  ///
+  /// In en, this message translates to:
+  /// **'Device name'**
+  String get deviceName;
+
+  /// No description provided for @deviceReady.
+  ///
+  /// In en, this message translates to:
+  /// **'Waiting for first report'**
+  String get deviceReady;
+
+  /// No description provided for @deviceSafeMode.
+  ///
+  /// In en, this message translates to:
+  /// **'Safe mode'**
+  String get deviceSafeMode;
+
+  /// No description provided for @deviceUnsupported.
+  ///
+  /// In en, this message translates to:
+  /// **'Unsupported device'**
+  String get deviceUnsupported;
+
+  /// No description provided for @diagBootReason.
+  ///
+  /// In en, this message translates to:
+  /// **'Last start'**
+  String get diagBootReason;
+
+  /// No description provided for @diagFreeHeap.
+  ///
+  /// In en, this message translates to:
+  /// **'Free memory'**
+  String get diagFreeHeap;
+
+  /// No description provided for @diagLastError.
+  ///
+  /// In en, this message translates to:
+  /// **'Last error code'**
+  String get diagLastError;
+
+  /// No description provided for @diagRejoins.
+  ///
+  /// In en, this message translates to:
+  /// **'Network rejoins'**
+  String get diagRejoins;
+
+  /// No description provided for @diagResets.
+  ///
+  /// In en, this message translates to:
+  /// **'Restarts'**
+  String get diagResets;
+
+  /// No description provided for @diagUptime.
+  ///
+  /// In en, this message translates to:
+  /// **'Running for'**
+  String get diagUptime;
+
+  /// No description provided for @diagnostics.
+  ///
+  /// In en, this message translates to:
+  /// **'Diagnostics'**
+  String get diagnostics;
+
+  /// No description provided for @disableUser.
+  ///
+  /// In en, this message translates to:
+  /// **'Disable'**
+  String get disableUser;
+
+  /// No description provided for @enableUser.
+  ///
+  /// In en, this message translates to:
+  /// **'Enable'**
+  String get enableUser;
+
+  /// No description provided for @userDisabled.
+  ///
+  /// In en, this message translates to:
+  /// **'disabled'**
+  String get userDisabled;
+
+  /// No description provided for @displayName.
+  ///
+  /// In en, this message translates to:
+  /// **'Display name'**
+  String get displayName;
+
+  /// No description provided for @done.
+  ///
+  /// In en, this message translates to:
+  /// **'Done'**
+  String get done;
+
+  /// No description provided for @editConfig.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit configuration'**
+  String get editConfig;
+
+  /// No description provided for @errorAlreadySetUp.
+  ///
+  /// In en, this message translates to:
+  /// **'This gateway is already set up.'**
+  String get errorAlreadySetUp;
+
+  /// No description provided for @errorConflict.
+  ///
+  /// In en, this message translates to:
+  /// **'That is not possible right now.'**
+  String get errorConflict;
+
+  /// No description provided for @errorDeviceNotReady.
+  ///
+  /// In en, this message translates to:
+  /// **'The device is not ready yet.'**
+  String get errorDeviceNotReady;
+
+  /// No description provided for @errorDeviceSafeMode.
+  ///
+  /// In en, this message translates to:
+  /// **'The device is in safe mode and does not water.'**
+  String get errorDeviceSafeMode;
+
+  /// No description provided for @errorHubTimeout.
+  ///
+  /// In en, this message translates to:
+  /// **'The gateway did not answer in time. It may still have worked; check again in a moment.'**
+  String get errorHubTimeout;
+
+  /// No description provided for @errorHubUnavailable.
+  ///
+  /// In en, this message translates to:
+  /// **'The watering service is not reachable right now.'**
+  String get errorHubUnavailable;
+
+  /// No description provided for @errorIncompatibleHub.
+  ///
+  /// In en, this message translates to:
+  /// **'The gateway parts do not fit together. Update the gateway.'**
+  String get errorIncompatibleHub;
+
+  /// No description provided for @errorInvalidCredentials.
+  ///
+  /// In en, this message translates to:
+  /// **'Wrong username or password.'**
+  String get errorInvalidCredentials;
+
+  /// No description provided for @errorInvalidInvite.
+  ///
+  /// In en, this message translates to:
+  /// **'This invite is not valid (anymore).'**
+  String get errorInvalidInvite;
+
+  /// No description provided for @errorInvalidSetupCode.
+  ///
+  /// In en, this message translates to:
+  /// **'The setup code is wrong.'**
+  String get errorInvalidSetupCode;
+
+  /// No description provided for @errorNetwork.
+  ///
+  /// In en, this message translates to:
+  /// **'Can\'t reach the gateway.'**
+  String get errorNetwork;
+
+  /// No description provided for @errorRateLimited.
+  ///
+  /// In en, this message translates to:
+  /// **'Too many attempts. Wait a moment and try again.'**
+  String get errorRateLimited;
+
+  /// No description provided for @errorSlotNotActuator.
+  ///
+  /// In en, this message translates to:
+  /// **'That slot is not a pump.'**
+  String get errorSlotNotActuator;
+
+  /// No description provided for @eventsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Events'**
+  String get eventsTitle;
+
+  /// No description provided for @noEvents.
+  ///
+  /// In en, this message translates to:
+  /// **'No events yet.'**
+  String get noEvents;
+
+  /// No description provided for @executionsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Recent decisions'**
+  String get executionsTitle;
+
+  /// No description provided for @noExecutions.
+  ///
+  /// In en, this message translates to:
+  /// **'The rule has not decided anything yet.'**
+  String get noExecutions;
+
+  /// No description provided for @executionWatered.
+  ///
+  /// In en, this message translates to:
+  /// **'Watered'**
+  String get executionWatered;
+
+  /// No description provided for @executionSkipped.
+  ///
+  /// In en, this message translates to:
+  /// **'Skipped: {reason}'**
+  String executionSkipped(String reason);
+
+  /// No description provided for @skipClock.
+  ///
+  /// In en, this message translates to:
+  /// **'clock not synced'**
+  String get skipClock;
+
+  /// No description provided for @skipCooldown.
+  ///
+  /// In en, this message translates to:
+  /// **'too soon after the last watering'**
+  String get skipCooldown;
+
+  /// No description provided for @skipDailyLimit.
+  ///
+  /// In en, this message translates to:
+  /// **'daily limit reached'**
+  String get skipDailyLimit;
+
+  /// No description provided for @skipNoPump.
+  ///
+  /// In en, this message translates to:
+  /// **'no pump available'**
+  String get skipNoPump;
+
+  /// No description provided for @skipPending.
+  ///
+  /// In en, this message translates to:
+  /// **'a watering is already pending'**
+  String get skipPending;
+
+  /// No description provided for @skipQuietHours.
+  ///
+  /// In en, this message translates to:
+  /// **'quiet hours'**
+  String get skipQuietHours;
+
+  /// No description provided for @skipSensorError.
+  ///
+  /// In en, this message translates to:
+  /// **'sensor problem'**
+  String get skipSensorError;
+
+  /// No description provided for @exportTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Export'**
+  String get exportTitle;
+
+  /// No description provided for @exportBody.
+  ///
+  /// In en, this message translates to:
+  /// **'A ZIP file with all plants, devices, readings, commands and users (without passwords). Your password is needed.'**
+  String get exportBody;
+
+  /// No description provided for @exportStart.
+  ///
+  /// In en, this message translates to:
+  /// **'Export data'**
+  String get exportStart;
+
+  /// No description provided for @exportDone.
+  ///
+  /// In en, this message translates to:
+  /// **'Export downloaded.'**
+  String get exportDone;
+
+  /// No description provided for @exportUnsupported.
+  ///
+  /// In en, this message translates to:
+  /// **'Downloading is only supported in the web app for now.'**
+  String get exportUnsupported;
+
+  /// No description provided for @fastReportHold.
+  ///
+  /// In en, this message translates to:
+  /// **'Keep fast reports after watering'**
+  String get fastReportHold;
+
+  /// No description provided for @fastReportInterval.
+  ///
+  /// In en, this message translates to:
+  /// **'Report interval while watering'**
+  String get fastReportInterval;
+
+  /// No description provided for @reportInterval.
+  ///
+  /// In en, this message translates to:
+  /// **'Report interval'**
+  String get reportInterval;
+
+  /// No description provided for @reportIntervals.
+  ///
+  /// In en, this message translates to:
+  /// **'Reports'**
+  String get reportIntervals;
+
+  /// No description provided for @gatewayApiVersion.
+  ///
+  /// In en, this message translates to:
+  /// **'Web service version'**
+  String get gatewayApiVersion;
+
+  /// No description provided for @gatewayCoordinator.
+  ///
+  /// In en, this message translates to:
+  /// **'Zigbee coordinator'**
+  String get gatewayCoordinator;
+
+  /// No description provided for @gatewayDatabase.
+  ///
+  /// In en, this message translates to:
+  /// **'Database size'**
+  String get gatewayDatabase;
+
+  /// No description provided for @gatewayHub.
+  ///
+  /// In en, this message translates to:
+  /// **'Watering service'**
+  String get gatewayHub;
+
+  /// No description provided for @gatewayHubVersion.
+  ///
+  /// In en, this message translates to:
+  /// **'Watering service version'**
+  String get gatewayHubVersion;
+
+  /// No description provided for @gatewayServices.
+  ///
+  /// In en, this message translates to:
+  /// **'Services'**
+  String get gatewayServices;
+
+  /// No description provided for @gatewayZigbee.
+  ///
+  /// In en, this message translates to:
+  /// **'Zigbee'**
+  String get gatewayZigbee;
+
+  /// No description provided for @statusUnknown.
+  ///
+  /// In en, this message translates to:
+  /// **'Unknown'**
+  String get statusUnknown;
+
+  /// No description provided for @installCode.
+  ///
+  /// In en, this message translates to:
+  /// **'Install code (optional)'**
+  String get installCode;
+
+  /// No description provided for @installCodeHint.
+  ///
+  /// In en, this message translates to:
+  /// **'From the label on the module. Needed for deployed modules.'**
+  String get installCodeHint;
+
+  /// No description provided for @installation.
+  ///
+  /// In en, this message translates to:
+  /// **'Installation'**
+  String get installation;
+
+  /// No description provided for @installationName.
+  ///
+  /// In en, this message translates to:
+  /// **'Name of this installation'**
+  String get installationName;
+
+  /// No description provided for @installationSettings.
+  ///
+  /// In en, this message translates to:
+  /// **'Installation settings'**
+  String get installationSettings;
+
+  /// No description provided for @inviteAs.
+  ///
+  /// In en, this message translates to:
+  /// **'Invite as'**
+  String get inviteAs;
+
+  /// No description provided for @inviteCreated.
+  ///
+  /// In en, this message translates to:
+  /// **'Invite created'**
+  String get inviteCreated;
+
+  /// No description provided for @inviteExpires.
+  ///
+  /// In en, this message translates to:
+  /// **'valid until {time}'**
+  String inviteExpires(String time);
+
+  /// No description provided for @inviteShownOnce.
+  ///
+  /// In en, this message translates to:
+  /// **'Send this link to the person. It is shown only once.'**
+  String get inviteShownOnce;
+
+  /// No description provided for @invitesTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Invites'**
+  String get invitesTitle;
+
+  /// No description provided for @noInvites.
+  ///
+  /// In en, this message translates to:
+  /// **'No open invites.'**
+  String get noInvites;
+
+  /// No description provided for @revokeInvite.
+  ///
+  /// In en, this message translates to:
+  /// **'Revoke invite'**
+  String get revokeInvite;
+
+  /// No description provided for @joinAccept.
+  ///
+  /// In en, this message translates to:
+  /// **'Create account'**
+  String get joinAccept;
+
+  /// No description provided for @joinClose.
+  ///
+  /// In en, this message translates to:
+  /// **'Close'**
+  String get joinClose;
+
+  /// No description provided for @joinConfigure.
+  ///
+  /// In en, this message translates to:
+  /// **'Name and configure'**
+  String get joinConfigure;
+
+  /// No description provided for @joinCountdown.
+  ///
+  /// In en, this message translates to:
+  /// **'Open for {time}'**
+  String joinCountdown(String time);
+
+  /// No description provided for @joinFailedBody.
+  ///
+  /// In en, this message translates to:
+  /// **'The module could not be set up. Remove it, power-cycle the module and try again.'**
+  String get joinFailedBody;
+
+  /// No description provided for @joinIdleTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Add a device'**
+  String get joinIdleTitle;
+
+  /// No description provided for @joinInstallation.
+  ///
+  /// In en, this message translates to:
+  /// **'Join {name}'**
+  String joinInstallation(String name);
+
+  /// No description provided for @joinInstructions.
+  ///
+  /// In en, this message translates to:
+  /// **'Open the join window, then power up the module or hold its button for 3 seconds.'**
+  String get joinInstructions;
+
+  /// No description provided for @joinOpen.
+  ///
+  /// In en, this message translates to:
+  /// **'Open join window'**
+  String get joinOpen;
+
+  /// No description provided for @joinOpenTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Waiting for the module…'**
+  String get joinOpenTitle;
+
+  /// No description provided for @joinRemoveRetry.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove and try again'**
+  String get joinRemoveRetry;
+
+  /// No description provided for @joinRole.
+  ///
+  /// In en, this message translates to:
+  /// **'You were invited as {role}.'**
+  String joinRole(String role);
+
+  /// No description provided for @joinTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Join'**
+  String get joinTitle;
+
+  /// No description provided for @joinUnsupportedBody.
+  ///
+  /// In en, this message translates to:
+  /// **'This is not a PlantModule ({model}). Remove it.'**
+  String joinUnsupportedBody(String model);
+
+  /// No description provided for @stepJoined.
+  ///
+  /// In en, this message translates to:
+  /// **'Joined the network'**
+  String get stepJoined;
+
+  /// No description provided for @stepInterviewing.
+  ///
+  /// In en, this message translates to:
+  /// **'Interviewing'**
+  String get stepInterviewing;
+
+  /// No description provided for @stepConfiguring.
+  ///
+  /// In en, this message translates to:
+  /// **'Configuring'**
+  String get stepConfiguring;
+
+  /// No description provided for @stepReady.
+  ///
+  /// In en, this message translates to:
+  /// **'Ready'**
+  String get stepReady;
+
+  /// No description provided for @lastSeenLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Last seen'**
+  String get lastSeenLabel;
+
+  /// No description provided for @lastUsedAgo.
+  ///
+  /// In en, this message translates to:
+  /// **'last used {ago}'**
+  String lastUsedAgo(String ago);
+
+  /// No description provided for @neverUsed.
+  ///
+  /// In en, this message translates to:
+  /// **'never used'**
+  String get neverUsed;
+
+  /// No description provided for @loginSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Sign in to continue'**
+  String get loginSubtitle;
+
+  /// No description provided for @username.
+  ///
+  /// In en, this message translates to:
+  /// **'Username'**
+  String get username;
+
+  /// No description provided for @password.
+  ///
+  /// In en, this message translates to:
+  /// **'Password'**
+  String get password;
+
+  /// No description provided for @passwordHint.
+  ///
+  /// In en, this message translates to:
+  /// **'At least 8 characters'**
+  String get passwordHint;
+
+  /// No description provided for @signIn.
+  ///
+  /// In en, this message translates to:
+  /// **'Sign in'**
+  String get signIn;
+
+  /// No description provided for @signOut.
+  ///
+  /// In en, this message translates to:
+  /// **'Sign out'**
+  String get signOut;
+
+  /// No description provided for @thisDevice.
+  ///
+  /// In en, this message translates to:
+  /// **'this device'**
+  String get thisDevice;
+
+  /// No description provided for @thisDeviceName.
+  ///
+  /// In en, this message translates to:
+  /// **'Name of this device'**
+  String get thisDeviceName;
+
+  /// No description provided for @thisDeviceHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Shown in the list of your logins'**
+  String get thisDeviceHint;
+
+  /// No description provided for @moduleEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'Empty'**
+  String get moduleEmpty;
+
+  /// No description provided for @moduleMoisture.
+  ///
+  /// In en, this message translates to:
+  /// **'Moisture sensor'**
+  String get moduleMoisture;
+
+  /// No description provided for @modulePump.
+  ///
+  /// In en, this message translates to:
+  /// **'Pump'**
+  String get modulePump;
+
+  /// No description provided for @slotModule.
+  ///
+  /// In en, this message translates to:
+  /// **'Module'**
+  String get slotModule;
+
+  /// No description provided for @slotPort.
+  ///
+  /// In en, this message translates to:
+  /// **'Port'**
+  String get slotPort;
+
+  /// No description provided for @portLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Port {port}'**
+  String portLabel(String port);
+
+  /// No description provided for @myDevices.
+  ///
+  /// In en, this message translates to:
+  /// **'My devices'**
+  String get myDevices;
+
+  /// No description provided for @revokeToken.
+  ///
+  /// In en, this message translates to:
+  /// **'Sign this device out'**
+  String get revokeToken;
+
+  /// No description provided for @noDevicesBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Open the join window and power up a module.'**
+  String get noDevicesBody;
+
+  /// No description provided for @noPlantsNoDevices.
+  ///
+  /// In en, this message translates to:
+  /// **'Add a device first, then create your plants.'**
+  String get noPlantsNoDevices;
+
+  /// No description provided for @noRulesNoPump.
+  ///
+  /// In en, this message translates to:
+  /// **'This plant has no pump, so it cannot be watered by a rule.'**
+  String get noRulesNoPump;
+
+  /// No description provided for @noSlots.
+  ///
+  /// In en, this message translates to:
+  /// **'Nothing is configured yet.'**
+  String get noSlots;
+
+  /// No description provided for @notifyFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'When it fails'**
+  String get notifyFailed;
+
+  /// No description provided for @notifySkipped.
+  ///
+  /// In en, this message translates to:
+  /// **'When it cannot decide'**
+  String get notifySkipped;
+
+  /// No description provided for @notifyWatered.
+  ///
+  /// In en, this message translates to:
+  /// **'When it waters'**
+  String get notifyWatered;
+
+  /// No description provided for @ruleNotify.
+  ///
+  /// In en, this message translates to:
+  /// **'Notify'**
+  String get ruleNotify;
+
+  /// No description provided for @outOfRange.
+  ///
+  /// In en, this message translates to:
+  /// **'Out of range'**
+  String get outOfRange;
+
+  /// No description provided for @pumpActiveHigh.
+  ///
+  /// In en, this message translates to:
+  /// **'Pump switches on with a high signal'**
+  String get pumpActiveHigh;
+
+  /// No description provided for @pumpMaxRun.
+  ///
+  /// In en, this message translates to:
+  /// **'Longest run'**
+  String get pumpMaxRun;
+
+  /// No description provided for @pumpMinPause.
+  ///
+  /// In en, this message translates to:
+  /// **'Shortest pause between runs'**
+  String get pumpMinPause;
+
+  /// No description provided for @quietFrom.
+  ///
+  /// In en, this message translates to:
+  /// **'From {time}'**
+  String quietFrom(String time);
+
+  /// No description provided for @quietTo.
+  ///
+  /// In en, this message translates to:
+  /// **'Until {time}'**
+  String quietTo(String time);
+
+  /// No description provided for @reauthBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter your password to continue.'**
+  String get reauthBody;
+
+  /// No description provided for @reauthTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Confirm with your password'**
+  String get reauthTitle;
+
+  /// No description provided for @removeDevice.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove device'**
+  String get removeDevice;
+
+  /// No description provided for @removeDeviceBody.
+  ///
+  /// In en, this message translates to:
+  /// **'{name} is removed from the network and its plants lose their sensor and pump. History is kept.'**
+  String removeDeviceBody(String name);
+
+  /// No description provided for @removeUser.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove user'**
+  String get removeUser;
+
+  /// No description provided for @removeUserBody.
+  ///
+  /// In en, this message translates to:
+  /// **'{name} loses access immediately.'**
+  String removeUserBody(String name);
+
+  /// No description provided for @renameDevice.
+  ///
+  /// In en, this message translates to:
+  /// **'Rename'**
+  String get renameDevice;
+
+  /// No description provided for @ruleMaxPerDay.
+  ///
+  /// In en, this message translates to:
+  /// **'At most per day'**
+  String get ruleMaxPerDay;
+
+  /// No description provided for @ruleMaxPerDayValue.
+  ///
+  /// In en, this message translates to:
+  /// **'at most {count} a day'**
+  String ruleMaxPerDayValue(int count);
+
+  /// No description provided for @ruleQuietHours.
+  ///
+  /// In en, this message translates to:
+  /// **'Quiet hours'**
+  String get ruleQuietHours;
+
+  /// No description provided for @ruleQuietValue.
+  ///
+  /// In en, this message translates to:
+  /// **'quiet {from} – {to}'**
+  String ruleQuietValue(String from, String to);
+
+  /// No description provided for @safeModeBody.
+  ///
+  /// In en, this message translates to:
+  /// **'The module stopped itself ({reason}) and does not water until it is reset.'**
+  String safeModeBody(String reason);
+
+  /// No description provided for @safeModeTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Safe mode'**
+  String get safeModeTitle;
+
+  /// No description provided for @saved.
+  ///
+  /// In en, this message translates to:
+  /// **'Saved.'**
+  String get saved;
+
+  /// No description provided for @setupCode.
+  ///
+  /// In en, this message translates to:
+  /// **'Setup code'**
+  String get setupCode;
+
+  /// No description provided for @setupCodeHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Shown in the log of the web service: docker compose logs api'**
+  String get setupCodeHint;
+
+  /// No description provided for @setupCreate.
+  ///
+  /// In en, this message translates to:
+  /// **'Set up this gateway'**
+  String get setupCreate;
+
+  /// No description provided for @setupNeedsHub.
+  ///
+  /// In en, this message translates to:
+  /// **'The watering service is not running yet. Setup needs it.'**
+  String get setupNeedsHub;
+
+  /// No description provided for @setupSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Create the owner account. This is only needed once.'**
+  String get setupSubtitle;
+
+  /// No description provided for @setupTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Set up this gateway'**
+  String get setupTitle;
+
+  /// No description provided for @telegramChat.
+  ///
+  /// In en, this message translates to:
+  /// **'Chat id'**
+  String get telegramChat;
+
+  /// No description provided for @telegramConfigured.
+  ///
+  /// In en, this message translates to:
+  /// **'Telegram is set up.'**
+  String get telegramConfigured;
+
+  /// No description provided for @telegramNotConfigured.
+  ///
+  /// In en, this message translates to:
+  /// **'Telegram is not set up.'**
+  String get telegramNotConfigured;
+
+  /// No description provided for @telegramTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Telegram'**
+  String get telegramTitle;
+
+  /// No description provided for @telegramToken.
+  ///
+  /// In en, this message translates to:
+  /// **'Bot token'**
+  String get telegramToken;
+
+  /// No description provided for @telegramTokenHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Leave empty to keep the saved token'**
+  String get telegramTokenHint;
+
+  /// No description provided for @timezoneHint.
+  ///
+  /// In en, this message translates to:
+  /// **'For example Europe/Berlin'**
+  String get timezoneHint;
+
+  /// No description provided for @transferOwnership.
+  ///
+  /// In en, this message translates to:
+  /// **'Make owner'**
+  String get transferOwnership;
+
+  /// No description provided for @transferOwnershipBody.
+  ///
+  /// In en, this message translates to:
+  /// **'{name} becomes the owner. You become an admin.'**
+  String transferOwnershipBody(String name);
+
+  /// No description provided for @usersTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Users'**
+  String get usersTitle;
+
+  /// No description provided for @waterQueuedDeviceOffline.
+  ///
+  /// In en, this message translates to:
+  /// **'Watering queued. The device is offline and gets it when it is back.'**
+  String get waterQueuedDeviceOffline;
+
+  /// No description provided for @noReadings.
+  ///
+  /// In en, this message translates to:
+  /// **'No readings in this period yet.'**
+  String get noReadings;
 }
 
 class _AppLocalizationsDelegate

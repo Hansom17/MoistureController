@@ -148,3 +148,25 @@ async def test_bridge_state_in_status_snapshot(rig):
     await rig.z2m.t.publish("zigbee2mqtt/bridge/state", b'{"state":"online"}', retain=True)
     await rig.api.settle()
     assert rig.api.state["state/status"]["zigbee2mqtt"] == "online"
+
+
+async def test_plant_snapshot_has_a_trend(rig):
+    dev = await add_device(rig)
+    plant = (await rig.api.request("plant_create", {"name": "T", "sensor": {"device_id": dev, "slot": 0}}))["body"]["plant"]
+    seq = 0
+    for value in (50, 50, 50, 50):                    # older readings, hours apart
+        seq += 1
+        rig.clock.advance(3600)
+        await rig.z2m.state(dev, report(seq=seq, v0=value))
+        await rig.api.settle()
+    assert rig.api.state["state/plants"][0]["trend"] == "steady"
+    seq += 1
+    rig.clock.advance(3600)
+    await rig.z2m.state(dev, report(seq=seq, v0=20))
+    await rig.api.settle()
+    assert rig.api.state["state/plants"][0]["trend"] == "falling"
+    seq += 1
+    rig.clock.advance(60)
+    await rig.z2m.state(dev, report(seq=seq, v0=80))
+    await rig.api.settle()
+    assert rig.api.state["state/plants"][0]["trend"] == "rising"

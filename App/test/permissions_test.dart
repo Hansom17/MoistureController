@@ -7,10 +7,15 @@ void main() {
   const matrix = {
     AppAction.viewData: [Role.owner, Role.admin, Role.member, Role.viewer],
     AppAction.water: [Role.owner, Role.admin, Role.member],
+    AppAction.editPlants: [Role.owner, Role.admin, Role.member],
     AppAction.editRules: [Role.owner, Role.admin, Role.member],
+    AppAction.identifyDevice: [Role.owner, Role.admin, Role.member],
+    AppAction.acknowledgeAlert: [Role.owner, Role.admin, Role.member],
     AppAction.manageDevices: [Role.owner, Role.admin],
-    AppAction.manageMembers: [Role.owner, Role.admin],
-    AppAction.manageHousehold: [Role.owner],
+    AppAction.manageUsers: [Role.owner, Role.admin],
+    AppAction.backup: [Role.owner, Role.admin],
+    AppAction.manageInstallation: [Role.owner],
+    AppAction.exportData: [Role.owner],
   };
 
   matrix.forEach((action, allowed) {
@@ -20,4 +25,6 @@ void main() {
       }
     });
   });
+
+  test('every action is in the matrix', () => expect(matrix.keys.toSet(), AppAction.values.toSet()));
 }

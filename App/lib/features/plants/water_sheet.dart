@@ -11,9 +11,9 @@ import '../../ui/common.dart';
 Future<void> showWaterSheet(
   BuildContext context,
   WidgetRef ref,
-  Household household,
-  Plant plant,
-) async {
+  Plant plant, {
+  bool deviceOffline = false,
+}) async {
   final seconds = await showModalBottomSheet<int>(
     context: context,
     showDragHandle: true,
@@ -24,16 +24,9 @@ Future<void> showWaterSheet(
 
   final l = context.l10n;
   try {
-    await ref
-        .read(householdActionsProvider)
-        .waterNow(household.id, plant.id, seconds);
+    await ref.read(actionsProvider).waterNow(plant.id, seconds);
     if (!context.mounted) return;
-    final gatewayOffline =
-        household.gateway != null && !household.gateway!.online;
-    showSnackBar(
-      context,
-      gatewayOffline ? l.waterQueuedGatewayOffline : l.waterQueued,
-    );
+    showSnackBar(context, deviceOffline ? l.waterQueuedDeviceOffline : l.waterQueued);
   } catch (e) {
     if (context.mounted) showErrorSnackBar(context, e);
   }

@@ -35,7 +35,7 @@ Phones first; tablets and desktop browsers get a two-pane layout on wide screens
 
 No Firebase, Bluetooth or QR-scanner packages are needed any more.
 
-**Offline-capable build.** The gateway may have no internet at all. The web build must therefore be self-contained: CanvasKit and fonts come from the Gateway's own origin, not from a CDN (build with `--no-web-resources-cdn`; **verify** the flag in the pinned Flutter version) and no Google Fonts requests are made.
+**Offline-capable build.** The gateway may have no internet at all. The web build must therefore be self-contained: CanvasKit and fonts come from the Gateway's own origin, not from a CDN (built with `--no-web-resources-cdn`, verified in Flutter 3.41: CanvasKit is loaded from the gateway's origin) and no Google Fonts requests are made: Roboto is bundled in `assets/fonts/` and texts only use characters Roboto has, because a missing character makes Flutter fetch a fallback font from the internet (`test/l10n_test.dart`).
 
 ## 3. Architecture
 
@@ -68,7 +68,7 @@ flowchart TB
 
 ## 4. Screens and navigation
 
-Status: **built** (needs adapting to the new API), **new** or **planned**.
+Status: **built** (adapted to the new api and run against the real gateway), **planned** or **not built**.
 
 ```mermaid
 flowchart TD
@@ -98,20 +98,20 @@ flowchart TD
 
 | Screen | Content | Min. role for actions | Status |
 |---|---|---|---|
-| **Setup** | Setup code from the gateway's log, installation name, timezone, owner username + password | — | new |
-| **Login** | Username + password, "this device's name"; token stored on success | — | new |
-| **Join (invite)** | Preview (role, installation name), username + password | — | new |
-| **Dashboard** | Plant cards: current moisture, trend, reading age, battery, device state (online / late / offline / safe mode), pending commands. Banner "gateway can't reach Zigbee" when the hub reports it; empty state "add a device first" | viewer | built, adapt |
-| **Plant detail** | Chart (24 h / 7 d / 30 d / 1 y), **Water now** (seconds picker within the pump's limits), command history, rules list + editor, rule executions ("why did / didn't it water?") | water, rules: member | built, adapt |
-| **Devices** | List with status, battery, link quality, firmware, config sync state | viewer | built, adapt |
-| **Add device** | Opens the join window (`POST /devices/join`) with an optional install code field and a countdown; the new device appears live and is named and configured right there | admin | new (replaces the BLE wizard) |
-| **Device detail** | Slot editor (§10), report intervals, health chart, diagnostics (uptime, boot reason, resets, rejoins, last error, firmware and interface version), events, identify / reboot / clear safe mode, remove | identify: member; rest: admin | built, adapt |
-| **Alerts** | Open and closed alerts, acknowledge | ack: member | built, adapt |
-| **Users & invites** | Users with roles; change role / remove; create invite → link + QR (copy, share); open invites with revoke | admin (admins: owner) | planned |
-| **My devices** | The user's tokens (name, created, last used); revoke; change password | — | planned |
-| **Installation** | Name, timezone, battery threshold; notifier settings (Telegram, planned); transfer ownership | owner | planned |
+| **Setup** | Setup code from the gateway's log, installation name, timezone, owner username + password | — | built |
+| **Login** | Username + password, "this device's name"; token stored on success | — | built |
+| **Join (invite)** | Preview (role, installation name), username + password | — | built |
+| **Dashboard** | Plant cards: current moisture, trend, reading age, battery, device state (online / late / offline / safe mode), pending commands. Banner "gateway can't reach Zigbee" when the hub reports it; empty state "add a device first" | viewer | built |
+| **Plant detail** | Chart (24 h / 7 d / 30 d / 1 y), **Water now** (seconds picker within the pump's limits), command history, rules list + editor, rule executions ("why did / didn't it water?") | water, rules: member | built |
+| **Devices** | List with status, battery, link quality, firmware, config sync state | viewer | built |
+| **Add device** | Opens the join window (`POST /devices/join`) with an optional install code field and a countdown; the new device appears live and is named and configured right there | admin | built (replaces the BLE wizard) |
+| **Device detail** | Slot editor (§10), report intervals, health chart, diagnostics (uptime, boot reason, resets, rejoins, last error, firmware and interface version), events, identify / reboot / clear safe mode, remove | identify: member; rest: admin | built |
+| **Alerts** | Open and closed alerts, acknowledge | ack: member | built |
+| **Users & invites** | Users with roles; change role / remove; create invite → link + QR (copy, share); open invites with revoke | admin (admins: owner) | built |
+| **My devices** | The user's tokens (name, created, last used); revoke; change password | — | built |
+| **Installation** | Name, timezone, battery threshold; notifier settings (Telegram token and chat id, no test message yet); ownership transfer is in Users | owner | built |
 | **Gateway status** | Zigbee2MQTT and coordinator state, hub version, clock, database size, backup now | viewer; backup: admin | built (as Gateway screen), adapt |
-| **Export / backup** | Start export, download ZIP | owner, reauth | planned |
+| **Export / backup** | Start export, download ZIP (browser download; owner, password needed); backup now (admin) | owner / admin | built |
 | **Settings** | Theme, language, sign out; on the fake backend: demo role switch | — | built |
 
 ## 5. Authentication
@@ -218,7 +218,7 @@ stateDiagram-v2
 
 ## 12. Users, invites and sessions
 
-- **Users & invites** (planned): list users with role badges; owner/admin can change roles and remove users within the rules of the role matrix; creating an invite shows the code **once** as link, QR (`qr_flutter`) and a copy button; open invites can be revoked.
+- **Users & invites** (built): list users with role badges; owner/admin can change roles, disable, remove users and (owner) make another user the owner, within the rules of the role matrix; creating an invite shows the link **once** with a copy button (a QR code with `qr_flutter` is not built yet); open invites can be revoked; an activity list shows the audit log.
 - **Join:** the link `http://<gateway>/join#c=<code>` opens the Join screen (the part after `#` is not sent to any server); the user picks a username and password; the app stores the returned token and opens the dashboard.
 - **My devices:** shows the user's tokens with last used time and a revoke button.
 
@@ -234,15 +234,9 @@ The app shows alerts in the Alerts screen and as a badge; with the page open the
 | `lib/main.dart` (to become the hub entry point; today `main_local.dart`) | The real hub: same-origin API on web, `API_URL` for development | The product |
 | mobile entry (later) | The hub found through mDNS (§6.4) | Android/iOS app |
 
-**Build and serve:** `flutter build web --release` produces `App/build/web`, which the hub serves (`MC_WEB_DIR`); a dev stack that builds and serves it together with the hub is planned. The build must be self-contained (§2).
+**Build and serve:** `flutter build web --release` produces `App/build/web`, which the hub serves (`MC_WEB_DIR`); the full stack on one machine is described in `readme.md`. The build must be self-contained (§2).
 
-**Migration from the current code:**
-
-- **Removed already:** the BLE pairing wizard, label scanner and protocol code, the `flutter_reactive_ble`, `mobile_scanner` and `cryptography` dependencies, BLE tests and permissions.
-- **Remove:** the household switcher and household scoping, the `local` flavor naming.
-- **Adapt:** `ApiMoistureRepository` to the new API (no `/households/{h}` prefix, token auth, `/stream` without a household), models (no households, memberships), the Gateway screen (Zigbee2MQTT status), device screens (join flow, report intervals), permissions to the new role endpoint.
-- **Add:** Setup, Login, Join, Users & invites, My devices, Installation screens; the "Add device" join screen; a build that does not use a CDN.
-- **Keep:** dashboard, plant detail, rules, alerts, charts, design system, SSE client, connection banner and state handling, mDNS discovery (for mobile later), localization.
+**Migration from the previous code (done):** the BLE wizard and household scoping are gone, `ApiMoistureRepository` and the models speak the new api, the `local` flavor is now `lib/main.dart`, and Setup, Login, Join, Users & invites, My devices, Installation, Add device, the slot editor and the self-contained web build were added. Kept: dashboard, plant detail, rules, alerts, charts, design system, SSE client, connection banner, mDNS discovery (for mobile later), localization.
 
 ## 15. Code layout (target)
 
@@ -270,9 +264,9 @@ App/
 
 | Level | What |
 |---|---|
-| Unit / widget (exist) | Fake repository, API repository (HTTP mocked), permissions, theme, gateway screen, discovery (kept for mobile). |
-| To adapt / add | Token handling and `401` flows (login redirect, reauth dialog), setup and invite flows, join-window screen with SSE events, config editor with the report intervals, join screen steps and failures, role-based widget tests (viewer sees no water button), SSE reconnect/resync, golden tests for `lib/ui/` (`alchemist`). |
-| Integration (manual) | The app against the real hub with a Zigbee2MQTT simulator (dev stack planned). An automated browser test is planned. |
+| Unit / widget (97) | Fake repository, API repository (HTTP mocked: auth header, error codes, reauth proof, retries, payloads), permissions, redirect rules of the router, theme, texts (only characters of the bundled font), discovery (kept for mobile); widget tests for setup, login, invite join, dashboard, watering flow, roles, Zigbee banner, add device, slot editor (pending, conflict, rejected), remove with password, users and invites, tokens, installation, alerts, export, gateway status. |
+| Still to add | SSE reconnect/resync tests, golden tests for `lib/ui/` (`alchemist`), a calibration wizard test. |
+| Integration | Done once by hand: the web build in a browser against the real api, hub and `Gateway/scripts/z2m_sim.py` (setup, login reload, devices, slot editor, plant, watering with live state, chart). An automated browser test is planned. |
 | On hardware | Joining and configuring a real PlantModule from the web app. |
 
 ## 17. Open points
