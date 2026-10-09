@@ -32,7 +32,7 @@ standard_clusters:
 
 custom_cluster:
   id: 0xFC11
-  manufacturer_code: TBD              # a test code is used in development
+  manufacturer_code: 0x131B           # Espressif's code, for development; a production code is decided later
 
   attributes:
     # --- telemetry (device -> gateway) ---

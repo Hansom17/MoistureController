@@ -383,7 +383,7 @@ The contract between the PlantModule firmware and the Gateway's Zigbee2MQTT exte
 | Device type | Zigbee 3.0 end device, receiver on, one endpoint (1), profile Home Automation, custom device ID |
 | Identity (Basic) | manufacturer `MoistureController`, model `MC-PLANT`, `swBuildId`, `hwVersion` |
 | Standard clusters | Basic (0x0000), Power Configuration (0x0001), Identify (0x0003) |
-| Custom cluster | `0xFC11`, manufacturer-specific (manufacturer code to be assigned; a test code is used in development) |
+| Custom cluster | `0xFC11`, manufacturer-specific (development uses Espressif's manufacturer code `0x131B`; a production code is decided later) |
 | Identity of a device | The IEEE address |
 | Interface version | `interface_version` attribute, major.minor in one `uint16` (currently 1.0) |
 
@@ -476,6 +476,8 @@ Reason codes: `expired`, `busy`, `limit`, `min_pause`, `slot_not_actuator`, `slo
 ## 8. Zigbee2MQTT converter
 
 The converter lives in `Gateway/firmware/zigbee2mqtt/` and implements this part from `interface.yaml`: `fromZigbee` for attribute reports and the device's cluster commands, `toZigbee` for the hub's `set` payloads (writes plus commit, commands), the `configure` function (bindings, reporting), and the `exposes` list. The MQTT key names and payload shapes are in `Gateway/specs.md` "Message paths".
+
+**Status: written and tested against the real libraries** (not yet with a running Zigbee2MQTT and a real module). Files in `Gateway/firmware/zigbee2mqtt/external_converters/`: `mc-plant.mjs` (the definition: cluster, `fromZigbee`, `toZigbee`, `configure`, `exposes`), `mc-plant/codec.mjs` (slot readings, slot tables, `cfg_error`, pure functions) and `mc-plant/interface.mjs`, **generated** from `interface.yaml` by `Gateway/scripts/gen_converter.py` (a test fails while they differ). Choices: `cfg_error` is published as text (`port_conflict (slot 3)`), `fast_mode` as a boolean, `interface_version` as `1.0`; `config` writes the intervals and all six slot tables and then sends `commit_config(rev)`; custom attributes are reported whole (no change threshold). The tests (`scripts/test_converter.sh`, 24 tests) load the definition into `zigbee-herdsman-converters`, encode and parse real herdsman frames of the custom cluster, check the command byte layout and the reporting set-up, and share fixtures with the hub's tests (`hub/tests/test_converter_contract.py`), so converter and hub cannot drift apart.
 
 ---
 

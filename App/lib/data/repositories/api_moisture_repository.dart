@@ -654,7 +654,7 @@ class ApiMoistureRepository implements MoistureRepository {
   String? _configError(Object? e) {
     if (e is! Map) return null;
     final raw = e['raw'];
-    return raw == null ? 'rejected' : 'rejected ($raw)';
+    return raw == null ? 'rejected' : 'rejected: $raw';
   }
 
   Device _device(Map d) {

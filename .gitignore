@@ -30,3 +30,6 @@ __pycache__/
 Gateway/firmware/mosquitto/passwd
 Gateway/firmware/mosquitto/tls/
 Gateway/firmware/mosquitto/conf.d/*.conf
+
+# Zigbee2MQTT converter tests link the node_modules of a Zigbee2MQTT checkout
+Gateway/firmware/zigbee2mqtt/node_modules

@@ -24,6 +24,8 @@ cd Gateway/firmware/api && ../../../.venv/bin/python -m pytest -q   # runs the a
 
 ### The hub
 
+`scripts/test_converter.sh` tests the Zigbee2MQTT converter (needs a Zigbee2MQTT checkout with `node_modules`, `Z2M_DIR`); `scripts/gen_converter.py` regenerates its data from `PlantModule/interface.yaml`.
+
 `scripts/z2m_sim.py` plays Zigbee2MQTT and PlantModules on the broker (`--pending 1` makes a module join when the join window is opened).
 
 ```bash
