@@ -22,7 +22,8 @@ async def run(settings: Settings) -> None:
                               will=make_will(probe.boot_id), client_id="mc-hub")
     pub = Publisher(transport, clock)
     pub.boot_id = probe.boot_id
-    hub = Hub(transport, make_sessionmaker(engine), clock, pub, settings.z2m_base_topic)
+    hub = Hub(transport, make_sessionmaker(engine), clock, pub, settings.z2m_base_topic,
+              engine=engine, backup_dir=settings.data_dir / "backups")
     await transport.connect()
     await hub.start()
     logging.getLogger("mc_hub").info("hub running (boot_id %s)", pub.boot_id)

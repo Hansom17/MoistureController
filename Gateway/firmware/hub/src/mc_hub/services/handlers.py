@@ -3,12 +3,15 @@ from mc_hub.bus.requests import Ctx, RequestHandler
 from mc_hub.db.models import Device, Plant
 from mc_hub.errors import HubError
 
-from . import commands, config_sync
+import json
+
+from . import commands, config_sync, devices as devs
+from .join import clean_install_code
 from .domain import _need
 from .views import device_view
 
 
-def register(h: RequestHandler) -> None:
+def register(h: RequestHandler, hub) -> None:
     @h.register("water")
     async def water(ctx: Ctx, b: dict):
         _need(b, "plant_id", "seconds")
@@ -47,3 +50,50 @@ def register(h: RequestHandler) -> None:
         ctx.emit("config", {"device_id": d.id, "rev": rev})
         ctx.emit("device", device_view(d))
         return {"rev": rev}
+
+    # ---- join window and removal (Gateway/specs.md 7.3, 7.4) --------------------------------
+
+    @h.register("device_join_open")
+    async def device_join_open(ctx: Ctx, b: dict):
+        seconds = int(b.get("seconds", 120))
+        if not 10 <= seconds <= 254:
+            raise HubError("validation", detail="seconds must be 10..254")
+        if not hub.jobs.zigbee_up:
+            raise HubError("conflict", "Zigbee2MQTT is not reachable")
+        t = hub.topics
+        if b.get("install_code"):
+            try:
+                code = clean_install_code(b["install_code"])
+            except ValueError as e:
+                raise HubError("validation", detail=str(e))
+            ctx.fx.publish(t.request("install_code/add"), json.dumps({"value": code}).encode())   # verify payload
+        hub.join.open(ctx.now, seconds)
+        ctx.fx.publish(t.request("permit_join"), json.dumps({"time": seconds}).encode())
+        ctx.touch("join")
+        ctx.emit("join", dict(hub.join.state))
+        return {"join": dict(hub.join.state)}
+
+    @h.register("device_join_close")
+    async def device_join_close(ctx: Ctx, b: dict):
+        hub.join.close()
+        ctx.fx.publish(hub.topics.request("permit_join"), json.dumps({"time": 0}).encode())
+        ctx.touch("join")
+        ctx.emit("join", dict(hub.join.state))
+        return {}
+
+    @h.register("device_remove")
+    async def device_remove(ctx: Ctx, b: dict):
+        _need(b, "device_id")
+        d = await ctx.session.get(Device, b["device_id"])
+        if d is None or d.deleted_at is not None:
+            raise HubError("not_found", "Device not found")
+        await devs.soft_delete(ctx.session, ctx.fx, ctx.now, d)
+        ctx.fx.publish(hub.topics.request("device/remove"),
+                       json.dumps({"id": d.ieee, "force": bool(b.get("force", False))}).encode())
+        return {}
+
+    @h.register("backup")
+    async def backup(ctx: Ctx, b: dict):
+        if hub.backup is None:
+            raise HubError("conflict", "No backup directory is configured")
+        return await hub.backup.run(ctx.now)

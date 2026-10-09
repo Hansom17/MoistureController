@@ -15,6 +15,8 @@ class Z2MTopics:
     @property
     def bridge_response(self) -> str: return f"{self.base}/bridge/response/#"
     @property
+    def bridge_response_permit_join(self) -> str: return f"{self.base}/bridge/response/permit_join"
+    @property
     def device_state(self) -> str: return f"{self.base}/+"
     @property
     def device_availability(self) -> str: return f"{self.base}/+/availability"

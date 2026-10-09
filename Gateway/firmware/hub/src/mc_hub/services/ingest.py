@@ -13,7 +13,8 @@ from mc_hub.zigbee import adapter
 from mc_hub.zigbee.messages import CmdAck, ConfigState, Event, Status, Telemetry
 from mc_hub.zigbee.topics import Z2MTopics
 
-from . import alerts, commands, config_sync, rules
+from . import alerts, commands, config_sync, devices as devs, rules
+from .join import Join
 from .effects import Effects
 from .views import alert_view, device_view
 
@@ -28,6 +29,7 @@ class Ingest:
                  topics: Z2MTopics, clock: Clock) -> None:
         self.sessions, self.t, self.topics, self.clock = sessions, transport, topics, clock
         self.clock_synced = True
+        self.join = Join()
 
     # ---- bridge ----------------------------------------------------------------------------
 
@@ -54,6 +56,8 @@ class Ingest:
                                status=self._join_status(supported, state))
                     s.add(d)
                     known[ieee] = d
+                    if self.join.joined(d.id):
+                        fx.emit("join", dict(self.join.state)); fx.touch("join")
                     if supported:
                         await s.flush()
                         config_sync.initial(d, now, s)
@@ -70,8 +74,7 @@ class Ingest:
                 fx.emit("device", device_view(d))
             for ieee, d in known.items():
                 if ieee not in seen and d.deleted_at is None:
-                    d.deleted_at, d.updated_at = now, now
-                    fx.emit("device", device_view(d))
+                    await devs.soft_delete(s, fx, now, d)
             await s.commit()
         fx.touch("devices")
         for old, new in renames:
@@ -98,6 +101,8 @@ class Ingest:
             d = await s.get(Device, dev_id)
             if d is None or d.deleted_at is not None:
                 return fx
+            if state == "online":
+                fx.kick(d.id)              # the first sign of life under the new name: send what is pending
             if state == "offline" and d.status in ("online", "late", "ready", "safe_mode"):
                 d.status, d.updated_at = "offline", now
                 a, new = await alerts.open_alert(s, now, "device_offline", "device", d.id, d.name or d.id)

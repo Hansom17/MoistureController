@@ -15,7 +15,7 @@ class Snapshots:
     def __init__(self, sessions: async_sessionmaker[AsyncSession], pub: Publisher):
         self.sessions, self.pub = sessions, pub
         self.extra_status: dict = {"zigbee2mqtt": "unknown", "coordinator": "unknown", "clock_synced": True}
-        self.join: dict = {"open": False, "ends_at": None, "devices": []}
+        self.join: dict = {"open": False, "ends_at": None, "devices": [], "error": None}
 
     async def get_setting(self, s: AsyncSession, key: str, default=None):
         row = await s.get(Setting, key)

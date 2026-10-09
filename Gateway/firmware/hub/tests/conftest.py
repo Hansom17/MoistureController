@@ -113,7 +113,8 @@ async def rig(tmp_path):
         r.tg_sent.append((token, chat_id, text))
 
     r.seq = 100
-    r.hub = Hub(r.hub_t, r.sessions, r.clock, pub, telegram=fake_telegram)
+    r.hub = Hub(r.hub_t, r.sessions, r.clock, pub, telegram=fake_telegram, engine=r.engine,
+                backup_dir=tmp_path / "backups")
     r.api = Api(r.broker.client(), r.clock)
     r.z2m = Z2M(r.broker.client())
     await r.api.start()

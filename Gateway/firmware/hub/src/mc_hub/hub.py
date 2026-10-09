@@ -9,7 +9,9 @@ from .bus.publisher import Publisher
 from .bus.requests import RequestHandler
 from .bus.transport import Transport
 from .clock import Clock
-from .services import domain, handlers
+from .services import domain, handlers, queries
+from .services.backup import Backup
+from .services.join import Join
 from .services.jobs import Jobs
 from .services.notify import Notifier, Send, telegram_send
 from .services.sender import Sender
@@ -23,18 +25,23 @@ log = logging.getLogger("mc_hub")
 
 class Hub:
     def __init__(self, transport: Transport, sessions: async_sessionmaker[AsyncSession], clock: Clock,
-                 publisher: Publisher, z2m_base: str = "zigbee2mqtt", telegram: Send = telegram_send) -> None:
+                 publisher: Publisher, z2m_base: str = "zigbee2mqtt", telegram: Send = telegram_send,
+                 engine=None, backup_dir=None) -> None:
         self.t, self.sessions, self.clock, self.pub = transport, sessions, clock, publisher
         self.topics = Z2MTopics(z2m_base)
         self.lock = asyncio.Lock()
         self.snapshots = Snapshots(sessions, publisher)
         self.ingest = Ingest(sessions, transport, self.topics, clock)
         self.sender = Sender(sessions, transport, self.topics, clock)
-        self.jobs = Jobs(sessions, clock)
+        self.join = self.ingest.join
+        self.snapshots.join = self.join.state
+        self.backup = Backup(engine, backup_dir) if engine is not None and backup_dir is not None else None
+        self.jobs = Jobs(sessions, clock, self.topics, self.join, self.backup)
         self.notifier = Notifier(sessions, telegram)
         self.requests = RequestHandler(transport, sessions, publisher, clock, self._flush, self.lock)
         domain.register(self.requests)
-        handlers.register(self.requests)
+        handlers.register(self.requests, self)
+        queries.register(self.requests, self.snapshots)
 
     async def start(self) -> None:
         await self.snapshots.publish(NAMES)
@@ -42,6 +49,7 @@ class Hub:
         await self.requests.start()
         await self.t.subscribe(self.topics.bridge_state, self._on_bridge_state)
         await self.t.subscribe(self.topics.bridge_devices, self._on_bridge_devices)
+        await self.t.subscribe(self.topics.bridge_response_permit_join, self._on_permit_join)
         await self.t.subscribe(self.topics.device_state, self._on_device)
         await self.t.subscribe(self.topics.device_availability, self._on_device)
 
@@ -56,6 +64,8 @@ class Hub:
             await self.snapshots.publish(fx.snapshots)
         for note in await self.notifier.deliver(fx.notes):
             await self.pub.event("notification", note)
+        for topic, payload in fx.out:
+            await self.t.publish(topic, payload)
         for did in fx.returned:
             async with self.lock:
                 await self.sender.device_returned(did)
@@ -65,10 +75,22 @@ class Hub:
             for kind, body in more.events:
                 await self.pub.event(kind, body)
 
+    async def _on_permit_join(self, topic: str, payload: bytes) -> None:
+        try:
+            data = json.loads(payload)
+        except ValueError:
+            return
+        if data.get("status") == "error" and self.join.state["open"]:
+            async with self.lock:
+                self.join.close(error=str(data.get("error", "permit_join failed")))
+            await self.pub.event("join", dict(self.join.state))
+            await self.snapshots.publish({"join"})
+
     async def tick(self) -> None:
         """One round of the periodic jobs (the service calls this every second)."""
         async with self.lock:
             fx = await self.jobs.tick()
+            await self.jobs.nightly_backup(int(self.clock.now()))
         await self._flush(fx)
 
     async def _on_bridge_state(self, topic: str, payload: bytes) -> None:

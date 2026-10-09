@@ -208,7 +208,7 @@ flowchart TB
 
 ## 4. Data model (SQLite)
 
-Timestamps are UTC Unix seconds in the databases and ISO 8601 in the API and on the bus. IDs are ULIDs unless noted; devices are identified by their Zigbee IEEE address (`0x00124b…`) and get a stable internal ID `dev-…`. There is **one household** per installation, so no table carries a household column. Each service has its **own SQLite file** (WAL mode, foreign keys on, Alembic migrations); a `hub` row refers to a user only by id, without a foreign key.
+Timestamps are UTC Unix seconds in the databases and on the bus (in `hub` events, snapshots and answers, and in the `from`/`to` of queries); `api` converts them to ISO 8601 for the REST API. IDs are ULIDs unless noted; devices are identified by their Zigbee IEEE address (`0x00124b…`) and get a stable internal ID `dev-…`. There is **one household** per installation, so no table carries a household column. Each service has its **own SQLite file** (WAL mode, foreign keys on, Alembic migrations); a `hub` row refers to a user only by id, without a foreign key.
 
 ### 4.1 `api.db`
 
@@ -645,7 +645,7 @@ There is no shared Python package: `mc_hub` and `mc_api` depend only on the cont
 | Contract | The example messages of `mqtt-contract.yaml` parse with each service's models, and what each service produces validates against the contract. Part B examples parse with `hub`'s adapter models. |
 | API | Access tests per role, setup and invite flows, reauth, login limits; run against a fake `hub` (a script answering requests and publishing snapshots/events from the contract examples), including timeout, `hub` down, duplicate and late answers, `resync`. |
 | Hub requests | Request handler tests: idempotent repeat, expired deadline, ordering per device, error types; run against an in-memory MQTT stand-in that can drop, delay and duplicate messages. |
-| Integration | `api` + `hub` + Mosquitto + a **Zigbee2MQTT simulator** (a script publishing the same topics and payloads as Zigbee2MQTT for a fake PlantModule): join, readings, watering with the module offline and back, config round trip, join with interview failure, rules, restart without losing queued commands. |
+| Integration | `api` + `hub` + Mosquitto + a **Zigbee2MQTT simulator** (`scripts/z2m_sim.py`, also used by the hub tests: it publishes the same topics and payloads as Zigbee2MQTT for a fake PlantModule): join, readings, watering with the module offline and back, config round trip, join with interview failure, rules, restart without losing queued commands. |
 | On hardware | A real PlantModule with the real coordinator; see `PlantModule/specs.md`. |
 
 ## 17. Security summary
@@ -657,7 +657,7 @@ There is no shared Python package: `mc_hub` and `mc_api` depend only on the cont
 
 ## 18. Status and open points
 
-Status: the split into `api` and `hub` (section 3) is the current design. `hub` slices 1 and 2 are implemented in `firmware/hub` (59 tests): database and migration, in-memory and real MQTT transports, request handler with idempotency and deadlines, events and snapshots, Zigbee2MQTT adapter and device reconcile, ingest, alerts, installation/plant/rule/alert/device requests, commands with the full lifecycle, cancel, the sender (online/offline queueing, ttl, one item in flight, retries), configuration revisions with validation against the board descriptions (`firmware/hub/src/mc_hub/boards`, a copy until the firmware exists), rule evaluation, the late/offline/expiry/Zigbee-down jobs, and notifications (`app` events, Telegram). Not yet built: join control, queries, export/backup, and the whole `api` service.
+Status: the split into `api` and `hub` (section 3) is the current design. `hub` slices 1 to 3 are implemented in `firmware/hub` (72 tests): database and migration, in-memory and real MQTT transports, request handler with idempotency and deadlines, events and snapshots, Zigbee2MQTT adapter and device reconcile, ingest, alerts, installation/plant/rule/alert/device requests, commands with the full lifecycle, cancel, the sender (online/offline queueing, ttl, one item in flight, retries), configuration revisions with validation against the board descriptions (`firmware/hub/src/mc_hub/boards`, a copy until the firmware exists), rule evaluation, the late/offline/expiry/Zigbee-down jobs, and notifications (`app` events, Telegram). join control (permit-join window, install code, interview retries, removal), the paged `query/*` requests incl. export chunks, `backup` with a nightly job, and the Zigbee2MQTT/PlantModule simulator `scripts/z2m_sim.py`. Not yet built: the whole `api` service, mDNS, the contract tests against the contract file.
 
 Open points:
 - Zigbee2MQTT behaviour with the custom device (items marked *verify* in 7): publication of transient `cmd_ack`/`event` objects, `install_code/add` payload, `device/interview` and `device/configure` requests, reporting configuration for custom-cluster attributes, whether reporting configuration survives a module reset.

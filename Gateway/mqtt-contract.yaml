@@ -67,7 +67,7 @@ requests:
   rule_delete: {body: {rule_id: string}}
   alert_ack: {body: {alert_id: string}}
   backup: {body: {}}
-  query:                     # topic kind: query/<name>; all paged with limit + cursor
+  query:                     # topic kind: query/<name> (e.g. mc/v1/req/hub/query/readings); all paged with limit + cursor, times are unix seconds
     readings: {body: {plant_id: string, from: datetime, to: datetime, bucket: "raw|hour|day"}}
     commands: {body: {plant_id: "optional", device_id: "optional", status: "optional"}}
     command: {body: {command_id: string}}
