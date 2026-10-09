@@ -1,0 +1,7 @@
+menu "PlantModule Zigbee"
+
+    config MC_ZIGBEE_STUB
+        bool "Use the stub instead of the Zigbee stack (bench tests without a radio)"
+        default n
+
+endmenu
