@@ -1,4 +1,5 @@
 #include "mc_config.h"
+#include "mc_factory.h"
 
 #include <string.h>
 
@@ -134,5 +135,77 @@ bool mc_config_same(const mc_config_t *a, const mc_config_t *b)
             return false;
         }
     }
+    return true;
+}
+
+static void put16(uint8_t *p, uint16_t v)
+{
+    p[0] = (uint8_t)(v & 0xFF);
+    p[1] = (uint8_t)(v >> 8);
+}
+
+static uint16_t get16(const uint8_t *p)
+{
+    return (uint16_t)(p[0] | (p[1] << 8));
+}
+
+size_t mc_config_encode(const mc_config_t *c, uint8_t out[MC_CONFIG_BLOB_SIZE])
+{
+    uint8_t *p = out;
+    *p++ = MC_CONFIG_SCHEMA;
+    put16(p, c->rev), p += 2;
+    put16(p, c->report_interval_s), p += 2;
+    put16(p, c->fast_report_interval_s), p += 2;
+    put16(p, c->fast_report_hold_s), p += 2;
+    put16(p, c->batt_low_mv), p += 2;
+    for (int i = 0; i < MC_NUM_SLOTS; i++) {
+        const mc_slot_cfg_t *s = &c->slots[i];
+        *p++ = s->module;
+        *p++ = s->port;
+        *p++ = s->active_high ? 1 : 0;
+        *p++ = s->samples;
+        put16(p, s->cal_dry), p += 2;
+        put16(p, s->cal_wet), p += 2;
+        put16(p, s->max_run_s), p += 2;
+        put16(p, s->min_pause_s), p += 2;
+    }
+    uint32_t crc = mc_crc32(out, (size_t)(p - out));
+    for (int k = 0; k < 4; k++) {
+        *p++ = (uint8_t)(crc >> (8 * k));
+    }
+    return (size_t)(p - out);
+}
+
+bool mc_config_decode(const uint8_t *buf, size_t len, mc_config_t *out)
+{
+    if (len != MC_CONFIG_BLOB_SIZE || buf[0] != MC_CONFIG_SCHEMA) {
+        return false;
+    }
+    uint32_t want = mc_crc32(buf, len - 4);
+    uint32_t have = (uint32_t)buf[len - 4] | ((uint32_t)buf[len - 3] << 8) | ((uint32_t)buf[len - 2] << 16) |
+                    ((uint32_t)buf[len - 1] << 24);
+    if (want != have) {
+        return false;
+    }
+    const uint8_t *p = buf + 1;
+    mc_config_t c;
+    memset(&c, 0, sizeof c);
+    c.rev = get16(p), p += 2;
+    c.report_interval_s = get16(p), p += 2;
+    c.fast_report_interval_s = get16(p), p += 2;
+    c.fast_report_hold_s = get16(p), p += 2;
+    c.batt_low_mv = get16(p), p += 2;
+    for (int i = 0; i < MC_NUM_SLOTS; i++) {
+        mc_slot_cfg_t *s = &c.slots[i];
+        s->module = *p++;
+        s->port = *p++;
+        s->active_high = *p++ != 0;
+        s->samples = *p++;
+        s->cal_dry = get16(p), p += 2;
+        s->cal_wet = get16(p), p += 2;
+        s->max_run_s = get16(p), p += 2;
+        s->min_pause_s = get16(p), p += 2;
+    }
+    *out = c;
     return true;
 }

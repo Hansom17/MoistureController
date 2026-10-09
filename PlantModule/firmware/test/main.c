@@ -6,6 +6,7 @@ void run_sensing_tests(void);
 void run_command_tests(void);
 void run_config_tests(void);
 void run_fuzz_tests(void);
+void run_hal_logic_tests(void);
 
 void setUp(void) {}
 void tearDown(void) {}
@@ -19,5 +20,6 @@ int main(void)
     run_command_tests();
     run_config_tests();
     run_fuzz_tests();
+    run_hal_logic_tests();
     return UNITY_END();
 }

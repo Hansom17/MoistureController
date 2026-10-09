@@ -44,6 +44,11 @@ def render() -> str:
         out.append(f'    .hw_version = {b["hw_version"]},')
         out.append(f'    .allow_raw_gpio = {"true" if b["allow_raw_gpio"] else "false"},')
         out.append(f'    .port_count = {len(b["ports"])},')
+        led, btn, bat = b.get("led"), b.get("button"), b.get("battery")
+        out.append(f'    .led = {{ .gpio = {led["gpio"] if led else -1}, .active_high = {"true" if not led or led["active_high"] else "false"} }},')
+        out.append(f'    .button = {{ .gpio = {btn["gpio"] if btn else -1}, .active_high = {"false" if not btn or btn["active_low"] else "true"} }},')
+        out.append(f'    .battery_gpio = {bat["gpio"] if bat else -1},')
+        out.append(f'    .battery_divider_x100 = {round(bat["divider"] * 100) if bat else 100},')
         out.append("    .ports = {")
         for p in b["ports"]:
             roles = " | ".join(ROLES[r] for r in p["roles"]) or "0"

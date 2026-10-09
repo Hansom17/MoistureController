@@ -1,0 +1,15 @@
+menu "PlantModule"
+
+    config MC_DEV_BOARD
+        string "Board used when the factory partition is empty (development only)"
+        default ""
+        help
+            A module made by the provisioning tool carries its board name in the factory partition. With this
+            option set (for example "devkitc-1") a board without factory data runs as that board instead of
+            entering safe mode. Leave empty in a release build.
+
+    config MC_DEV_JOIN
+        bool "Join with the default link key when no install code is stored (development only)"
+        default n
+
+endmenu

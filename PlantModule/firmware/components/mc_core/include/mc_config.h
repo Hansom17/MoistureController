@@ -60,4 +60,14 @@ static inline uint16_t mc_cfg_err_wire(mc_cfg_err_t e)
     return (uint16_t)((e.code << 8) | e.slot);
 }
 
+/* Stored form of a configuration (NVS blob): schema byte, fields little endian, CRC32 last. Independent of the
+ * struct layout so that a firmware update can read what an older one wrote. */
+#define MC_CONFIG_SCHEMA 1
+#define MC_CONFIG_BLOB_SIZE 87
+
+size_t mc_config_encode(const mc_config_t *c, uint8_t out[MC_CONFIG_BLOB_SIZE]);
+
+/* False for a wrong length, an unknown schema or a bad CRC. */
+bool mc_config_decode(const uint8_t *buf, size_t len, mc_config_t *out);
+
 #endif

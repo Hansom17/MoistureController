@@ -16,11 +16,21 @@ typedef struct {
 } mc_board_port_t;
 
 /* One PCB revision. The table is generated from firmware/boards/<name>.json (scripts/gen_boards.py). */
+/* A fixed pin of the board; gpio -1 = not present. */
+typedef struct {
+    int8_t gpio;
+    bool active_high; /* LED: on = high; button: pressed = high (false: pressed = low) */
+} mc_board_pin_t;
+
 typedef struct {
     const char *name;
     uint8_t hw_version;
     bool allow_raw_gpio;
     uint8_t port_count;
+    mc_board_pin_t led;
+    mc_board_pin_t button;
+    int8_t battery_gpio;      /* -1: no battery divider */
+    uint16_t battery_divider_x100; /* Vbat = Vpin * divider / 100 */
     mc_board_port_t ports[MC_MAX_PORTS];
 } mc_board_t;
 
