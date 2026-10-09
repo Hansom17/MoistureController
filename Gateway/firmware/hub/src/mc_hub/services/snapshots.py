@@ -8,7 +8,7 @@ from mc_hub.db.models import Alert, Device, Plant, Reading, Rule, Setting
 
 from .views import alert_view, device_view, plant_view, rule_view
 
-NAMES = ("installation", "devices", "plants", "rules", "alerts_open", "join", "status")
+NAMES = ("installation", "devices", "plants", "rules", "alerts_open", "join", "status", "boards")
 
 
 class Snapshots:
@@ -47,6 +47,9 @@ class Snapshots:
         if name == "alerts_open":
             rows = (await s.execute(select(Alert).where(Alert.resolved_at.is_(None)).order_by(Alert.opened_at))).scalars()
             return [alert_view(a) for a in rows]
+        if name == "boards":
+            from .boards import all_boards
+            return list(all_boards().values())
         if name == "join":
             return self.join
         if name == "status":

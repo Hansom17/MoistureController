@@ -13,7 +13,7 @@ from mc_hub.zigbee import adapter
 from mc_hub.zigbee.messages import CmdAck, ConfigState, Event, Status, Telemetry
 from mc_hub.zigbee.topics import Z2MTopics
 
-from . import alerts
+from . import alerts, commands, config_sync, rules
 from .effects import Effects
 from .views import alert_view, device_view
 
@@ -27,6 +27,7 @@ class Ingest:
     def __init__(self, sessions: async_sessionmaker[AsyncSession], transport: Transport,
                  topics: Z2MTopics, clock: Clock) -> None:
         self.sessions, self.t, self.topics, self.clock = sessions, transport, topics, clock
+        self.clock_synced = True
 
     # ---- bridge ----------------------------------------------------------------------------
 
@@ -53,6 +54,9 @@ class Ingest:
                                status=self._join_status(supported, state))
                     s.add(d)
                     known[ieee] = d
+                    if supported:
+                        await s.flush()
+                        config_sync.initial(d, now, s)
                 elif d.deleted_at is None and d.status in ("joining", "join_failed", "unsupported"):
                     new = self._join_status(model_id == MODEL, state)
                     if new != d.status:
@@ -99,6 +103,7 @@ class Ingest:
                 a, new = await alerts.open_alert(s, now, "device_offline", "device", d.id, d.name or d.id)
                 if new:
                     fx.emit("alert", alert_view(a)); fx.touch("alerts_open")
+                    fx.notify(f"{d.name or d.id} is offline", [], "alert", alert_kind="device_offline")
             elif state == "online" and d.status == "offline":
                 d.status, d.updated_at = "online", now
                 await self._resolve(s, fx, now, "device_offline", d)
@@ -121,7 +126,8 @@ class Ingest:
                 return fx
             before = device_view(d)
             has_status = False
-            for m in msgs:
+            order = {Status: 0, ConfigState: 1, CmdAck: 2, Event: 3, Telemetry: 4}
+            for m in sorted(msgs, key=lambda m: order[type(m)]):
                 if isinstance(m, Telemetry):
                     await self._telemetry(s, fx, d, m, now)
                 elif isinstance(m, Status):
@@ -130,15 +136,18 @@ class Ingest:
                 elif isinstance(m, Event):
                     await self._event(s, fx, d, m, now)
                 elif isinstance(m, ConfigState):
-                    self._config_state(d, m)
+                    await config_sync.apply_state(s, fx, now, d, m.cfg_rev, m.cfg_result, m.cfg_error)
                 elif isinstance(m, CmdAck):
-                    pass  # command lifecycle arrives with the commands slice
+                    await commands.apply_ack(s, fx, now, d, m)
             if msgs and any(isinstance(m, Telemetry) and m.seq >= 0 for m in msgs):
                 d.last_seen_at = now
                 if not has_status and d.status in OFFLINE_STATES:
                     d.status = "online"
                 if d.status == "online":
                     await self._resolve(s, fx, now, "device_offline", d)
+            if msgs:
+                fx.kick(d.id)
+                fx.returned.add(d.id)
             d.updated_at = now if device_view(d) != before else d.updated_at
             after = device_view(d)
             if after != before:
@@ -174,6 +183,7 @@ class Ingest:
             fx.emit("reading", {"id": row.id, "device_id": d.id, "slot": r.slot, "plant_id": row.plant_id,
                                 "value": r.value, "raw": r.raw, "error": r.error, "ts": now})
             fx.touch("plants")
+            await rules.evaluate_reading(s, fx, now, row, self.clock_synced)
         d.slots = latest
 
     async def _status(self, s: AsyncSession, fx: Effects, d: Device, m: Status, now: int) -> None:
@@ -186,6 +196,7 @@ class Ingest:
                                              severity="critical", detail={"safe_reason": m.safe_reason})
             if new:
                 fx.emit("alert", alert_view(a)); fx.touch("alerts_open")
+                fx.notify(f"{d.name or d.id} is in safe mode ({m.safe_reason})", [], "alert", alert_kind="device_safe_mode")
         elif m.status == "operational":
             was_safe = d.status == "safe_mode"
             if d.status != "online":
@@ -211,18 +222,11 @@ class Ingest:
         elif m.code == "safety_stop":
             await self._raise(s, fx, now, "safety_stop", "device", d.id, name, {"slot": m.slot}, "critical")
 
-    def _config_state(self, d: Device, m: ConfigState) -> None:
-        d.reported_rev = m.cfg_rev
-        if m.cfg_result == "rejected":
-            d.rejected_rev = d.desired_rev
-            d.config_error = {"raw": m.cfg_error}
-        elif m.cfg_result == "ok":
-            d.config_error = None
-
     async def _raise(self, s, fx: Effects, now, kind, st, sid, name, detail=None, severity="warning") -> None:
         a, new = await alerts.open_alert(s, now, kind, st, sid, name, severity, detail)
         if new:
             fx.emit("alert", alert_view(a)); fx.touch("alerts_open")
+            fx.notify(f"{name}: {kind.replace('_', ' ')}", [], "alert", alert_kind=kind)
 
     async def _resolve(self, s, fx: Effects, now, kind, d: Device) -> None:
         for a in await alerts.resolve_alerts(s, now, kind, "device", d.id):

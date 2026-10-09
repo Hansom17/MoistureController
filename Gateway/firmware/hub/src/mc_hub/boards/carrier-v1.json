@@ -1,0 +1,16 @@
+{
+  "schema": 1,
+  "name": "carrier-v1",
+  "hw_version": 1,
+  "allow_raw_gpio": false,
+  "ports": [
+    {"id": "P1", "gpio": 1, "adc": "ADC1_CH0", "roles": ["moisture", "pump"]},
+    {"id": "P2", "gpio": 2, "adc": "ADC1_CH1", "roles": ["moisture", "pump"]},
+    {"id": "P3", "gpio": 3, "adc": "ADC1_CH2", "roles": ["moisture", "pump"]},
+    {"id": "P4", "gpio": 4, "adc": "ADC1_CH3", "roles": ["moisture", "pump"]}
+  ],
+  "i2c": {"sda": 18, "scl": 19, "switchable_pullups": false},
+  "battery": {"gpio": 5, "divider": 2.0},
+  "led": {"gpio": 20, "active_high": true},
+  "button": {"gpio": 21, "active_low": true}
+}

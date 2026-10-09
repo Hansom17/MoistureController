@@ -9,7 +9,10 @@ from .bus.publisher import Publisher
 from .bus.requests import RequestHandler
 from .bus.transport import Transport
 from .clock import Clock
-from .services import domain
+from .services import domain, handlers
+from .services.jobs import Jobs
+from .services.notify import Notifier, Send, telegram_send
+from .services.sender import Sender
 from .services.effects import Effects
 from .services.ingest import Ingest
 from .services.snapshots import NAMES, Snapshots
@@ -20,14 +23,18 @@ log = logging.getLogger("mc_hub")
 
 class Hub:
     def __init__(self, transport: Transport, sessions: async_sessionmaker[AsyncSession], clock: Clock,
-                 publisher: Publisher, z2m_base: str = "zigbee2mqtt") -> None:
+                 publisher: Publisher, z2m_base: str = "zigbee2mqtt", telegram: Send = telegram_send) -> None:
         self.t, self.sessions, self.clock, self.pub = transport, sessions, clock, publisher
         self.topics = Z2MTopics(z2m_base)
         self.lock = asyncio.Lock()
         self.snapshots = Snapshots(sessions, publisher)
         self.ingest = Ingest(sessions, transport, self.topics, clock)
-        self.requests = RequestHandler(transport, sessions, publisher, clock, self.snapshots.publish, self.lock)
+        self.sender = Sender(sessions, transport, self.topics, clock)
+        self.jobs = Jobs(sessions, clock)
+        self.notifier = Notifier(sessions, telegram)
+        self.requests = RequestHandler(transport, sessions, publisher, clock, self._flush, self.lock)
         domain.register(self.requests)
+        handlers.register(self.requests)
 
     async def start(self) -> None:
         await self.snapshots.publish(NAMES)
@@ -42,14 +49,35 @@ class Hub:
         await self.pub.status("offline")
 
     async def _flush(self, fx: Effects) -> None:
+        """Publish what a committed change produced, then let the sender look at the touched devices."""
         for kind, body in fx.events:
             await self.pub.event(kind, body)
         if fx.snapshots:
             await self.snapshots.publish(fx.snapshots)
+        for note in await self.notifier.deliver(fx.notes):
+            await self.pub.event("notification", note)
+        for did in fx.returned:
+            async with self.lock:
+                await self.sender.device_returned(did)
+        for did in fx.wake:
+            async with self.lock:
+                more = await self.sender.flush(did)
+            for kind, body in more.events:
+                await self.pub.event(kind, body)
+
+    async def tick(self) -> None:
+        """One round of the periodic jobs (the service calls this every second)."""
+        async with self.lock:
+            fx = await self.jobs.tick()
+        await self._flush(fx)
 
     async def _on_bridge_state(self, topic: str, payload: bytes) -> None:
         state = parse_state_value(payload)
         self.snapshots.extra_status["zigbee2mqtt"] = state
+        self.jobs.bridge_state(state)
+        self.sender.zigbee_up = state == "online"
+        if state == "online":
+            await self._flush(Effects(wake=await self._all_device_ids()))
         await self.snapshots.publish({"status"})
 
     async def _on_bridge_devices(self, topic: str, payload: bytes) -> None:
@@ -82,3 +110,9 @@ class Hub:
             log.warning("bad payload on %s", topic)
             return
         await self._flush(fx)
+
+    async def _all_device_ids(self) -> set[str]:
+        from sqlalchemy import select
+        from .db.models import Device
+        async with self.sessions() as s:
+            return {d for (d,) in (await s.execute(select(Device.id).where(Device.deleted_at.is_(None)))).all()}

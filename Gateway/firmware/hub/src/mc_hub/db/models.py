@@ -61,6 +61,10 @@ class ConfigRevision(Base):
     error: Mapped[dict | None] = mapped_column(JSON, nullable=True)
     created_at: Mapped[int] = mapped_column(Integer)
     created_by: Mapped[str | None] = mapped_column(String, nullable=True)
+    sent_at: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    attempts: Mapped[int] = mapped_column(Integer, default=0)
+    last_attempt_at: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    confirmed_at: Mapped[int | None] = mapped_column(Integer, nullable=True)
 
 
 class Plant(Base):
@@ -135,6 +139,8 @@ class Command(Base):
     finished_at: Mapped[int | None] = mapped_column(Integer, nullable=True)
     ends_at: Mapped[int | None] = mapped_column(Integer, nullable=True)
     cancel_of: Mapped[str | None] = mapped_column(String, nullable=True)
+    attempts: Mapped[int] = mapped_column(Integer, default=0)
+    last_attempt_at: Mapped[int | None] = mapped_column(Integer, nullable=True)
     updated_at: Mapped[int] = mapped_column(Integer)
 
 

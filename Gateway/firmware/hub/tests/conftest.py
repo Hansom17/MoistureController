@@ -107,7 +107,13 @@ async def rig(tmp_path):
     await r.hub_t.connect()
     pub = Publisher(r.hub_t, r.clock)
     pub.boot_id = pub0.boot_id
-    r.hub = Hub(r.hub_t, r.sessions, r.clock, pub)
+    r.tg_sent = []
+
+    async def fake_telegram(token, chat_id, text):
+        r.tg_sent.append((token, chat_id, text))
+
+    r.seq = 100
+    r.hub = Hub(r.hub_t, r.sessions, r.clock, pub, telegram=fake_telegram)
     r.api = Api(r.broker.client(), r.clock)
     r.z2m = Z2M(r.broker.client())
     await r.api.start()
@@ -124,3 +130,43 @@ async def add_device(r, name="dev-a", entry=None):
     await r.api.settle()
     dev = r.api.state["state/devices"][0]
     return dev["id"]
+
+
+def sent(rig, dev):
+    """Payloads the hub published to the device's /set topic, in order."""
+    return [json.loads(p) for t, p in rig.broker.log if t == f"zigbee2mqtt/{dev}/set"]
+
+
+async def device_report(rig, dev, **extra):
+    rig.seq += 1
+    if "cfg_rev" in extra:
+        rig.cfg_rev = extra["cfg_rev"]
+    extra.setdefault("cfg_rev", getattr(rig, "cfg_rev", 0))      # a real module always reports the revision it runs
+    await rig.z2m.state(dev, report(seq=rig.seq, **extra))
+    await rig.api.settle()
+
+
+async def ack(rig, dev, cmd_id, state, n, reason="none", ends_in_s=0):
+    await device_report(rig, dev, cmd_ack={"n": n, "cmd_id": cmd_id, "state": state, "reason": reason,
+                                           "ends_in_s": ends_in_s})
+
+
+CFG = {"slots": [{"slot": 0, "module": "moisture", "port": "P1"},
+                 {"slot": 2, "module": "pump", "port": "P3", "max_run_s": 60, "min_pause_s": 600}]}
+
+
+async def ready_device(rig, config=CFG):
+    """A joined module that runs a configuration with a moisture sensor on slot 0 and a pump on slot 2."""
+    dev = await add_device(rig)
+    await device_report(rig, dev, cfg_rev=1, cfg_result="ok")
+    res = await rig.api.request("device_config_put", {"device_id": dev, "base_rev": 1, "config": config})
+    assert res["ok"], res
+    await device_report(rig, dev, cfg_rev=2, cfg_result="ok")
+    return dev
+
+
+async def ready_plant(rig, name="Ficus"):
+    dev = await ready_device(rig)
+    res = await rig.api.request("plant_create", {"name": name, "sensor": {"device_id": dev, "slot": 0},
+                                                 "pump": {"device_id": dev, "slot": 2}})
+    return dev, res["body"]["plant"]

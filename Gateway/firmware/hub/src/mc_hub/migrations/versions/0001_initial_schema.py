@@ -89,6 +89,10 @@ def upgrade() -> None:
     sa.Column('error', sa.JSON(), nullable=True),
     sa.Column('created_at', sa.Integer(), nullable=False),
     sa.Column('created_by', sa.String(), nullable=True),
+    sa.Column('sent_at', sa.Integer(), nullable=True),
+    sa.Column('attempts', sa.Integer(), nullable=False),
+    sa.Column('last_attempt_at', sa.Integer(), nullable=True),
+    sa.Column('confirmed_at', sa.Integer(), nullable=True),
     sa.ForeignKeyConstraint(['device_id'], ['devices.id'], ),
     sa.PrimaryKeyConstraint('device_id', 'rev')
     )
@@ -154,6 +158,8 @@ def upgrade() -> None:
     sa.Column('finished_at', sa.Integer(), nullable=True),
     sa.Column('ends_at', sa.Integer(), nullable=True),
     sa.Column('cancel_of', sa.String(), nullable=True),
+    sa.Column('attempts', sa.Integer(), nullable=False),
+    sa.Column('last_attempt_at', sa.Integer(), nullable=True),
     sa.Column('updated_at', sa.Integer(), nullable=False),
     sa.ForeignKeyConstraint(['device_id'], ['devices.id'], ),
     sa.ForeignKeyConstraint(['plant_id'], ['plants.id'], ),

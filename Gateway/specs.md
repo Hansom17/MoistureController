@@ -657,7 +657,7 @@ There is no shared Python package: `mc_hub` and `mc_api` depend only on the cont
 
 ## 18. Status and open points
 
-Status: the split into `api` and `hub` (section 3) is the current design. `hub` slice 1 is implemented in `firmware/hub` (database and migration, in-memory and real MQTT transports, request handler with idempotency and deadlines, events, snapshots, Zigbee2MQTT adapter, device reconcile, ingest, alerts, installation/plant/rule/alert/device-name requests, 29 tests). Not yet built: commands, sender, config sync, join control, rule evaluation, status jobs, Telegram, export/backup, queries, and the whole `api` service. The previous implementation (WiFi/MQTT gateway and a separate FastAPI server) was removed; it is in git history at commit `eb97b07` and is the reference for the logic listed in 19. The coordinator side was brought up once (7.6).
+Status: the split into `api` and `hub` (section 3) is the current design. `hub` slices 1 and 2 are implemented in `firmware/hub` (59 tests): database and migration, in-memory and real MQTT transports, request handler with idempotency and deadlines, events and snapshots, Zigbee2MQTT adapter and device reconcile, ingest, alerts, installation/plant/rule/alert/device requests, commands with the full lifecycle, cancel, the sender (online/offline queueing, ttl, one item in flight, retries), configuration revisions with validation against the board descriptions (`firmware/hub/src/mc_hub/boards`, a copy until the firmware exists), rule evaluation, the late/offline/expiry/Zigbee-down jobs, and notifications (`app` events, Telegram). Not yet built: join control, queries, export/backup, and the whole `api` service.
 
 Open points:
 - Zigbee2MQTT behaviour with the custom device (items marked *verify* in 7): publication of transient `cmd_ack`/`event` objects, `install_code/add` payload, `device/interview` and `device/configure` requests, reporting configuration for custom-cluster attributes, whether reporting configuration survives a module reset.
@@ -666,6 +666,7 @@ Open points:
 - Whether a separate mobile app needs token registration over discovery beyond the login endpoint.
 - Telegram channel details (message formats, acknowledging from a button).
 - Whether the contract file should generate the request/event models for both services.
+- Rule skip reasons for blocked commands are mapped (`busy` → `pending_command`, `safety_limit` → `daily_limit`, no actuator → `no_pump`); a separate reason for the min-pause block may be better.
 - Size and paging of the `query/export` chunks and of the `devices`/`plants` snapshots for large installations.
 - Browser push notifications from `api` (needs HTTPS).
 - Remote access: VPN/tunnel plus HTTPS, request hardening, push.

@@ -134,10 +134,14 @@ async def test_alert_ack_goes_through_request(rig):
 
 async def test_config_state_sync(rig):
     dev = await add_device(rig)
-    await rig.z2m.state(dev, report(seq=1, cfg_rev=3, cfg_result="ok"))
+    await rig.z2m.state(dev, report(seq=1, cfg_rev=0, cfg_result="ok"))
     await rig.api.settle()
     d = rig.api.state["state/devices"][0]
-    assert d["reported_rev"] == 3 and d["config_sync"] == "in_sync"
+    assert d["reported_rev"] == 0 and d["config_sync"] == "pending"   # the initial revision 1 is still to be applied
+    await rig.z2m.state(dev, report(seq=2, cfg_rev=1, cfg_result="ok"))
+    await rig.api.settle()
+    d = rig.api.state["state/devices"][0]
+    assert d["reported_rev"] == 1 and d["config_sync"] == "in_sync"
 
 
 async def test_bridge_state_in_status_snapshot(rig):

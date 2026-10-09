@@ -12,6 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from mc_hub.clock import Clock
 from mc_hub.db.models import RequestRecord
 from mc_hub.errors import HubError
+from mc_hub.services.effects import Effects
 
 from .envelope import T_REQUEST, V, Actor, Request, dumps, err, ok
 from .publisher import Publisher
@@ -27,14 +28,13 @@ class Ctx:
     actor: Actor
     request_id: str
     now: int
-    events: list[tuple[str, dict]] = field(default_factory=list)
-    snapshots: set[str] = field(default_factory=set)
+    fx: Effects = field(default_factory=Effects)
 
     def emit(self, kind: str, body: dict) -> None:
-        self.events.append((kind, body))
+        self.fx.emit(kind, body)
 
     def touch(self, *names: str) -> None:
-        self.snapshots.update(names)
+        self.fx.touch(*names)
 
 
 HandlerFn = Callable[[Ctx, dict], Awaitable[dict | None]]
@@ -42,10 +42,10 @@ HandlerFn = Callable[[Ctx, dict], Awaitable[dict | None]]
 
 class RequestHandler:
     def __init__(self, transport: Transport, sessions: async_sessionmaker[AsyncSession],
-                 publisher: Publisher, clock: Clock, publish_snapshots: Callable[[set[str]], Awaitable[None]],
+                 publisher: Publisher, clock: Clock, flush: Callable[[Effects], Awaitable[None]],
                  lock: asyncio.Lock | None = None):
         self.t, self.sessions, self.pub, self.clock = transport, sessions, publisher, clock
-        self.publish_snapshots = publish_snapshots
+        self.flush = flush
         self.handlers: dict[str, HandlerFn] = {}
         # Requests are processed one at a time: simple and ordered. One household is small.
         self._lock = lock or asyncio.Lock()
@@ -73,10 +73,7 @@ class RequestHandler:
             answer, ctx = await self._process(kind, req)
         await self.t.publish(req.reply_to, dumps(answer))
         if ctx is not None:
-            for ekind, body in ctx.events:
-                await self.pub.event(ekind, body)
-            if ctx.snapshots:
-                await self.publish_snapshots(ctx.snapshots)
+            await self.flush(ctx.fx)
 
     async def _process(self, kind: str, req: Request) -> tuple[dict, Ctx | None]:
         async with self.sessions() as s:

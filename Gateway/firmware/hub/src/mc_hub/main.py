@@ -30,7 +30,17 @@ async def run(settings: Settings) -> None:
     loop = asyncio.get_running_loop()
     for sig in (signal.SIGINT, signal.SIGTERM):
         loop.add_signal_handler(sig, stop.set)
+    async def ticker() -> None:
+        while True:
+            await asyncio.sleep(1)
+            try:
+                await hub.tick()
+            except Exception:
+                logging.getLogger("mc_hub").exception("job tick failed")
+
+    ticks = asyncio.create_task(ticker())
     await stop.wait()
+    ticks.cancel()
     await hub.stop()
     await transport.close()
     await engine.dispose()
