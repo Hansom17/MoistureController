@@ -3,7 +3,7 @@
 # it the device keys in the database can't be decrypted (§13.4).
 set -eu
 cd "$(dirname "$0")/.."
-mkdir -p secrets/firebase
+mkdir -p secrets
 umask 077
 for name in postgres_password; do
   [ -f "secrets/$name" ] || openssl rand -hex 24 > "secrets/$name"

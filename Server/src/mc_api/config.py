@@ -24,11 +24,9 @@ class Settings:
     # 32 bytes hex; encrypts device PSKs in the database.
     key_encryption_key: str = field(default_factory=lambda: secrets.token_hex(32))
 
-    # "firebase" in every real deployment. "dev" accepts `Bearer dev:<uid>`
-    # tokens and must never be enabled on a public server.
+    # Only "dev" exists: it accepts `Bearer dev:<uid>` tokens and must never be
+    # enabled on a public server. Real login arrives with the hub.
     auth_mode: str = "dev"
-    firebase_credentials: str | None = None
-    firebase_project_id: str | None = None
 
     public_api_url: str = "http://localhost:8000"
     app_url: str = "http://localhost:8420"
@@ -50,7 +48,7 @@ class Settings:
             from urllib.parse import quote
 
             s.database_url = s.database_url.replace("{password}", quote(db_password, safe=""))
-        s.auth_mode = _env("MC_AUTH_MODE", "firebase")
+        s.auth_mode = _env("MC_AUTH_MODE", "dev")
         key = _env("MC_KEY_ENCRYPTION_KEY")
         if key:
             s.key_encryption_key = key
@@ -62,8 +60,6 @@ class Settings:
             s.key_encryption_key = key_file.read_text().strip()
         else:
             raise RuntimeError("MC_KEY_ENCRYPTION_KEY is required")
-        s.firebase_credentials = _env("MC_FIREBASE_CREDENTIALS")
-        s.firebase_project_id = _env("MC_FIREBASE_PROJECT_ID")
         s.public_api_url = _env("MC_PUBLIC_API_URL", s.public_api_url)
         s.app_url = _env("MC_APP_URL", s.app_url)
         s.cors_origins = [o for o in (_env("MC_CORS_ORIGINS", "") or "").split(",") if o]

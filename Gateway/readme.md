@@ -5,7 +5,7 @@ The household's box at home: Mosquitto for the ESP32 devices on the LAN, plus th
 ```
 firmware/   gateway service (src/mc_gateway, tests), Dockerfile, docker-compose.yml, broker/ (Mosquitto image + config)
 hardware/   empty for now
-scripts/    make-secrets.sh, fake_device.py (ESP32 simulator for dev)
+scripts/    make-secrets.sh
 ```
 
 ## Run

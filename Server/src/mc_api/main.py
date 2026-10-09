@@ -15,14 +15,14 @@ from fastapi.middleware.cors import CORSMiddleware
 from mc_core.commands import CommandRejected
 
 from .api import activity, devices, export, gateway, households, me, plants
-from .auth.verify import DevVerifier, FirebaseVerifier, TokenVerifier
+from .auth.verify import DevVerifier, TokenVerifier
 from .config import Settings
 from .context import AppContext
 from .crypto import KeyBox
 from .db.session import create_all, make_engine, make_sessionmaker
 from .errors import Problem, command_rejected_handler, problem_handler, problem_response
 from .jobs import runner
-from .notify.push import FcmPushSender, PushSender
+from .notify.push import PushSender
 from .realtime.bus import EventBus
 
 log = logging.getLogger(__name__)
@@ -40,14 +40,11 @@ def create_app(settings: Settings | None = None, *, verifier: TokenVerifier | No
     settings = settings or Settings.from_env()
 
     if verifier is None:
-        if settings.auth_mode == "dev":
-            log.warning("AUTH MODE 'dev': accepting unsigned dev tokens — never expose this")
-            verifier = DevVerifier()
-        else:
-            verifier = FirebaseVerifier(settings.firebase_credentials,
-                                        settings.firebase_project_id)
-    push: PushSender = (FcmPushSender(verifier.app) if isinstance(verifier, FirebaseVerifier)
-                        else PushSender())
+        if settings.auth_mode != "dev":
+            raise RuntimeError("only MC_AUTH_MODE=dev exists until the hub login is built")
+        log.warning("AUTH MODE 'dev': accepting unsigned dev tokens — never expose this")
+        verifier = DevVerifier()
+    push: PushSender = PushSender()
 
     @asynccontextmanager
     async def lifespan(app: FastAPI):
@@ -114,6 +111,6 @@ def create_app(settings: Settings | None = None, *, verifier: TokenVerifier | No
     async def healthz():
         # Unauthenticated; also the probe of the app's LAN discovery (App/specs.md Part A §6.4).
         return {"ok": True, "service": "moisture-api", "id": settings.instance_id,
-                "auth": "dev" if settings.auth_mode == "dev" else "firebase"}
+                "auth": settings.auth_mode}
 
     return app

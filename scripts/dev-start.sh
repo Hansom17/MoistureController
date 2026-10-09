@@ -2,28 +2,25 @@
 # Starts everything for local testing on this Mac:
 #   API server + PostgreSQL · gateway stack (gateway service + Mosquitto),
 #   enrolled and claimed automatically · seeded household "Dev home"
-#   · simulated plant board on the gateway · web app on http://localhost:8420
+#   · web app on http://localhost:8420  (the plant device simulator is gone; a Zigbee2MQTT simulator is planned)
 #
 #   ./scripts/dev-start.sh            start (and build the web app)
 #   ./scripts/dev-stop.sh [--wipe]    stop (and delete all data)
 #
 # Options: --no-app (skip the web app), --skip-app-build (serve the last build),
-#          --interval N (simulator wake interval in s, default 20),
-#          --moisture N (simulator start moisture in %), --no-open
+#          --no-open
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 DEV="$ROOT/.dev"
 mkdir -p "$DEV"
 
-APP=1 BUILD_APP=1 OPEN=1 INTERVAL=20 MOISTURE=""
+APP=1 BUILD_APP=1 OPEN=1
 while [ $# -gt 0 ]; do
   case "$1" in
     --no-app) APP=0 ;;
     --skip-app-build) BUILD_APP=0 ;;
     --no-open) OPEN=0 ;;
-    --interval) INTERVAL="$2"; shift ;;
-    --moisture) MOISTURE="$2"; shift ;;
     -h|--help) sed -n '2,13p' "$0"; exit 0 ;;
     *) echo "unknown option $1 (see --help)"; exit 1 ;;
   esac
@@ -61,7 +58,7 @@ if ! docker compose version >/dev/null 2>&1; then
 fi
 echo "  $(docker compose version)"
 
-# --- 2. Python (simulator) ----------------------------------------------------------------
+# --- 2. Python environment ----------------------------------------------------------------
 step "Python environment"
 if [ ! -x "$ROOT/.venv/bin/python" ]; then
   # Outside ~/Documents: iCloud hides files in synced venvs, which breaks imports.
@@ -97,21 +94,8 @@ sed 's/^/  /' "$DEV/seed.log"
 HID=$(api "$API/me/households" | field "next(h['id'] for h in d if h['name'] == 'Dev home')")
 connected() { api "$API/households/$HID/gateway" | grep -q '"online":true.*"in_sync":true'; }
 wait_for 90 "the gateway (online, in sync)" connected
-BUNDLE_TARGET=$(field "d['mqtt']['host'] + ':' + str(d['mqtt']['port'])" < "$DEV/bundle.json")
 
-# --- 5. Simulated plant board ------------------------------------------------------------------
-step "Simulated device → gateway at $BUNDLE_TARGET"
-stop_pid simulator
-MOISTURE_ARG=""
-[ -n "$MOISTURE" ] && MOISTURE_ARG="--moisture $MOISTURE"
-# shellcheck disable=SC2086 — MOISTURE_ARG is empty or two words
-nohup "$ROOT/.venv/bin/python" -u "$ROOT/Gateway/scripts/fake_device.py" --bundle "$DEV/bundle.json" \
-  --interval "$INTERVAL" --state "$DEV/simulator-state.json" $MOISTURE_ARG \
-  > "$DEV/simulator.log" 2>&1 &
-echo $! > "$DEV/simulator.pid"
-wait_for 45 "the first wake cycle" grep -q '"sleeping"' "$DEV/simulator.log"
-
-# --- 6. Web app -----------------------------------------------------------------------------------
+# --- 5. Web app -----------------------------------------------------------------------------------
 if [ "$APP" = 1 ]; then
   step "Web app"
   if [ "$BUILD_APP" = 1 ] || [ ! -f "$ROOT/App/build/web/index.html" ]; then
@@ -135,10 +119,8 @@ cat <<EOF
 $(printf '\033[1m')Ready$(printf '\033[0m')
   App          http://localhost:8420            (signed in as $DEV_UID)
   API docs     http://localhost:8000/docs       (token: dev:$DEV_UID)
-  Device       $(field "d['device_id']" < "$DEV/bundle.json") → $BUNDLE_TARGET, wakes every ${INTERVAL}s
 
 Logs
-  simulator    tail -f .dev/simulator.log
   API          docker compose -f Server/docker-compose.yml --env-file Server/.env.dev logs -f api
   gateway      docker compose -f Gateway/firmware/docker-compose.yml --env-file Gateway/firmware/.env.dev logs -f gateway
   gateway CLI  docker compose -f Gateway/firmware/docker-compose.yml --env-file Gateway/firmware/.env.dev exec gateway mc-gateway status

@@ -25,6 +25,6 @@ dart run tool/gen_color_scheme.dart
 
 ## Status
 
-Done: theme + design tokens, dashboard, household switcher, plant detail (chart, water now, commands, rules), devices, device detail, alerts, settings (theme, language), role-aware UI, live-update wiring, DE/EN, gateway screen, BLE pairing wizard with label scanner, API discovery on the LAN with connection banner and Server screen, API repository. Tests cover discovery, the repository, pairing, permissions and the gateway screen.
+Done: theme + design tokens, dashboard, household switcher, plant detail (chart, water now, commands, rules), devices, device detail, alerts, settings (theme, language), role-aware UI, live-update wiring, DE/EN, gateway screen, API discovery on the LAN with connection banner and Server screen, API repository. Tests cover discovery, the repository, permissions and the gateway screen.
 
-Not yet: generated API client (needs the OpenAPI file, which is not committed) and `main_prod.dart`, Firebase login/push, slot editor, sensor calibration wizard, members/invites, export, Widgetbook catalog.
+Removed with the redesign: the BLE pairing wizard and its dependencies. Still to do for the hub design (see `specs.md`): hub login (setup, login, join, tokens), the Zigbee join screen, users and invites, adapting the API repository to the hub API, calibration wizard, export.

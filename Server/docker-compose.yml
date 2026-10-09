@@ -37,19 +37,15 @@ services:
     depends_on:
       postgres: {condition: service_healthy}
     environment:
-      MC_AUTH_MODE: ${MC_AUTH_MODE:-firebase}
+      MC_AUTH_MODE: ${MC_AUTH_MODE:-dev}
       MC_DATABASE_URL: postgresql+asyncpg://mc:{password}@postgres:5432/mc
       MC_DATABASE_PASSWORD_FILE: /run/secrets/postgres_password
       MC_KEY_ENCRYPTION_KEY_FILE: /run/secrets/key_encryption_key
-      MC_FIREBASE_CREDENTIALS: ${MC_FIREBASE_CREDENTIALS:-}
-      MC_FIREBASE_PROJECT_ID: ${MC_FIREBASE_PROJECT_ID:-}
       MC_PUBLIC_API_URL: ${MC_PUBLIC_API_URL:-http://localhost:8000}
       MC_APP_URL: ${MC_APP_URL:-http://localhost:8420}
       MC_CORS_ORIGINS: ${MC_CORS_ORIGINS:-}
       MC_MIN_APP_VERSION: ${MC_MIN_APP_VERSION:-}
     secrets: [postgres_password, key_encryption_key]
-    volumes:
-      - ${MC_FIREBASE_CREDENTIALS_DIR:-./secrets/firebase}:/run/firebase:ro
     ports:
       - "${MC_API_BIND:-127.0.0.1:8000}:8000"
     read_only: true
@@ -63,7 +59,7 @@ services:
     image: python:3.13-alpine
     network_mode: host
     environment:
-      MC_AUTH_MODE: ${MC_AUTH_MODE:-firebase}
+      MC_AUTH_MODE: ${MC_AUTH_MODE:-dev}
       MC_INSTANCE_ID: ${MC_INSTANCE_ID:-mc-local}
       MC_API_PORT: ${MC_API_PORT:-8000}
     volumes: [./scripts/advertise_mdns.py:/advertise_mdns.py:ro]

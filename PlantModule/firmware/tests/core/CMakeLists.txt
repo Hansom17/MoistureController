@@ -16,5 +16,4 @@ execute_process(COMMAND ${Python3_EXECUTABLE}
     COMMAND_ERROR_IS_FATAL ANY)
 set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS
     ${CMAKE_CURRENT_LIST_DIR}/../../../../Gateway/specs.md
-    ${CMAKE_CURRENT_LIST_DIR}/../ble_vectors.json
     ${CMAKE_CURRENT_LIST_DIR}/../../../scripts/gen_contract_examples.py)

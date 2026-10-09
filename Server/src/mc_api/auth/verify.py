@@ -1,6 +1,6 @@
-"""ID token verification (Server/specs.md Part A §5.1)."""
+"""Token verification. Only the unsigned development verifier exists; real login is the hub's own
+(Gateway/specs.md Part A §5)."""
 
-import asyncio
 import time
 from dataclasses import dataclass
 
@@ -35,33 +35,3 @@ class DevVerifier(TokenVerifier):
         stale = len(parts) > 3 and parts[3] == "stale"
         auth_time = int(time.time()) - (3600 if stale else 0)
         return Principal(parts[1], email, True, auth_time, parts[1])
-
-
-class FirebaseVerifier(TokenVerifier):
-    def __init__(self, credentials_path: str | None, project_id: str | None):
-        import firebase_admin
-        from firebase_admin import credentials
-
-        cred = credentials.Certificate(credentials_path) if credentials_path else None
-        options = {"projectId": project_id} if project_id else None
-        self.app = firebase_admin.initialize_app(cred, options, name="mc")
-
-    async def verify(self, token: str, *, check_revoked: bool = False) -> Principal:
-        from firebase_admin import auth
-
-        try:
-            claims = await asyncio.to_thread(
-                auth.verify_id_token, token, app=self.app, check_revoked=check_revoked)
-        except auth.RevokedIdTokenError as e:
-            raise Problem(401, "session_revoked") from e
-        except auth.UserDisabledError as e:
-            raise Problem(401, "account_disabled") from e
-        except Exception as e:
-            raise Problem(401, "invalid_token") from e
-        return Principal(
-            uid=claims["uid"],
-            email=claims.get("email"),
-            email_verified=bool(claims.get("email_verified")),
-            auth_time=int(claims.get("auth_time", 0)),
-            name=claims.get("name"),
-        )

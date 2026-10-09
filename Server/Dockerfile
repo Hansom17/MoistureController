@@ -4,7 +4,7 @@ FROM python:3.13-slim AS build
 WORKDIR /src
 COPY Shared/core core
 COPY Server api
-RUN pip install --no-cache-dir --prefix=/install ./core "./api[firebase]"
+RUN pip install --no-cache-dir --prefix=/install ./core ./api
 
 FROM python:3.13-slim
 COPY --from=build /install /usr/local
