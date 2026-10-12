@@ -18,8 +18,16 @@ spawn() { # name, command...
   nohup "$@" > "$B/$n.log" 2>&1 & echo $! > "$B/$n.pid"
 }
 
+# Reports a service that is not running after the start, with the end of its log.
+check() {
+  for n in "$@"; do
+    alive "$n" || { echo "!! $n did not start:"; tail -5 "$B/$n.log" | cut -c1-200; failed=1; }
+  done
+}
+
 case "${1:-}" in
 start)
+  failed=0
   mkdir -p "$B/z2m/data/external_converters" "$B/hub" "$B/api"
   if [ ! -x "$B/venv/bin/mc-hub" ]; then
     python3 -m venv "$B/venv"; "$B/venv/bin/pip" install -q -e "$REPO/Gateway/firmware/hub" -e "$REPO/Gateway/firmware/api"
@@ -27,6 +35,25 @@ start)
   if [ ! -e "$B/z2m/data/configuration.yaml" ]; then   # first time: take the network of the existing Zigbee2MQTT (read only)
     for f in configuration.yaml coordinator_backup.json database.db; do cp "$Z2M/data/$f" "$B/z2m/data/$f"; done
     sed -i.bak 's#port: 8080#port: 8081#' "$B/z2m/data/configuration.yaml"
+  fi
+  # macOS marks files in a dot-directory as hidden and Python then skips the venv's editable-install .pth files
+  chflags -R nohidden "$B/venv" 2>/dev/null || true
+  # The dongle's device name changes with the USB port it is plugged into: find it instead of trusting the config.
+  conf="$B/z2m/data/configuration.yaml"
+  port="$(sed -n 's/^ *port: *\(\/dev\/[^ ]*\).*/\1/p' "$conf" | head -1)"
+  if [ -n "$port" ] && [ ! -e "$port" ]; then
+    found=( $(ls /dev/cu.usbserial-* 2>/dev/null || true) )
+    if ! ioreg -p IOUSB -l -w0 2>/dev/null | grep -q "SONOFF Dongle"; then
+      echo "!! no SONOFF dongle is connected (looked at the USB bus). Plug it in, then start again."
+      exit 1
+    elif [ "${#found[@]}" = 1 ]; then
+      echo "the dongle is now ${found[0]} (was $port): updating the Zigbee2MQTT configuration"
+      sed -i.bak "s#port: $port#port: ${found[0]}#" "$conf"
+    else
+      echo "!! the dongle is connected but I cannot tell which serial device it is: ${found[*]:-none found}"
+      echo "   Set 'port:' in $conf to the right one."
+      exit 1
+    fi
   fi
   conv="$REPO/Gateway/firmware/zigbee2mqtt/external_converters"
   ln -sfn "$conv/mc-plant.mjs" "$B/z2m/data/external_converters/mc-plant.mjs"
@@ -41,6 +68,8 @@ start)
   sleep 4
   alive api || MC_DATA_DIR="$B/api" MC_PORT="$PORT" MC_BIND=127.0.0.1 MC_WEB_DIR="$REPO/App/build/web" spawn api "$B/venv/bin/mc-api" run
   sleep 4
+  check mosquitto z2m hub api
+  [ "$failed" = 0 ] || { echo "not everything started, see the logs in $B"; exit 1; }
   echo "running: http://127.0.0.1:$PORT   (login in $B/credentials.txt; logs in $B/*.log)"
   grep -h "SETUP CODE" "$B/api.log" 2>/dev/null | tail -1 || true
   echo "open the join window for a new module:"
