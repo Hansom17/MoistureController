@@ -98,7 +98,74 @@ The module is always awake. In the operational state it repeats:
 - After a run a **minimum pause** (`min_pause_s`) applies before the same pump may run again.
 - Outputs come up **off** after any reset.
 
-**Power.** Supplied externally. The battery divider and `batt_low_mv` are reported as information; the `low_battery` event is raised when a connected cell falls below the threshold, with no change in behaviour yet (§18).
+**Power.** Supplied externally (USB, or 5 V / a charger-boost board on J7). The battery level is measured and reported as described in §6.1; the module does not change its behaviour for a low cell except for the pump refusal in §6.1.4.
+
+### 6.1 Battery level detection (plan)
+
+**Status: plan only, nothing of this is implemented.** Today the firmware reads the battery divider every 30 s, reports it in 100 mV units through the Power Configuration cluster and raises `low_battery` once; the rest of this section is the design that replaces that. Goal: the user is told **in time** that a cell is getting low, sees a believable level, and a flat cell never makes a pump run half-way. Scope decided with the project owner: **one Li-ion/LiPo cell (1S)**, detection, reporting and alerts **now** on the always-awake firmware; everything that only matters once the module sleeps stays in §18.
+
+**6.1.1 What is measured and what limits the accuracy**
+
+| Topic | Fact / decision |
+|---|---|
+| Path | Cell (J7 VBAT pin, sense only; the cell's charging and protection are on an external board) → R3/R4 **330 kΩ / 330 kΩ** divider → C7 100 nF → **GPIO5 (ADC1_CH4)**; board description `battery: {gpio: 5, divider: 2.0}`; 4.2 V full gives 2.1 V at the pin (inside the 12 dB range). |
+| Source impedance | 165 kΩ is high for the ADC sample-and-hold. C7 (100 nF) acts as the reservoir, so the reading is stable but must be averaged over several conversions; **verify on the prototype** that a single conversion and an 8-conversion average agree within 10 mV. |
+| ADC accuracy | Use the chip's eFuse-calibrated conversion (curve fitting, as in the HAL today) with 12 dB attenuation. Expected total error about ±50 mV (ADC ±30 mV, resistors 1 % ≈ ±20 mV at 4 V). Good for a threshold and a level, not for a fuel gauge. |
+| Per-device correction | A per-device **`batt_cal_permille`** (default 1000, range 900–1100) multiplies the result, set from a multimeter reading (§6.1.6). It sits in the configuration, so it survives a factory reset only through the hub (factory reset clears the configuration). |
+| No cell connected | Pin below 500 mV after settling means "no cell": state `absent`, voltage reported as 0, **no alerts**. This is the normal case on USB / VIN only. |
+| Charging / USB | The board has no charger sense: while a cell is on a charger the pin shows the charge voltage (up to 4.2 V), so the level looks full and **"charging" cannot be detected**. The app must not claim to know it. A charger-status input is a carrier wishlist item. |
+| Load sag | A running pump pulls the cell down. The "level" is therefore measured **at rest**: no sample while any pump runs and for 5 s after it stopped (the sample is skipped, the previous value stays, `seq` is unaffected). |
+| Strapping pin | GPIO5 is a strapping pin on the C6 (**verify**); the 165 kΩ divider is high impedance and with the cell absent the pin floats to 0 V, so a boot-time problem is not expected, but it is checked in the prototype (§17.1). |
+| Divider current | 330 k + 330 k draws about 5 µA at 3.7 V, permanent; irrelevant now, a switch or a higher resistance belongs to the low-power work (§18). |
+
+**6.1.2 Sampling and filtering (firmware)**
+- One battery sample **with every sensor sample** (every `report_interval_s`, and in fast mode too) plus one at boot, instead of the free-running 30 s timer. So a reading is always aligned with a `seq` and the hub can store it with the moisture value.
+- A sample is the **median of 8 conversions** (calibrated, divided by the divider ratio, multiplied by `batt_cal_permille`). The core then keeps the **median of the last 3 samples** as the reported `batt_mv`, which removes single outliers (radio transmit bursts, a load switching on) without delaying a real trend by more than two intervals.
+- The core stays pure: the HAL delivers raw millivolts at the pin (`BATT_SAMPLE`), the core applies divider, calibration, filter and thresholds, so all of it is host-tested.
+
+**6.1.3 Battery state machine (in the sensing machine)**
+
+| State | Entered when (filtered `batt_mv`) | Leaves when |
+|---|---|---|
+| `absent` | below 500 mV | at or above 500 mV |
+| `ok` | above `batt_low_mv` + hysteresis, or first value above `batt_low_mv` | below `batt_low_mv` |
+| `low` | at or below `batt_low_mv` for **3 consecutive samples** | above `batt_low_mv` + 100 mV (`ok`), or at or below `batt_critical_mv` (`critical`) |
+| `critical` | at or below `batt_critical_mv` for 3 consecutive samples | above `batt_critical_mv` + 100 mV (`low`) |
+
+Defaults: **`batt_low_mv` 3600** (about 10 % at rest for a Li-ion cell) and **`batt_critical_mv` 3400** (a few percent left; the protection circuit of a typical cell cuts off near 3.0 V and the module's regulator needs margin). The current default 3500 changes. Hysteresis 100 mV so a cell recovering after a pump run does not flap. Changing a threshold in the configuration re-evaluates at the next sample. A reset starts in `ok`/`absent` from the first sample; the state is not stored.
+
+**Events** (cluster command `event`, existing counter `n`): `low_battery` (arg = `batt_mv`) once on entering `low`; the new `battery_critical` (arg = `batt_mv`) once on entering `critical`. Recovery has no event: the hub resolves from the reported state.
+
+**6.1.4 Behaviour in `critical`**
+- A `pump_run` is **refused** with the new ack reason `battery_low`, because a pump start on an almost flat cell can brown the module out in the middle of a run (it would come back with the pump off, but the run is lost and the cell is stressed). `pump_stop`, `cancel`, `device_action` and reporting are unaffected. A run that is already running when the state changes finishes.
+- The validation order of §7.5 gets one more step after `slot_not_actuator`: **battery critical → `battery_low`**.
+- No other behaviour changes (no longer intervals): that belongs to low power (§18).
+
+**6.1.5 Interface changes (planned, not yet in `interface.yaml`)**
+
+| Where | Change |
+|---|---|
+| Custom cluster, telemetry | `batt_mv` **0x0138** uint16 (filtered millivolts, 0 when absent), reportable; `batt_state` **0x0139** enum8 (0 absent, 1 ok, 2 low, 3 critical), reportable. The standard Power Configuration `batteryVoltage` (100 mV units) stays for generic clients but is too coarse for the thresholds. |
+| Custom cluster, configuration | `batt_low_mv` default 3600 (was 3500); new `batt_critical_mv` **0x0005** uint16 (default 3400); new `batt_cal_permille` **0x0006** uint16 (default 1000, 900–1100). Config schema 1 → 2: a stored schema-1 configuration is migrated on boot (new fields get their defaults), no re-join. |
+| Enums | `event_code` 8 `battery_critical`; `reason` 8 `battery_low`; new enum `batt_state`. |
+| Reporting (set by the converter) | `batt_mv`: min 60 s, max 600 s, change 20 mV; `batt_state`: min 1 s, max 600 s, any change. Both are numbers/enums, not octet strings, so the stack can report them (§17.1 finding). |
+| MQTT keys | `batt_mv` → `batt_mv` (and `voltage_mv` kept as an alias for the standard attribute), `batt_state` → `batt_state`. |
+
+**6.1.6 Calibration (per device, optional)**
+1. The user measures the cell (or a bench supply on the VBAT pin) with a multimeter and enters the value in the app (Device detail → "Calibrate battery").
+2. The hub computes `permille = measured_mv / uncorrected_mv × 1000` (uncorrected = the reported value divided by the current `batt_cal_permille`), clamps it to 900–1100 and sends a new configuration revision.
+3. The module applies it from the next sample; the app shows the new value when the hub sees it. A reading more than 10 % off is not "calibrated away": the app tells the user to check the wiring instead.
+
+**6.1.7 Tests**
+- **Host tests (`mc_core`):** divider and calibration maths; median filter; state machine including debounce, hysteresis, the 500 mV "absent" rule, threshold change at runtime; sample skipped while a pump runs and 5 s after; `battery_critical` event and `low_battery` once each; `pump_run` refused with `battery_low` in `critical` and a running run unaffected; stored schema-1 configuration migrates.
+- **Hardware (prototype):** a bench supply at 3.0 / 3.4 / 3.6 / 3.9 / 4.2 V against a multimeter (error table, then the calibration step); single conversion versus 8-average at 165 kΩ source impedance; sag during a real pump run; boot with the pin driven and floating (strapping); behaviour on USB with and without a cell.
+- **Converter and hub tests:** see `Gateway/specs.md` §13.1; the app tests are listed in `App/specs.md` §17.
+
+**6.1.8 Open points and risks**
+- The rest-voltage percentage is **only an estimate**; the Li-ion curve is flat between 3.7 and 3.9 V. The app shows it as "about" and the voltage next to it (decided with the project owner).
+- Without a charger sense the module cannot tell "charging" from "full".
+- The default thresholds (3600 / 3400) are a starting point; a measured discharge of the real cell with the real pump decides the final values.
+- Other chemistries (2×AA, LiFePO4) need different dividers, thresholds and curves; the hub's curve table (`Gateway/specs.md` §13.1) is built for that, the module is cell-agnostic apart from the thresholds.
 
 ## 7. State machines
 
@@ -199,7 +266,7 @@ stateDiagram-v2
     Rejected --> [*]
 ```
 
-Validation on `Received`, in this order (first failure wins, the reason goes into the ack): module not in `Operational` or in safe mode → `busy`; `ttl_s` already expired → `expired`; slot not configured as a pump → `slot_not_actuator`; `seconds` > min(`max_run_s`, firmware ceiling) → `limit`; pump in its minimum pause → `min_pause`; pump already running → `busy`. A command id seen before is **not executed twice**: the stored result is acknowledged again.
+Validation on `Received`, in this order (first failure wins, the reason goes into the ack): module not in `Operational` or in safe mode → `busy`; `ttl_s` already expired → `expired`; slot not configured as a pump → `slot_not_actuator`; **battery in `critical` → `battery_low` (planned, §6.1.4)**; `seconds` > min(`max_run_s`, firmware ceiling) → `limit`; pump in its minimum pause → `min_pause`; pump already running → `busy`. A command id seen before is **not executed twice**: the stored result is acknowledged again.
 
 Actuator machine per port: `Off` → `On` (timer `T_PUMP_END`) → `Pause` (timer `T_PUMP_PAUSE`, `min_pause_s`) → `Off`. A stop in `On` goes to `Pause` at once. The actuator machine is the only code that drives the pin; a reset or `ZB_LEFT` or entering safe mode forces `Off`.
 
@@ -342,7 +409,7 @@ Goal: answer the open Zigbee questions on the real board before the real firmwar
 2. Interview and configure by Zigbee2MQTT with a minimal converter: bindings and reporting configuration accepted; reports arrive at the configured intervals; behaviour after a module reset (is the reporting configuration kept?).
 3. Command round trip: Zigbee2MQTT `set` → attribute writes + commit → `cmd_ack`; latency, several writes in a row, lost-frame behaviour.
 4. Fast reporting: explicit reports every 30 s while an output is on.
-5. ADC: read a real moisture sensor and the battery divider; fix the divider ratio and sensor ranges. Pump output: switch a port with an external driver, run timing.
+5. ADC: read a real moisture sensor and the battery divider; fix the divider ratio and sensor ranges (the battery checks are listed in §6.1.7). Pump output: switch a port with an external driver, run timing.
 6. Button: GPIO21 behaviour (short, 3 s, 10 s); LED patterns.
 7. Rejoin: switch the coordinator off and on, move the module out of range; measure rejoin time.
 8. Range: join and report through a wall; check the antenna placement on the carrier.
@@ -367,7 +434,7 @@ Parked on purpose; none of this is part of the first firmware. The state machine
 - **Buffering across sleep:** RTC reading ring buffer, `pend[]` acknowledgements.
 - **Sensor power switching:** power on, settle, read, power off around every read (board description `sensor_power`).
 - **Wake sources:** button on a low-power pin (GPIO0 on a later carrier revision).
-- **Battery:** low-battery behaviour (longer intervals), battery thresholds, charging.
+- **Battery (beyond §6.1):** longer intervals and fewer reports on a low cell, switching the divider off between samples, measuring under radio/pump load while sleeping, a charger-status input, other cell types.
 - **Power budget:** sleep current, energy per wake, awake window length, expected battery life, a measurement template, results table.
 
 ---
@@ -415,7 +482,7 @@ The contract between the PlantModule firmware and the Gateway's Zigbee2MQTT exte
 | 0x0137 | `config_schema` | uint8 | |
 | 0x0140 | `board` | char string (16) | Board name, e.g. `carrier-v1` |
 
-Standard clusters carry battery voltage (0x0001/0x0020, 100 mV units; informational while externally powered).
+Standard clusters carry battery voltage (0x0001/0x0020, 100 mV units; informational while externally powered). **Planned:** millivolt-resolution `batt_mv`, `batt_state`, `batt_critical_mv`, `batt_cal_permille` and the matching event and reason, see Part A §6.1.5.
 
 ## 4. Configuration (Gateway → device)
 

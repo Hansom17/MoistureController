@@ -109,7 +109,7 @@ flowchart TD
 | **Alerts** | Open and closed alerts, acknowledge | ack: member | built |
 | **Users & invites** | Users with roles; change role / remove; create invite → link + QR (copy, share); open invites with revoke | admin (admins: owner) | built |
 | **My devices** | The user's tokens (name, created, last used); revoke; change password | — | built |
-| **Installation** | Name, timezone, battery threshold; notifier settings (Telegram token and chat id, no test message yet); ownership transfer is in Users | owner | built |
+| **Installation** | Name, timezone, battery thresholds (low / critical, plan §10.1); notifier settings (Telegram token and chat id, no test message yet); ownership transfer is in Users | owner | built |
 | **Gateway status** | Zigbee2MQTT and coordinator state, hub version, clock, database size, backup now | viewer; backup: admin | built (as Gateway screen), adapt |
 | **Export / backup** | Start export, download ZIP (browser download; owner, password needed); backup now (admin) | owner / admin | built |
 | **Settings** | Theme, language, sign out; on the fake backend: demo role switch | — | built |
@@ -188,6 +188,21 @@ Component library and palette: Part B.
 - Device-level fields: `report_interval_s` (10–3600 s, default 300), `fast_report_interval_s` (10–300 s, default 30, used while watering) and `fast_report_hold_s` (0–1800 s, default 120). The editor shows that a change is applied as soon as the device confirms it ("pending until the device reports the new revision").
 - Save = `PUT …/config` with `base_rev`; validation errors (422) show on the affected slot.
 - **Planned:** the calibration wizard (capture *dry* and *wet* with `sensor_sample`, review, save as a new revision). It needs the firmware command and a hub endpoint.
+### 10.1 Battery display and calibration (plan)
+
+**Status: plan only.** Source of the data and the rules: `Gateway/specs.md` §13.1, module side `PlantModule/specs.md` §6.1 (one Li-ion/LiPo cell). The app shows what the snapshot says and never computes a level itself.
+
+- **What is shown where**
+  - **Plant card and device list:** a battery chip next to the status chip, only when the device has a cell (`present`): icon + **"about 72 %"** and the colour of the state (`ok` neutral, `low` `warning`, `critical` `error`). Without a cell (`absent`, USB only) **no chip at all**, not "0 %". A percentage that is `null` (stale report) shows the icon with "—".
+  - **Device detail, new "Battery" card:** voltage in volts with two decimals (tabular figures), "about NN %", the state in words (OK / Low / Critical / No battery), a **battery chart** from the stored reports (24 h / 7 d / 30 d, same range control as the moisture chart, thresholds drawn as the two dashed lines), and the text "Charging cannot be detected." as a hint when the voltage is above 4.1 V. A line "Calibrated" with the correction (for example +1.3 %) when `batt_cal_permille` ≠ 1000.
+  - **Alerts:** `battery_low` (warning) and `battery_critical` (critical) in the list with the device name and the voltage at the time; acknowledge as for other alerts.
+  - **Watering refused:** when a command comes back "battery low" the plant page shows it in the command history with the reason text "Battery too low to water" and, on the **Water now** sheet, a hint while the plant's device is `critical` (the button stays enabled: the module decides).
+- **Installation settings:** two number fields **"Battery low (mV)"** (default 3600) and **"Battery critical (mV)"** (default 3400) with the check `3000 ≤ critical < low ≤ 4000` and the sentence "Applied to all devices as soon as they confirm it"; the cell type is shown as read-only "Li-ion / LiPo, one cell".
+- **Calibrate battery (device detail, admin):** a dialog that shows the value the module reports now, asks for the value measured with a multimeter (volts, two decimals), and sends it (`POST /devices/{id}/battery/calibrate`); the dialog states the limit (10 %) and shows the hub's error text if the value is further off. Result appears through the normal "configuration pending until the device confirms" state.
+- **States and wording (l10n):** OK, Low, Critical, No battery; "about NN %"; "Battery too low to water". No colour alone: the icon changes (full, low, alert, none) and the text states the level.
+- **Fake repository:** the simulated devices get a cell with a slowly falling voltage, one device in `low`, one `absent` and one that reaches `critical` during a demo run, so every state can be seen without hardware.
+- **Widget tests:** the chip per state (including none and stale), the Battery card and its chart range, the settings validation, the calibration dialog (accepts, rejects more than 10 % off, shows the server error), the refused-watering text.
+
 
 ## 11. Adding a device (Zigbee join)
 
@@ -270,6 +285,8 @@ App/
 | On hardware | Joining and configuring a real PlantModule from the web app. |
 
 ## 17. Open points
+
+- Battery display and calibration (§10.1) are planned, not built; the percentage is an estimate from the hub.
 
 - The build and serve setup of Flutter web without a CDN (**verify** flags; also check `go_router` URL strategy when served from the hub root).
 - Generated API client from the hub's OpenAPI.
