@@ -106,3 +106,23 @@ jobs:
           . "$IDF_PATH/export.sh"
           idf.py set-target esp32c6
           idf.py build
+
+  web-build:
+    name: Web build (downloadable for the gateway)
+    needs: app          # only a tested app is published
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: "3.41.6"
+          channel: stable
+          cache: true
+      - run: App/scripts/build_web.sh
+      # the artifact holds the files the api serves: unzip it into App/build/web on the gateway device
+      - uses: actions/upload-artifact@v4
+        with:
+          name: moisture-web
+          path: App/build/web
+          retention-days: 30
+          if-no-files-found: error

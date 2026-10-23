@@ -10,7 +10,7 @@ The one command that does steps 5 and 6 is `Gateway/scripts/install.sh` (`--chec
 |---|---|
 | **A small computer** | Raspberry Pi 4/5 (2 GB is enough) or any mini PC or old laptop. 64-bit (arm64 or amd64), wired network preferred, 8 GB free disk. |
 | **Zigbee coordinator** | The SONOFF Dongle Plus MG24 (EmberZNet, adapter `ember`) used during development. Plug it into a USB port, ideally on a short extension cable away from the computer and from USB 3 devices (interference). |
-| **A computer with Flutter** | Only to build the web app once (step 4). Or copy a prebuilt `App/build/web` from someone who has built it. |
+| **The web app** | Either download the build that CI publishes (no Flutter needed) or build it on a computer with Flutter (step 4). |
 | **Your network** | The gateway only needs your home network. It needs **no cloud and no account**. Do not expose its port to the internet. |
 
 ## 2. Prepare the device
@@ -36,14 +36,26 @@ git clone <your repository> moisture && cd moisture
 ```
 Without a remote, copy the folder from your computer instead (`rsync -a --exclude .git --exclude App/build ./ moisture@<device>:moisture/`). The gateway needs `Gateway/` only; `App/build/web` comes in the next step.
 
-## 4. Build and copy the web app (on your computer)
+## 4. Get the web app onto the device
 
+The web build is plain files that the `api` serves; nothing is baked into it, it talks to the server it was loaded from. Repeat this step whenever the app changes. Pick one way:
+
+**A. Download what CI built** (no Flutter needed). Every run of the CI workflow publishes the artifact **`moisture-web`** (kept 30 days) once the app tests pass:
 ```bash
-cd App
-flutter build web --release --no-web-resources-cdn
-rsync -a build/web/ moisture@<device>:moisture/App/build/web/
+# on the device, in the repository (needs `gh auth login` once); the newest run of the branch:
+gh run list --branch redesign-zigbee-hub --workflow CI --limit 1       # note the run id
+gh run download <run id> -n moisture-web -D App/build/web
 ```
-The web build is plain files that the `api` serves; nothing is baked into it, it talks to the server it was loaded from. Repeat this step whenever the app changes.
+Or open the run in the browser (repository → Actions → the run → Artifacts → `moisture-web`), download the zip on your computer and copy it over: `unzip moisture-web.zip -d App/build/web`.
+
+**B. Build it yourself** on a computer with Flutter and copy it:
+```bash
+App/scripts/build_web.sh                  # builds App/build/web and App/build/moisture-web.tar.gz
+rsync -a App/build/web/ moisture@<device>:moisture/App/build/web/
+```
+(or copy the archive and `tar -xzf moisture-web.tar.gz -C App/build`.)
+
+Check what you have with `cat App/build/web/build-info.txt` (commit, build time, Flutter version); the same file is served at `http://<device>/build-info.txt`. To apply a new build to a running gateway nothing needs restarting: the `api` reads the files on every request, reload the page.
 
 ## 5. Plug in the dongle and install
 
@@ -93,7 +105,7 @@ In the app, **Settings → Gateway** shows Zigbee2MQTT, the coordinator, the hub
 
 | Task | Command (in `Gateway/firmware`) |
 |---|---|
-| **Update** | `git pull`, rebuild the web app (step 4) if the app changed, then `docker compose up -d --build`. The databases migrate themselves. |
+| **Update** | `git pull`, get the new web app (step 4) if the app changed, then `docker compose up -d --build`. The databases migrate themselves. |
 | **Backup** | `../scripts/backup.sh` copies the databases and the whole Zigbee2MQTT data (**the network key: without it every module has to join again**). Run it before updates and keep the folder off the device. The hub also makes a nightly copy of its database. |
 | **Restore Zigbee data** | `docker compose down`, then `docker run --rm -v moisture_z2m-data:/data -v "$PWD/<backup>/z2m-data:/in" alpine cp -r /in/. /data/`, then `docker compose up -d`. |
 | **Logs** | `docker compose logs -f hub` (or `api`, `zigbee2mqtt`, `mosquitto`) |

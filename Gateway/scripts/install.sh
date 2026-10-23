@@ -54,7 +54,7 @@ fi
 if [ -f "$web/index.html" ]; then
   ok "web build in $web"
 else
-  bad "no web build at $web: build it on a computer with Flutter (cd App && flutter build web --release --no-web-resources-cdn) and copy App/build/web here, or pass --web DIR"
+  bad "no web build at $web: download the CI artifact moisture-web or build it (App/scripts/build_web.sh), see Gateway/INSTALL.md step 4, or pass --web DIR"
 fi
 
 # --- Zigbee dongle --------------------------------------------------------------------------------------------
