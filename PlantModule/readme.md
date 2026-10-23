@@ -66,6 +66,44 @@ That writes the bootloader, the partition table and the app and **keeps the sett
 python -m esptool --port /dev/cu.usbmodem1101 write-flash 0x20000 build/plantmodule.bin
 ```
 
+### Flashing all partitions (a new module, or a clean start)
+
+`idf.py flash` writes the bootloader, the partition table, OTA data and the app. The **data partitions** are not written: `nvs` (settings, counters), `factory` (board name, serial, install code) and the Zigbee storage `zb_storage`/`zb_fct`. The layout is in `firmware/partitions.csv`:
+
+| Partition | Offset | Size | Written by |
+|---|---|---|---|
+| bootloader | `0x0` | | `idf.py flash` |
+| partition table | `0x8000` | | `idf.py flash` |
+| `nvs` | `0x9000` | `0x6000` | the firmware at run time |
+| `otadata` | `0xf000` | `0x2000` | `idf.py flash` |
+| `phy_init` | `0x11000` | `0x1000` | the firmware at run time |
+| `factory` | `0x12000` | `0x1000` | **`scripts/factory_image.py`, below** |
+| `zb_storage`, `zb_fct` | `0x13000`, `0x17000` | `0x4000`, `0x1000` | the Zigbee stack at run time |
+| `ota_0` (the app) | `0x20000` | `0x1a0000` | `idf.py flash` |
+
+**A module from scratch** (all partitions, including the factory data):
+
+```bash
+python -m esptool --port /dev/cu.usbmodem1101 erase-flash                      # wipes everything, also the factory data
+../scripts/factory_image.py --board carrier-v1 --serial MC000001 --out factory.bin
+idf.py -p /dev/cu.usbmodem1101 flash                                           # bootloader, table, otadata, app
+python -m esptool --port /dev/cu.usbmodem1101 write-flash 0x12000 factory.bin # the factory partition
+```
+
+`scripts/factory_image.py` builds the 4 KB image of the `factory` partition (layout in `specs.md` §10 and `mc_factory.h`; the C parser accepts what it writes). Add `--install-code <32 hex characters>` for a module that must use an install code and `--require-install-code` so that it refuses to join without one. Keep the install code and the image out of git: the code is a secret, and the gateway needs the same code to accept the module.
+
+Without factory data a module enters safe mode (`factory_invalid`), unless it is a bench build (`sdkconfig.dev`), which runs as `carrier-v1`. A module with factory data is not touched by a normal `idf.py flash`, and a factory reset (10 s button) keeps it.
+
+**One file** (for a production line, or to flash from another machine that has no ESP-IDF):
+
+```bash
+idf.py merge-bin                       # build/merged-binary.bin: bootloader, table, otadata and app in one image
+python -m esptool --port /dev/cu.usbmodem1101 write-flash 0x0 build/merged-binary.bin
+python -m esptool --port /dev/cu.usbmodem1101 write-flash 0x12000 factory.bin     # then the factory data
+```
+
+The merged image **fills the gaps between its parts with `0xFF`**, so writing it also **erases `nvs`, `factory` and the Zigbee storage**: the module forgets its settings and its network, and the factory data must be written again afterwards (the last line). Use it only for a clean start, never as an update of a module in use.
+
 ### 5. Look at the log
 
 ```bash
