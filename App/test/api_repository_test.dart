@@ -359,6 +359,11 @@ void main() {
     expect(last('DELETE', '/devices/dev-abc').queryParameters['force'], true);
   });
 
+  test('report now is a device action with its own name', () async {
+    await repo.deviceAction('dev-abc', DeviceAction.reportNow);
+    expect(api.bodies['POST /devices/dev-abc/actions'], {'action': 'report_now'});
+  });
+
   group('battery', () {
     test('the battery object of a device is parsed, without one the device has none', () async {
       api.respond = (o) => o.path == '/devices'

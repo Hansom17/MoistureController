@@ -33,6 +33,23 @@ class PlantDetailScreen extends StatelessWidget {
             appBar: AppBar(
               title: Text(plant.value?.name ?? ''),
               actions: [
+                if (plant.value != null && can(user.role, AppAction.identifyDevice))
+                  Consumer(
+                    builder: (context, ref, _) {
+                      final device = ref.watch(devicesProvider).value?.where((d) => d.id == plant.value!.deviceId).firstOrNull;
+                      return PopupMenuButton<String>(
+                        tooltip: context.l10n.plantMenu,
+                        onSelected: (_) => readNow(context, ref, device!),
+                        itemBuilder: (_) => [
+                          PopupMenuItem(
+                            value: 'read',
+                            enabled: device != null && device.reachable,
+                            child: Text(context.l10n.readNow),
+                          ),
+                        ],
+                      );
+                    },
+                  ),
                 if (plant.value != null && can(user.role, AppAction.editPlants))
                   IconButton(
                     tooltip: context.l10n.editPlant,
@@ -130,11 +147,27 @@ class _Overview extends ConsumerWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    plant.lastReadingAt == null
-                        ? l.noReading
-                        : l.lastReading(formatAgo(l, plant.lastReadingAt!)),
-                    style: theme.textTheme.bodyMedium,
+                  Row(
+                    children: [
+                      Flexible(
+                        child: Text(
+                          plant.lastReadingAt == null
+                              ? l.noReading
+                              : l.lastReading(formatAgo(l, plant.lastReadingAt!)),
+                          style: theme.textTheme.bodyMedium,
+                        ),
+                      ),
+                      if (device != null)
+                        RoleGate(
+                          role: role,
+                          action: AppAction.identifyDevice,
+                          builder: (context, allowed) => IconButton(
+                            tooltip: l.readNow,
+                            icon: const Icon(Icons.refresh),
+                            onPressed: allowed && device.reachable ? () => readNow(context, ref, device) : null,
+                          ),
+                        ),
+                    ],
                   ),
                   const SizedBox(height: Spacing.sm),
                   if (device != null) ...[
@@ -392,5 +425,15 @@ class _RuleTile extends ConsumerWidget {
         ),
       ],
     );
+  }
+}
+
+/// Asks the module for a fresh sample and report; the new value arrives through the live updates.
+Future<void> readNow(BuildContext context, WidgetRef ref, Device device) async {
+  try {
+    await ref.read(actionsProvider).deviceAction(device.id, DeviceAction.reportNow);
+    if (context.mounted) showSnackBar(context, context.l10n.readingRequested);
+  } catch (e) {
+    if (context.mounted) showErrorSnackBar(context, e);
   }
 }

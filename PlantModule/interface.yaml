@@ -149,7 +149,7 @@ enums:
   cfg_result:   {0: ok, 1: rejected}
   ack_state:    {0: running, 1: done, 2: failed, 3: rejected, 4: cancelled}
   reason:       {0: none, 1: expired, 2: busy, 3: limit, 4: min_pause, 5: slot_not_actuator, 6: slot_not_sensor, 7: hw_error, 8: battery_low}
-  device_action: {1: identify, 2: reboot, 3: clear_safe_mode}
+  device_action: {1: identify, 2: reboot, 3: clear_safe_mode, 4: report_now}   # report_now: sample now and report at once
   event_code:   {1: boot, 2: low_battery, 3: sensor_fault, 4: sensor_ok, 5: safety_stop, 6: safe_mode, 7: config_rejected, 8: battery_critical}
   batt_state:   {0: absent, 1: ok, 2: low, 3: critical}
   cfg_error:    {1: port_invalid, 2: port_conflict, 3: out_of_range, 4: busy, 5: stale_rev, 6: schema_unknown, 7: role_unsupported}

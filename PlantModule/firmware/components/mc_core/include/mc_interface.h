@@ -157,6 +157,7 @@ typedef enum {
     MC_DEVICE_ACTION_IDENTIFY = 1,
     MC_DEVICE_ACTION_REBOOT = 2,
     MC_DEVICE_ACTION_CLEAR_SAFE_MODE = 3,
+    MC_DEVICE_ACTION_REPORT_NOW = 4,
 } mc_device_action_t;
 
 typedef enum {

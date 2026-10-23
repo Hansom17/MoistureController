@@ -139,5 +139,6 @@ test('device actions', () => {
   assert.equal(codec.encodeDeviceAction('identify'), 1);
   assert.equal(codec.encodeDeviceAction('reboot'), 2);
   assert.equal(codec.encodeDeviceAction('clear_safe_mode'), 3);
+  assert.equal(codec.encodeDeviceAction('report_now'), 4);
   assert.throws(() => codec.encodeDeviceAction('format'), /not one of/);
 });

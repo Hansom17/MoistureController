@@ -204,3 +204,18 @@ async def test_battery_flow_calibration_thresholds_and_the_refused_run(stack: St
             break
         await stack.settle(2)
     assert c["status"] == "failed" and c["reason"] == "battery_low"
+
+
+async def test_report_now_is_allowed_for_a_member_and_makes_the_module_report(stack: Stack):
+    owner = await stack.setup_owner()
+    member, _ = await stack.user(owner, "member")
+    viewer, _ = await stack.user(owner, "viewer")
+    admin, _ = await stack.user(owner, "admin")
+    dev = await join_device(stack, admin)
+    module = next(iter(stack.sim.modules.values()))
+    assert (await stack.post(f"/devices/{dev}/actions", viewer, {"action": "report_now"})).status_code == 403
+    assert (await stack.post(f"/devices/{dev}/actions", member, {"action": "reboot"})).status_code == 403
+    seq = module.seq
+    r = await stack.post(f"/devices/{dev}/actions", member, {"action": "report_now"})
+    assert r.status_code == 202, r.text
+    await stack.until(lambda: module.seq > seq)

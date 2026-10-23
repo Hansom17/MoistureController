@@ -26,6 +26,7 @@ void mc_lifecycle_reboot(mc_core_t *c, mc_actions_t *out, bool clear_crash);
 void mc_sense_start(mc_core_t *c, mc_actions_t *out);
 void mc_sense_stop(mc_core_t *c, mc_actions_t *out);
 void mc_sense_rearm(mc_core_t *c, mc_actions_t *out);
+void mc_sense_sample_now(mc_core_t *c, mc_actions_t *out);
 void mc_sense_on_timer(mc_core_t *c, mc_actions_t *out, mc_timer_t id, uint8_t arg);
 void mc_sense_on_adc(mc_core_t *c, mc_actions_t *out, uint8_t slot, bool ok, uint16_t raw);
 void mc_sense_on_report_result(mc_core_t *c, mc_actions_t *out);

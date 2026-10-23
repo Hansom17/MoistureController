@@ -268,6 +268,9 @@ static void device_action(mc_core_t *c, mc_actions_t *out, const mc_cmd_t *cmd)
             mc_lifecycle_reboot(c, out, true);
         }
         break;
+    case MC_DEVICE_ACTION_REPORT_NOW:
+        mc_sense_sample_now(c, out);
+        break;
     default:
         break;
     }

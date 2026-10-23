@@ -1211,4 +1211,14 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get batteryLevel => 'Level (estimate)';
+
+  @override
+  String get plantMenu => 'Plant menu';
+
+  @override
+  String get readNow => 'Read now';
+
+  @override
+  String get readingRequested =>
+      'Reading requested. It arrives in a few seconds.';
 }

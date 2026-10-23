@@ -744,7 +744,8 @@ export default {
     "device_action": {
       "1": "identify",
       "2": "reboot",
-      "3": "clear_safe_mode"
+      "3": "clear_safe_mode",
+      "4": "report_now"
     },
     "event_code": {
       "1": "boot",

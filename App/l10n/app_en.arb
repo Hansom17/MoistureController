@@ -722,5 +722,8 @@
   "commandFailedBattery": "Battery too low to water",
   "waterBatteryHint": "This module's battery is critical: it will refuse to water.",
   "batteryVoltage": "Voltage",
-  "batteryLevel": "Level (estimate)"
+  "batteryLevel": "Level (estimate)",
+  "plantMenu": "Plant menu",
+  "readNow": "Read now",
+  "readingRequested": "Reading requested. It arrives in a few seconds."
 }

@@ -1217,4 +1217,14 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get batteryLevel => 'Stand (geschätzt)';
+
+  @override
+  String get plantMenu => 'Pflanzenmenü';
+
+  @override
+  String get readNow => 'Jetzt messen';
+
+  @override
+  String get readingRequested =>
+      'Messung angefordert. Der Wert kommt in wenigen Sekunden.';
 }

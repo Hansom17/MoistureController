@@ -16,12 +16,16 @@ class PlantCard extends StatelessWidget {
     this.device,
     this.hasPendingCommand = false,
     this.onTap,
+    this.onReadNow,
   });
 
   final Plant plant;
   final Device? device;
   final bool hasPendingCommand;
   final VoidCallback? onTap;
+
+  /// Shown as a menu entry when set (the caller decides who may and whether the device is reachable).
+  final VoidCallback? onReadNow;
 
   @override
   Widget build(BuildContext context) {
@@ -91,6 +95,12 @@ class PlantCard extends StatelessWidget {
                   ],
                 ),
               ),
+              if (onReadNow != null)
+                PopupMenuButton<String>(
+                  tooltip: l.plantMenu,
+                  onSelected: (_) => onReadNow!(),
+                  itemBuilder: (_) => [PopupMenuItem(value: 'read', child: Text(l.readNow))],
+                ),
             ],
           ),
         ),

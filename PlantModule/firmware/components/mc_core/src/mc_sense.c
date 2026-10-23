@@ -48,6 +48,15 @@ void mc_sense_rearm(mc_core_t *c, mc_actions_t *out)
     }
 }
 
+/* device_action report_now: start a sample at once (it ends with an explicit report). A sample that is already running
+ * ends with one anyway; the interval then continues from the end of this sample. */
+void mc_sense_sample_now(mc_core_t *c, mc_actions_t *out)
+{
+    if (c->sn_active && c->sn != MC_SN_SAMPLING) {
+        mc_arm(out, MC_TIMER_SAMPLE, 0, 1);
+    }
+}
+
 void mc_fast_enter(mc_core_t *c, mc_actions_t *out)
 {
     mc_cancel(out, MC_TIMER_FAST_HOLD, 0);

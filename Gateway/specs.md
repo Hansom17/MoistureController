@@ -726,7 +726,7 @@ This part fixes **what the hub understands** from a device, independent of how Z
 | `cmd_ack` | `n`, `cmd_id`, `state` (`running` / `done` / `failed` / `rejected` / `cancelled`), `reason`, `ends_in_s` | Cluster command `cmd_ack` from the module |
 | `config_state` | `cfg_rev`, `cfg_result`, `cfg_error` (code, slot) | Attribute reports `cfg_*` |
 | desired config | revision, intervals, slot table | `set` key `config` → attribute writes + `commit_config` |
-| commands | `pump.run`, `pump.stop`, `cmd.cancel`, `device.identify`, `device.reboot`, `device.clear_safe_mode` (`sensor.sample` planned) | `set` keys `pump_run`, `pump_stop`, `cancel`, `device_action` → cluster commands |
+| commands | `pump.run`, `pump.stop`, `cmd.cancel`, `device.identify`, `device.reboot`, `device.clear_safe_mode`, `device.report_now` (`sensor.sample` planned) | `set` keys `pump_run`, `pump_stop`, `cancel`, `device_action` → cluster commands |
 
 Rules that hold whatever the encoding:
 - Every command has an id and a time to live; the module drops expired ones and never executes an id twice.

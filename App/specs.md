@@ -105,7 +105,7 @@ flowchart TD
 | **Plant detail** | Chart (24 h / 7 d / 30 d / 1 y), **Water now** (seconds picker within the pump's limits), command history, rules list + editor, rule executions ("why did / didn't it water?") | water, rules: member | built |
 | **Devices** | List with status, battery, link quality, firmware, config sync state | viewer | built |
 | **Add device** | Opens the join window (`POST /devices/join`) with an optional install code field and a countdown; the new device appears live and is named and configured right there | admin | built (replaces the BLE wizard) |
-| **Device detail** | Slot editor (§10), report intervals, health chart, diagnostics (uptime, boot reason, resets, rejoins, last error, firmware and interface version), events, identify / reboot / clear safe mode, remove | identify: member; rest: admin | built |
+| **Device detail** | Slot editor (§10), report intervals, health chart, diagnostics (uptime, boot reason, resets, rejoins, last error, firmware and interface version), events, read now / identify / reboot / clear safe mode, remove | identify: member; rest: admin | built |
 | **Alerts** | Open and closed alerts, acknowledge | ack: member | built |
 | **Users & invites** | Users with roles; change role / remove; create invite → link + QR (copy, share); open invites with revoke | admin (admins: owner) | built |
 | **My devices** | The user's tokens (name, created, last used); revoke; change password | — | built |
@@ -166,6 +166,7 @@ Commands and configuration reach the module through the hub and Zigbee, so the r
 - **Water now:** the command appears immediately as *Queued*; with the device online it moves within a second or two to *Running until …* and *Done* (live updates). If the device is offline the command stays *Queued — device offline* until it returns or its time to live ends (*Expired*). States: *Queued / Running / Done / Failed (reason) / Expired / Cancelled*. A queued or running command can be cancelled or stopped ("best effort, may already have run").
 - **Config changes:** the device shows *Pending (rev 8)* until it reports the revision it runs. *Rejected* shows the module's error (for example "port P3 cannot drive this module") with a button to revert the form to the reported config.
 - **Zigbee/gateway trouble:** a banner on all screens ("Zigbee is not running — data and commands are paused"); devices are not marked offline meanwhile.
+- **Read now:** the plant page has a refresh button next to "Last reading …" (and the device detail a "Read now" action) that sends the device action `report_now` (member); the module takes a fresh sample and reports at once, the new value arrives through the live updates a second or two later. Disabled for viewers and for devices that are not reachable.
 - **Late / offline / safe mode devices:** a status chip with "last seen 2 h ago" and the link quality; a device in safe mode shows the reason and a "clear safe mode" action for admins.
 
 ## 8. Role-aware UI

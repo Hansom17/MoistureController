@@ -145,10 +145,12 @@ void main() {
   });
 
   testWidgets('rules: the detail shows the rule and why it did or did not water', (tester) async {
+    tallScreen(tester); // everything on screen, nothing depends on the scroll position
     await pumpApp(tester);
     await tester.tap(find.text('Monstera'));
     await tester.pumpAndSettle();
     await tester.scrollUntilVisible(find.textContaining('Below 25 %'), 300, scrollable: find.byType(Scrollable).first);
+    await tester.ensureVisible(find.textContaining('Below 25 %')); // fully inside the window, not on its edge
     await tester.tap(find.textContaining('Below 25 %'));
     await tester.pumpAndSettle();
     await tester.scrollUntilVisible(find.textContaining('Skipped: too soon'), 300, scrollable: find.byType(Scrollable).first);

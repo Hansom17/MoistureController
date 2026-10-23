@@ -204,7 +204,7 @@ async def calibrate_battery(device_id: str, body: CalibrateIn, request: Request,
 
 @router.post("/devices/{device_id}/actions", status_code=202)
 async def device_action(device_id: str, body: ActionIn, request: Request, p: Principal = Depends(require("member"))):
-    if body.action != "identify" and rank(p.role) < rank("admin"):
+    if body.action not in ("identify", "report_now") and rank(p.role) < rank("admin"):
         raise ApiError("forbidden", "Only admins can reboot a device or clear its safe mode")
     return (await hub(request, p, "device_action", {"device_id": device_id, "action": body.action}))["command"]
 

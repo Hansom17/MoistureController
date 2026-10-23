@@ -58,7 +58,7 @@ requests:
   device_update: {body: {device_id: string, name: string}}
   device_remove: {body: {device_id: string, force: bool}}
   device_config_put: {body: {device_id: string, base_rev: int, config: object}, answer: {rev: int}}
-  device_action: {body: {device_id: string, action: "identify|reboot|clear_safe_mode"}, answer: {command: object}}
+  device_action: {body: {device_id: string, action: "identify|reboot|clear_safe_mode|report_now"}   # identify and report_now: member; the others: admin, answer: {command: object}}
   plant_create: {body: {name: string, notes: string, sensor: {device_id: string, slot: int}, pump: {device_id: string, slot: int}}}
   plant_update: {body: {plant_id: string, fields: object}}
   plant_delete: {body: {plant_id: string}}
