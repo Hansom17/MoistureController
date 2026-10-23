@@ -101,6 +101,16 @@ docker compose logs --tail 30 hub api
 ```
 In the app, **Settings → Gateway** shows Zigbee2MQTT, the coordinator, the hub, the clock and the database size. It starts on every boot (`restart: unless-stopped`); reboot the device once and check that the app comes back.
 
+## 8a. Start at boot
+
+Docker is enabled at boot and every container has `restart: unless-stopped`, so a crashed container restarts and a rebooted device comes back by itself. One more piece makes it complete: a systemd service that runs `docker compose up -d` at boot (it also brings back containers that were removed, for example after a `docker compose down`) and stops the stack gracefully at shutdown so the SQLite files are closed cleanly:
+```bash
+Gateway/scripts/autostart.sh            # installs and enables it; asks for the sudo password
+Gateway/scripts/autostart.sh --print    # only shows the unit file
+Gateway/scripts/autostart.sh --remove   # takes it away again
+```
+Check with `systemctl status moisture-gateway` and, once, reboot the device and look at `docker compose ps`.
+
 ## 9. Everyday operation
 
 | Task | Command (in `Gateway/firmware`) |
