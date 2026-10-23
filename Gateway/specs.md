@@ -524,7 +524,10 @@ The module is always listening, so the hub can send as soon as there is somethin
 5. **Idempotency:** the module does not execute a `cmd_id` twice, so a retry after a lost acknowledgement is safe; a repeated config revision with identical content answers `ok` again.
 6. **Restart:** the queue lives in SQLite, so a hub restart loses nothing.
 
-> **Low power (later):** a sleepy module can receive only right after it has reported. The sender then waits for a report ("check-in") and sends inside the module's awake window; items not confirmed stay queued for the next check-in. This mode comes back with the low-power firmware (`PlantModule/specs.md` Part A §18).
+> **Low power (planned, `PlantModule/specs.md` §18).** The sender has a mode per device, taken from the module's `power_mode`:
+> - `always_on`: as above.
+> - `light_sleep` (sleepy end device polling its parent every ≤ 5 s): the sender works as above; the coordinator holds the message until the module polls. The ack timeout (10 s) and the pacing already fit; after a received frame the module polls fast, so the several frames of a config push do not each wait a full poll interval. Zigbee2MQTT's active availability check is switched off for such devices.
+> - `deep_sleep`: the **check-in sender**. A report from the module is the check-in and opens a window of `awake_s` seconds in which the module listens. The hub sends the queued items inside the window, one at a time, oldest first; unconfirmed items stay queued for the next check-in. Nothing is sent while the module sleeps (the coordinator would drop it). A command whose `ttl_s` is shorter than the module's wake interval is refused at creation (`validation`, "this module only listens every N minutes"); rule commands get a ttl of at least two wake intervals. A configuration revision that needs more frames than one window is sent over several check-ins and applied by `commit_config`, as the module stages writes anyway.
 
 ## 10. Config sync
 
@@ -541,6 +544,7 @@ The module is always listening, so the hub can send as soon as there is somethin
 | a report with `status = operational` | `online` | `last_seen_at`, `link_quality`, `voltage_mv` |
 | a report with `status = safe_mode` | `safe_mode` | `device_safe_mode` alert with `safe_reason`; pump commands refused |
 | no report for 3 × `report_interval_s` (reports repeat at least every 300 s as a heartbeat) | `late` | — |
+| planned (§18): a `deep_sleep` module between check-ins | `sleeping` (not `late` until 3 intervals without a check-in) | the app shows the next expected check-in |
 | Zigbee2MQTT availability `offline` (active check about every 5 minutes) | `offline` | `device_offline` alert |
 | availability `online` or any report | `online` | alerts resolved, queue flushed (9.4) |
 | Zigbee2MQTT or the coordinator down | status unchanged, `zigbee_offline` alert on the installation | the late/offline jobs are suspended while Zigbee2MQTT is down |
@@ -691,7 +695,7 @@ Open points:
 - Size and paging of the `query/export` chunks and of the `devices`/`plants` snapshots for large installations.
 - Browser push notifications from `api` (needs HTTPS).
 - Remote access: VPN/tunnel plus HTTPS, request hardening, push.
-- Low power: the check-in sender mode (9.4) returns with the sleepy firmware.
+- Low power: the plan is `PlantModule/specs.md` §18; for the hub it means the sender modes (9.4), the `sleeping` status (11), `power_mode` in the config validation (CONFIG-driven from `interface.yaml`), availability off for battery devices, the low-battery interval policy (13.1) and the parameters in `hub/params.py` (generated). Nothing is built yet.
 - Battery (13.1): curve per cell type against a measured discharge; a per-device threshold override; estimating the remaining days from the voltage trend; charging cannot be detected on carrier v1.
 
 ## 19. Reusing the previous implementation

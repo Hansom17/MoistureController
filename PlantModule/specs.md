@@ -17,7 +17,7 @@ Folder: `firmware/` (ESP-IDF project), `hardware/` (KiCad carrier), `scripts/` (
 - Enforce hard safety limits locally, whatever the Gateway sends.
 - Join the Gateway's Zigbee network without any credentials typed into the device.
 - Be written as **explicit state machines** (§7) so every behaviour, timeout and failure path is defined and testable on the host.
-- Be easy to extend later: other PCB revisions (§2.1), more module types (§4), and low power (§18).
+- Be easy to extend later: other PCB revisions (§2.1), more module types (§4), and low power (§18, planned).
 
 ## 2. Hardware target
 
@@ -98,7 +98,7 @@ The module is always awake. In the operational state it repeats:
 - After a run a **minimum pause** (`min_pause_s`) applies before the same pump may run again.
 - Outputs come up **off** after any reset.
 
-**Power.** Supplied externally (USB, or 5 V / a charger-boost board on J7). The battery level is measured and reported as described in §6.1; the module does not change its behaviour for a low cell except for the pump refusal in §6.1.4.
+**Power.** Supplied externally (USB, or 5 V / a charger-boost board on J7). The battery level is measured and reported as described in §6.1; the module does not change its behaviour for a low cell except for the pump refusal in §6.1.4. Running from the cell with sleep is planned in §18 (`power_mode`; this section describes `always_on`).
 
 ### 6.1 Battery level detection
 
@@ -160,7 +160,7 @@ Defaults: **`batt_low_mv` 3600** (about 10 % at rest for a Li-ion cell) and **`b
 **6.1.4 Behaviour in `critical`**
 - A `pump_run` is **refused** with the new ack reason `battery_low`, because a pump start on an almost flat cell can brown the module out in the middle of a run (it would come back with the pump off, but the run is lost and the cell is stressed). `pump_stop`, `cancel`, `device_action` and reporting are unaffected. A run that is already running when the state changes finishes.
 - The validation order of §7.5 gets one more step after `slot_not_actuator`: **battery critical → `battery_low`**.
-- No other behaviour changes (no longer intervals): that belongs to low power (§18).
+- No other behaviour changes (no longer intervals): that belongs to low power (§18, planned).
 
 **6.1.5 Interface changes (planned, not yet in `interface.yaml`)**
 
@@ -446,18 +446,188 @@ Goal: answer the open Zigbee questions on the real board before the real firmwar
 - Pinned ESP-IDF and `esp-zigbee-sdk` versions (set at the first install).
 - I2C/1-Wire auto-detect and more drivers; Zigbee OTA.
 
-## 18. Low power (later)
+## 18. Low power (plan)
 
-Parked on purpose; none of this is part of the first firmware. The state machines have named extension points (a `Sleep` state in the lifecycle machine, wake events in the event table, a `PrepareSleep` step in the run loop).
+**Status: planned, nothing built.** This section is the design for running the module from a single cell. It replaces the earlier "parked" list; whatever is not decided here is listed in 18.12. Until the phases of 18.10 are done the module stays always-on (`power_mode = always_on`, today's behaviour), so nothing in §6 to §8 changes for existing modules.
 
-- **Sleepy end device** instead of receiver-always-on: Zigbee poll interval, parent timeout, fast rejoin after deep sleep, awake window after each report; the role stays "end device", so switching is configuration, not a new join (to be verified).
-- **Deep sleep cycle:** wake interval (`wake_interval_s`), `awake_s`, `next_wake_s`, wake reason, commissioning window after a join, sleeping between samples, reports after waking, the hub's check-in sender (`Gateway/specs.md` "Low power").
-- **Pump across sleep:** pin hold through deep sleep on low-power pins, a wake at the end of a run.
-- **Buffering across sleep:** RTC reading ring buffer, `pend[]` acknowledgements.
-- **Sensor power switching:** power on, settle, read, power off around every read (board description `sensor_power`).
-- **Wake sources:** button on a low-power pin (GPIO0 on a later carrier revision).
-- **Battery (beyond §6.1):** longer intervals and fewer reports on a low cell, switching the divider off between samples, measuring under radio/pump load while sleeping, a charger-status input, other cell types.
-- **Power budget:** sleep current, energy per wake, awake window length, expected battery life, a measurement template, results table.
+### 18.1 Decisions
+
+| # | Decision | Why |
+|---|---|---|
+| L1 | **Three power modes**, chosen by configuration (`power_mode`): `always_on` (today, default), `light_sleep`, `deep_sleep`. The role stays "Zigbee end device" in all of them, so switching modes needs no new join (**verify** on the bench, 18.10 P2). | One firmware for mains-fed modules, cell-powered modules and the tiniest cells; no second product. |
+| L2 | **`light_sleep` is the mode that gets built and tuned first.** Sleepy end device: the radio is off between short polls of the parent, RAM, timers, GPIO states and the Zigbee network state are kept, nothing rejoins on wake. | Commands stay near-live (target ≤ 5 s), the hub sender does not change, the pump timers and the state machines keep running unchanged. |
+| L3 | **`deep_sleep` follows** as the mode for the smallest sleep current. The chip sleeps between samples and wakes by timer; commands only get through in a short awake window after a report (a "check-in"). | Lowest average current when latency of minutes is acceptable (a plant that is watered by a rule, not by hand). |
+| L4 | **Target:** the real cell is a **3300 mAh, 3.6 V** Li-ion cell (the curve in `interface.yaml`). It lasts **months** at the default 5 minute report interval: the budget target is **≤ 0.5 mA average at the cell**, which is 6600 h, about **9 months** of the nominal capacity (about 7 months with 80 % usable and some self-discharge; 1 mA would give 4 months, 0.25 mA about 18). The number is measured **at the cell**, so it includes whatever sits between the cell and the chip (18.3). The real value comes from 18.9. | Concrete enough to decide where energy may go. |
+| L5 | **Command latency in `light_sleep`: ≤ 5 s** (95th percentile from the hub's send to the module's acknowledgement), by a poll interval of at most 5 s plus a fast-poll window after traffic (18.4). In `deep_sleep` the latency is up to one wake interval and the app says so. | Water now and Read now must feel live on a cell-powered module. |
+| L6 | **Sensors are powered only around a read** (switched sensor rail). Carrier v1 cannot do this (pin 1 of every port is the always-on 3V3); v1 is used to **measure** and to build the firmware, the target of L4 needs **carrier v2** (18.3). | A capacitive moisture sensor draws milliamps; always on it alone exceeds the whole budget of L4. |
+| L7 | **The pump is never run while the chip sleeps deeply.** During a run the module stays in `light_sleep` at most (timers, no radio gaps longer than the stop poll of 18.4); `deep_sleep` is only entered again after the run. | A stop command must always be able to arrive, and the output must not depend on a held pin. |
+
+### 18.2 Where the energy goes (what has to be measured, not assumed)
+
+Orders of magnitude only; every number is replaced by a measurement in 18.9.
+
+| Consumer | When | Comment |
+|---|---|---|
+| Radio receiver on (today) | continuously | Tens of mA: this alone makes the current firmware unusable on a cell. Removed by L2/L3. |
+| Radio poll (`light_sleep`) | every poll interval, a few ms each | Dominates the idle current of `light_sleep`; scales with 1 / poll interval. |
+| Radio transmit + receive of a report | per report (every `report_interval_s`, 30 s while watering) | Roughly 10 to 15 frames per report cycle (slots, status, battery, `seq`), each with an acknowledgement. Fewer frames per cycle is a direct saving (18.5). |
+| CPU awake for sampling | per sample (~100 ms to 2 s with settle time) | ADC conversions, median filters (§5, §6.1), sensor settle time. |
+| Sensors | during the awake sample window | With a switched rail only for `settle_ms + read time`; without it permanently (v1). |
+| Chip sleep current | all the time | Light sleep tens of µA, deep sleep single-digit µA (chip only; carrier parts add to it). |
+| Battery divider | permanently on v1 | 330k/330k: about 5 µA at 3.7 V. |
+| LED | only on button/identify/join | Not in the idle budget. |
+| Pump | a few runs a day | Outside the idle budget; its own energy per run is reported. |
+
+### 18.3 Hardware (carrier v2 wishlist, what the firmware needs from it)
+
+- **Where the cell is connected.** For now the cell sits on a charger/boost board that feeds **J7 (VIN, 5 V)**; later it goes **directly on the carrier**. The first arrangement matters for the budget: a boost converter to 5 V followed by the carrier's regulator down to 3.3 V converts twice, and the quiescent current and the light-load efficiency of both parts add to the module's own current (typically tens to hundreds of µA, which can exceed the chip's whole sleep current). So every measurement of 18.9 is taken at the cell, and run A also measures the supply chain alone (module disconnected, then module in sleep) so its share is known. The direct-on-board design then needs a low-quiescent 3.3 V regulator (or a buck/LDO with Iq of a few µA) fed from the cell range 3.0 to 4.2 V; the choice follows from these numbers.
+
+- **Switched sensor rail:** a load switch on a low-power GPIO in front of pin 1 of every port (or of the sensor ports as a group). The board description gets `sensor_power` (GPIO, polarity, `settle_ms`); without the entry (carrier v1) the firmware treats sensors as always powered and skips the switching steps.
+- **Button on GPIO0** (low-power pin) so it can wake the chip from deep sleep. On v1 (GPIO21) the button works in `always_on` and `light_sleep` only; in `deep_sleep` it is read at each wake.
+- **Battery divider** that is switched or much higher in resistance (the 5 µA matters at ~100 µA average); the sense pin stays a plain ADC input.
+- **Pump driver** with a gate pull-down so the pump is off whatever the chip does, including reset and deep sleep.
+- **No strapping pins on sleep-critical signals** (GPIO4/5 on v1: check with the battery sense).
+- A **charger-status input** and a protection/charger design are separate topics (D23); they do not block this plan.
+- The `low_power` entry of the board description (§2.1) is filled in: which ports may hold an output in deep sleep, whether the button wakes the chip.
+
+### 18.4 Firmware design
+
+**Modes and the state machines.** `power_mode` is a configuration value (18.5). The lifecycle machine (§7.3) keeps all its states; sleeping is not a lifecycle state but a property of `Operational`:
+
+```mermaid
+stateDiagram-v2
+    [*] --> Active
+    Active --> Settling: T_SAMPLE (sensor rail on)
+    Settling --> Active: T_SETTLED (read, rail off)
+    Active --> Napping: nothing pending (light_sleep)
+    Napping --> Active: poll due / T_SAMPLE / pump timer / button / frame received
+    Active --> Sleeping: report sent, awake window over (deep_sleep)
+    Sleeping --> Active: timer wake (reports first, then the awake window)
+```
+
+- **`Active`** is today's behaviour. **`Napping`** (light sleep) and **`Sleeping`** (deep sleep) are entered only when the core says so: a pure function `mc_core_may_sleep(state)` returns the longest time the chip may sleep, or 0 when it must stay awake (sampling or settling in progress, a pump running or in its stop-poll phase, a configuration transaction open, an acknowledgement or event not yet sent, LED pattern running, joining/rejoining, boot). It is host-testable with the fake clock like every other part of the core.
+- **New events:** `T_SETTLED`, `WAKE(reason)`, `POLL_DONE`, `AWAKE_WINDOW_OVER`. **New actions:** `ACT_SENSOR_POWER(on/off)`, `ACT_SLEEP(ms, mode)`. The portable core never sleeps itself; the HAL executes `ACT_SLEEP` (ESP-IDF power management with tickless idle for light sleep, `esp_deep_sleep_start` for deep sleep).
+- **Sampling sequence with a switched rail:** rail on → wait `settle_ms` (board description) → read all slots (§5) → rail off, always, also on timeout/error. A pump run never overlaps a rail-off step of a slot that is needed.
+- **Battery measurement** (§6.1) is taken at the end of the sample window, with the radio idle and the rail still off or settled, as it is today ("quiet after pump"); the divider switching of 18.3 adds its own settle time.
+
+**`light_sleep` (sleepy end device).**
+- The receiver is switched off between polls (`rx_on_when_idle = false`); the stack polls the parent every `poll_interval_ms` (default 3000, range 500 to 5000). The parent (the coordinator) holds the messages for the module, so Zigbee2MQTT can send at any moment (the existing hub sender works unchanged).
+- **Fast-poll window:** after any received frame, any sent report and any command, the module polls every ~250 ms for ~3 s, then returns to the normal interval. This is what keeps multi-frame traffic (a configuration of several attribute writes, a commit, an acknowledgement exchange) from taking 10 × `poll_interval_ms`. During a pump run the poll interval is capped at 1 s so a stop arrives quickly (L7).
+- **Parent timeout:** the end-device aging timeout (`ed_timeout`, today 64 min) and the keep-alive are set so a missed poll or two does not drop the module from the parent's child table; a lost parent still goes through `Rejoining` (§7.3).
+- **Light sleep needs a UART or no console:** the USB serial/JTAG console of the dev kit does not survive light sleep; bench builds keep `power_mode = always_on` while flashing or watching logs, or use the UART pins (**verify**).
+- **Reporting engine:** the stack's periodic reporting keeps working while napping (timers are kept), but the module sends its explicit reports (§6) at the end of each sample window instead of relying on it, to batch them into one radio session (18.5).
+
+**`deep_sleep`.**
+- Wake interval = `report_interval_s` (one concept, not two). On each wake the module restores state from RTC memory, samples, reports, stays awake for `awake_s` (default 5 s, range 2 to 30) with the receiver on so the hub can send, then sleeps for the rest of the interval. A button press or an expired pump run wakes it in between (button on a low-power pin only, 18.3).
+- **Not a reboot:** `boot_id`, `seq`, the reset counter and the pending acknowledgements/events (`pend[]`) live in RTC memory; a deep-sleep wake does not count as a reset for the crash-loop detector (§11) and does not change `boot_id`. A real reset (power, watchdog, panic) does.
+- **Fast rejoin:** the network state is in `zb_storage`; after the wake the stack comes up from it and talks to the parent without a new join. If the parent does not answer, the usual `Rejoining` back-off applies.
+- **Check-in:** the first frame of every wake is the report; the hub treats it as the signal that the module can receive for `awake_s` (see Gateway/specs.md 9.4). A command sent while the module sleeps waits in the hub's queue (and is lost on the parent after its short holding time, so the hub must not rely on the coordinator for it).
+- **Buffering:** if a report cannot be delivered (link down) the readings are kept in an RTC ring buffer (up to 16 samples, oldest dropped) and sent with the next successful report, with their sample age; the hub stores them with the original time.
+
+**Common rules.**
+- **Configuring is done awake.** Zigbee2MQTT's `configure` step (bindings, reporting) and the attribute-set check of the stack (§8) run while the module is in `Active` with the receiver on: after a join, a rejoin or a firmware change, sleeping is held off until the interview and configure are done (`ZB_CONFIGURED`), exactly as the core waits in `Interviewing` today.
+- **Mode changes** take effect after the configuration commit and an acknowledgement; switching from `deep_sleep` back to `always_on` is done through the awake window (the hub sends `power_mode` while the module is up).
+- **Safe mode** (§11) never sleeps: a module in safe mode stays awake and reachable so the hub can clear it. After a `battery_critical` the module keeps sleeping (it must save the cell) but still wakes for the check-in.
+- **Watchdog, crash loop and boot reasons** keep working; the boot reason gains `deep_sleep_wake` (which is not counted as a reset).
+
+### 18.5 Interface changes (interface version minor bump, config schema 3)
+
+Planned additions to `PlantModule/interface.yaml` (the generators then produce header, converter and hub parameters):
+
+| Item | Where | Meaning |
+|---|---|---|
+| `power_mode` (enum8: 0 always_on, 1 light_sleep, 2 deep_sleep), rw, default 0 | configuration attribute + config blob | Mode (L1). A mode the board cannot do (no `low_power` entry for a deep-sleep need) is rejected `role_unsupported`. |
+| `poll_interval_ms` (uint16, 500 to 5000, default 3000), rw | configuration | `light_sleep` poll interval (L5). |
+| `awake_s` (uint8, 2 to 30, default 5), rw | configuration | `deep_sleep` window after each report. |
+| `sensor_settle_ms` | board description (not a config value) | Per board; carrier v1: 0 (rail not switched). |
+| `wake_reason`, `awake_ms`, `poll_fail_count`, `next_wake_s` | diagnostics attributes (reported, read-only) | Reason for the last wake, how long the last awake window lasted, parent poll failures, seconds until the next planned wake (deep sleep). |
+| `low_batt_interval_factor` (battery section of the interface file) | tunable | A low cell stretches `report_interval_s` by this factor (default 2, 4 when critical), a hub-side policy, see 18.8. |
+| `boot_reason` value `deep_sleep_wake` | enum | See 18.4. |
+| Basic cluster `powerSource` | identity | `battery` when `power_mode` is not `always_on`, so Zigbee2MQTT treats the module as a battery device. |
+| Reporting table | `reporting` | In `light_sleep` and `deep_sleep` the module sends all its attributes itself at the end of a sample window, in a fixed order with `seq` last (as it does for a fast report today); the periodic min/max intervals only remain a heartbeat. `slot_n`, the explicit set and the hash of §8 (attribute-set change) stay. |
+
+**Fewer frames per report.** Today one report cycle sends about 13 attribute reports. Two cheaper forms are to be examined in P2/P4: a combined report frame (several attributes in one ZCL report command, which the stack supports for the standard way of reporting) and a custom "snapshot" command with the compact payload that the hub adapter unpacks. The converter, not the hub, would undo the packing, so the hub contract stays. The choice follows from the measured energy per report (18.9).
+
+### 18.6 Gateway and hub consequences
+
+(Details in `Gateway/specs.md` 9.4 and 11.)
+- **`light_sleep`:** no change to the sender; the ack timeout (10 s) and the retry pacing already cover a 5 s poll. Zigbee2MQTT's active availability ping is **turned off** for battery modules (a ping to a sleeping module wastes energy and a missed one is normal); `late` and `offline` come from the hub's own rule (3 × `report_interval_s`, as today) instead of the ping.
+- **`deep_sleep`:** the **check-in sender** (the parked mode of 9.4) becomes real: the hub holds all items for the device and sends them one at a time, oldest first, inside the `awake_s` window after a report; unconfirmed items stay queued for the next check-in. The status is `sleeping` between check-ins (not `late`), `late` = no check-in for 3 intervals. Expiry (`ttl_s`) still applies; a command whose ttl is shorter than the wake interval is refused at creation with a clear error ("this module only listens every N minutes").
+- **Config push:** a new configuration revision is sent in the fast-poll window (light sleep) or the awake window (deep sleep); a configuration that needs more frames than fit into `awake_s` is sent over several check-ins and applied only at its `commit_config` (the module already stages writes until the commit, §7.6).
+- **Battery policy:** the hub stretches the report interval on a low cell (18.5) by pushing `report_interval_s`, because the policy belongs in the configuration (visible, overridable), not hidden in the module.
+- **Rules:** a rule that waters a plant in `deep_sleep` mode may find the module asleep: the command waits for the next check-in; `ttl_s` for rule commands is raised to at least two wake intervals for such modules.
+
+### 18.7 App consequences
+
+(Details in `App/specs.md`.) A **power mode** setting in the device configuration (always on / light sleep / deep sleep) with a one-line consequence for each; the `sleeping` status of the design system becomes real for `deep_sleep`; commands show "queued until the module's next check-in (about N min)" instead of "device offline"; Read now explains that a deep-sleeping module answers at its next wake; the battery card shows the estimated remaining days from the voltage trend (D23) when the data is there; mode changes are only offered to admins.
+
+### 18.8 Battery behaviour beyond §6.1
+
+- A low cell stretches the interval (hub policy, 18.5/18.6); a critical cell keeps the module sleeping and reporting, refuses pumps as today and sends `battery_critical` once.
+- **Measuring under load:** the cell voltage sags during radio transmit and during pump starts; the existing measurement is taken in the quiet window (§6.1). Whether a second, loaded measurement (right after a transmit) gives a useful internal-resistance estimate is a later experiment, not part of this plan.
+- Brown-out threshold and the cut-off of the cell protection are checked against `batt_critical_mv` in 18.9.
+
+### 18.9 Measurement plan and acceptance criteria
+
+**Equipment.** No current profiler is available at the moment; the oscilloscope (plus a multimeter) does the job with some care. The difficulty is the range: about 20 µA asleep against 50 to 100 mA while the radio transmits, a ratio above 1000:1, which no single shunt covers.
+
+| What | How with a scope and a multimeter |
+|---|---|
+| **Sleep current** (µA) | Multimeter in its µA range in series with the supply, or a 1 kΩ shunt (30 µA gives 30 mV) with the module powered from a bench supply or the cell through a low-leakage switch; read after the module has settled for 10 s. The burden voltage must stay below 50 mV (the regulator input must not sag). For the sleep reading of the whole chain (boost, regulator) measure at the cell side. |
+| **Active bursts** (radio, sampling, pump start) | A 1 Ω shunt in the supply line (or the low side of the cell), read with a differential probe or two probe channels with math (A minus B); 100 mA gives 100 mV. Trigger on the first edge, record 1 to 5 s, and **integrate the waveform** (most scopes have an integral/area function) to get the **energy per event** in mC (charge) or µWh. Average current = sum of charges per cycle ÷ cycle length. |
+| **Average** | Not read from a 5 minute cycle directly: compute it from the sleep current, the charge of one report cycle (above) and the number of cycles per hour. Check it once with the cell: run 24 h, measure the cell voltage before and after with the multimeter and compare with a measured discharge curve (coarse, ±20 %). |
+| **Command latency** | Scope on the module's LED or a spare GPIO (toggled by the firmware at the command acknowledgement) against a pulse from the hub side (the command arrival is logged by the hub); or both timestamps from the hub's own log (send time, ack time), which is enough for the 5 s criterion. |
+
+An optional **Nordic PPK2** (about 100 €) or an Otii Arc would replace all of the table with one tool, give the average directly and capture every poll; it is the first purchase to make if the scope work gets in the way. With only the scope, all numbers carry roughly ±20 % and the acceptance criteria of 18.9 are checked with that margin. The same cell and the same sensors are used for every run; the coordinator logs or a Zigbee sniffer show the radio side; at least 24 h per average, 7 days for the soak.
+
+| Run | Configuration | Measures |
+|---|---|---|
+| A | `always_on`, v1 | Baseline current; sensor draw (rail permanently on) and divider draw, by unplugging them. |
+| B | `light_sleep`, no sensors, poll 1 / 3 / 5 s | Sleep current, current per poll, average; command latency (200 round trips each, p50/p95/max). |
+| C | B + sensors on the switched rail (v2) or switched by a bench relay | Energy of one sample window; average at 300 s and 60 s intervals. |
+| D | `deep_sleep`, wake 300 s, `awake_s` 5 | Sleep current, energy of one wake (boot + sample + report + window), rejoin success rate, delivery of commands in the window. |
+| E | Pump run during `light_sleep` | Stop latency, energy per run, battery sag. |
+| F | 7-day soak in both modes | Missed reports, rejoins, hub status flapping, battery trend, clock drift of the wake interval. |
+
+**Acceptance criteria** (to be confirmed or changed once run A and B are measured):
+- `light_sleep` average ≤ 0.5 mA at 300 s with the switched rail (L4); `deep_sleep` average at least 3 times lower than `light_sleep`.
+- Command latency in `light_sleep`: p95 ≤ 5 s, no command lost in 200 trials.
+- No rejoin and no `late` status in a 7 day soak at the default settings; at most 1 missed report in 1000.
+- Pump stop reaches the module within 2 s during a run.
+- Clean behaviour on every error path: parent lost while asleep, coordinator restart, gateway offline for an hour, cell in `critical`, switching the mode back and forth (a test list for the bench).
+
+### 18.10 Phases
+
+| Phase | Content | Done when |
+|---|---|---|
+| **P0** | Measure run A on v1 with the 3300 mAh cell, with scope and multimeter (18.9): the supply chain alone, the module always on, the sensors and the divider. Write the numbers into 18.2; settle the budget of L4. | Table filled with ±20 % numbers. |
+| **P1** | Core: sleep-aware states (`may_sleep`, `Settling`, events and actions), `power_mode` and the new config/diagnostic attributes in `interface.yaml` and the generators, board description `sensor_power` / `settle_ms`, host tests (no sleep during sampling, pump, transaction; sample sequence with rail; wake bookkeeping). | Host tests pass; behaviour in `always_on` unchanged. |
+| **P2** | Zigbee layer + HAL: sleepy end device with poll interval, fast-poll window, parent timeout, power management config, `light_sleep` on the bench with the v1 board (sensors permanently on); verify that the mode switch needs no rejoin and that configure/attribute changes work. Runs B and E. | L5 met on the bench; no rejoin. |
+| **P3** | Hub, converter, app: `power_mode` setting, `powerSource`, availability off for battery modules, status and wording, tests (hub 100+, converter, app). | End to end with the real module in `light_sleep`. |
+| **P4** | `deep_sleep`: RTC state, wake handling, awake window, buffering, the hub check-in sender and `sleeping` status. Run D. | A command is delivered inside the window; no data lost over a link outage. |
+| **P5** | Carrier v2 with the switched rail, button on GPIO0, divider and pump-driver changes; run C and the soak F; budget check against L4. | Acceptance criteria of 18.9 met or revised with numbers. |
+| **P6** | Low-battery policy (18.8), mode-switch edge cases, readme/INSTALL/specs updated, OTA interplay (an image is fetched in `always_on` through a command that holds the module awake; OTA itself stays a separate plan). | Documented; bench list passes. |
+
+Dependencies: P1 and P3 do not need hardware; P2 needs the bench module; P4 needs P2 and P3; P5 needs the board fabricated. The attribute-set rebuild (§8, done) is a precondition for shipping new attributes to modules in the field without a re-join.
+
+### 18.11 Risks
+
+| Risk | Mitigation |
+|---|---|
+| `esp-zigbee-sdk` light sleep on the C6 is less mature than on other chips (**verify** poll behaviour, clock sources, wake latency, behaviour with reporting configured by Zigbee2MQTT). | P2 starts with a minimal sleepy build before the full firmware is put on it; keep `always_on` as the fallback in the same image. |
+| A sleepy module drops out of the parent's child table (aging timeout). | Set `ed_timeout` and keep-alive generously; test with the coordinator restarted; `Rejoining` stays the recovery. |
+| Zigbee2MQTT behaviour for battery devices (availability, `configure` on wake, queued messages for the sleepy child). | Test in P3 with the real converter; the hub's own `late` rule is the fallback. |
+| Many frames per report cost more energy than the sleep saves. | Measure energy per report first (18.9 B/C), then combine frames (18.5). |
+| The ADC or the USB console misbehave across sleep. | Re-initialise the ADC after a wake (HAL), bench builds use `always_on`/UART. |
+| Carrier v2 is a hardware turn of weeks. | P0 to P4 are done on v1; the firmware treats a missing `sensor_power` as "always powered". |
+
+### 18.12 Open questions
+
+- **The charger/boost board on J7:** its model, its quiescent current and its behaviour at light load are unknown. It may dominate the sleep current; measured in run A (18.9). Whether it protects the cell against over-discharge (cut-off voltage) matters for `batt_critical_mv`.
+- Whether `light_sleep` plus a long report interval already meets the target, which would make `deep_sleep` optional (decided after runs B/D).
+- Whether the combined report frame (18.5) is supported through the stack for custom-cluster attributes or needs the snapshot command.
+- Time at which a sleeping module is allowed to run a stored pump schedule locally (not planned; rules stay in the hub).
+- Zigbee OTA for sleepy modules.
 
 ---
 

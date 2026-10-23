@@ -187,6 +187,7 @@ Component library and palette: Part B.
 - Loads `GET /devices/{d}/config` (desired, reported, sync state, limits) and the board description `GET /meta/boards/{board}` (the logical ports of the device's PCB revision with the roles each supports, e.g. analog sensor or pump; served by the hub from the board files of the PlantModule, so the app never duplicates board knowledge).
 - Per slot: module picker, port picker (P1…Pn) filtered to ports that exist on this board, support the module and are not used by another slot, module options (calibration dry/wet, `active_high`, `max_run_s` 1–300 s (the firmware ceiling), `min_pause_s` 0–65535 s).
 - Device-level fields: `report_interval_s` (10–3600 s, default 300), `fast_report_interval_s` (10–300 s, default 30, used while watering) and `fast_report_hold_s` (0–1800 s, default 120). The editor shows that a change is applied as soon as the device confirms it ("pending until the device reports the new revision").
+- **Power mode (planned, `PlantModule/specs.md` §18, admin only):** a choice *Always on* / *Light sleep* / *Deep sleep* with one line each ("for mains or USB power", "for a cell; commands arrive within a few seconds", "smallest current; commands wait for the module's next check-in, about every N minutes"). In light sleep the poll interval can be set (0.5–5 s); in deep sleep the awake window. A change is a configuration revision like any other and the module acknowledges it. A device in deep sleep shows the `sleeping` status with "next check-in about …", commands show "queued until the next check-in" instead of "device offline", Read now says the module answers at its next wake, and a rule's water time is checked against the wake interval. Where the data allows, the battery card adds an estimate of the remaining days from the voltage trend.
 - Save = `PUT …/config` with `base_rev`; validation errors (422) show on the affected slot.
 - **Planned:** the calibration wizard (capture *dry* and *wet* with `sensor_sample`, review, save as a new revision). It needs the firmware command and a hub endpoint.
 ### 10.1 Battery display and calibration
@@ -378,7 +379,7 @@ Every status is shown as **icon + label + colour** (chip), never colour alone.
 | Status | Light | Dark | Icon | Used for |
 |---|---|---|---|---|
 | `ok` | `#27692B` | `#81C784` | `check_circle` | Device online, command done, gateway in sync |
-| `sleeping` | `#505D6B` | `#AAB6C2` | `bedtime` | Reserved for sleepy low-power devices (later); not used while modules are always awake |
+| `sleeping` | `#505D6B` | `#AAB6C2` | `bedtime` | A module in `deep_sleep` between check-ins (planned, `PlantModule/specs.md` §18); not used while modules are always on or in light sleep |
 | `pending` | `#0F5AAE` | `#9CC3F5` | `schedule` | Queued / delivered / running commands, config pending |
 | `warning` | `#8A5100` | `#FFB95C` | `warning` | Device late, low battery, gateway offline banner |
 | `error` | = `colorScheme.error` | = `colorScheme.error` | `error` | Device offline, command failed / expired, config rejected |
