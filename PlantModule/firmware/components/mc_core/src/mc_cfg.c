@@ -49,7 +49,9 @@ void mc_cfg_on_write(mc_core_t *c, mc_actions_t *out, uint16_t attr, const uint8
     }
     bool scalar = attr == MC_ATTR_REPORT_INTERVAL_S || attr == MC_ATTR_FAST_REPORT_INTERVAL_S ||
                   attr == MC_ATTR_FAST_REPORT_HOLD_S || attr == MC_ATTR_BATT_LOW_MV ||
-                  attr == MC_ATTR_BATT_CRITICAL_MV || attr == MC_ATTR_BATT_CAL_PERMILLE;
+                  attr == MC_ATTR_BATT_CRITICAL_MV || attr == MC_ATTR_BATT_CAL_PERMILLE ||
+                  attr == MC_ATTR_POLL_INTERVAL_MS || attr == MC_ATTR_POWER_MODE || attr == MC_ATTR_AWAKE_S;
+    bool byte_wide = attr == MC_ATTR_POWER_MODE || attr == MC_ATTR_AWAKE_S; /* enum8 and uint8 */
     bool slot = attr >= MC_ATTR_SLOT_CFG_0 && attr <= MC_ATTR_SLOT_CFG_5;
     if (!scalar && !slot) {
         return;
@@ -57,11 +59,11 @@ void mc_cfg_on_write(mc_core_t *c, mc_actions_t *out, uint16_t attr, const uint8
     begin_stage(c);
     mc_arm(out, MC_TIMER_CFG_TXN, 0, MC_CFG_TXN_TIMEOUT_MS);
     if (scalar) {
-        if (len < 2) {
+        if (len < (byte_wide ? 1 : 2)) {
             mark_bad(c, MC_CFG_ERROR_OUT_OF_RANGE, MC_SLOT_NONE);
             return;
         }
-        uint16_t v = rd16(data);
+        uint16_t v = byte_wide ? data[0] : rd16(data);
         switch (attr) {
         case MC_ATTR_REPORT_INTERVAL_S:
             c->stage.cfg.report_interval_s = v;
@@ -77,6 +79,15 @@ void mc_cfg_on_write(mc_core_t *c, mc_actions_t *out, uint16_t attr, const uint8
             break;
         case MC_ATTR_BATT_CRITICAL_MV:
             c->stage.cfg.batt_critical_mv = v;
+            break;
+        case MC_ATTR_POWER_MODE:
+            c->stage.cfg.power_mode = (uint8_t)(v > 255 ? 255 : v);
+            break;
+        case MC_ATTR_POLL_INTERVAL_MS:
+            c->stage.cfg.poll_interval_ms = v;
+            break;
+        case MC_ATTR_AWAKE_S:
+            c->stage.cfg.awake_s = (uint8_t)(v > 255 ? 255 : v);
             break;
         default:
             c->stage.cfg.batt_cal_permille = v;

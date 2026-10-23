@@ -8,8 +8,8 @@
 #define MC_ENDPOINT 1
 #define MC_CLUSTER_ID 0xFC11
 #define MC_MANUFACTURER_CODE 0x131B
-#define MC_INTERFACE_VERSION 0x0100
-#define MC_CONFIG_SCHEMA 2
+#define MC_INTERFACE_VERSION 0x0101
+#define MC_CONFIG_SCHEMA 3
 
 /* attribute ids of the custom cluster */
 #define MC_ATTR_SEQ 0x0100
@@ -34,6 +34,10 @@
 #define MC_ATTR_BATT_MV 0x0138
 #define MC_ATTR_BATT_STATE 0x0139
 #define MC_ATTR_BOARD 0x0140
+#define MC_ATTR_WAKE_REASON 0x0141
+#define MC_ATTR_AWAKE_MS 0x0142
+#define MC_ATTR_POLL_FAIL_COUNT 0x0143
+#define MC_ATTR_NEXT_WAKE_S 0x0144
 #define MC_ATTR_CFG_REV 0x0030
 #define MC_ATTR_CFG_RESULT 0x0031
 #define MC_ATTR_CFG_ERROR 0x0032
@@ -43,6 +47,9 @@
 #define MC_ATTR_BATT_LOW_MV 0x0004
 #define MC_ATTR_BATT_CRITICAL_MV 0x0005
 #define MC_ATTR_BATT_CAL_PERMILLE 0x0006
+#define MC_ATTR_POWER_MODE 0x0007
+#define MC_ATTR_POLL_INTERVAL_MS 0x0008
+#define MC_ATTR_AWAKE_S 0x0009
 #define MC_ATTR_SLOT_CFG_0 0x0010
 #define MC_ATTR_SLOT_CFG_1 0x0011
 #define MC_ATTR_SLOT_CFG_2 0x0012
@@ -69,6 +76,15 @@
 #define MC_CFG_BATT_CAL_PERMILLE_MIN 900
 #define MC_CFG_BATT_CAL_PERMILLE_MAX 1100
 #define MC_CFG_BATT_CAL_PERMILLE_DEFAULT 1000
+#define MC_CFG_POWER_MODE_MIN 0
+#define MC_CFG_POWER_MODE_MAX 2
+#define MC_CFG_POWER_MODE_DEFAULT 0
+#define MC_CFG_POLL_INTERVAL_MS_MIN 500
+#define MC_CFG_POLL_INTERVAL_MS_MAX 5000
+#define MC_CFG_POLL_INTERVAL_MS_DEFAULT 3000
+#define MC_CFG_AWAKE_S_MIN 2
+#define MC_CFG_AWAKE_S_MAX 30
+#define MC_CFG_AWAKE_S_DEFAULT 5
 
 /* battery detection tunables (interface.yaml, section battery) */
 #define MC_BATT_ADC_CONVERSIONS 8
@@ -95,7 +111,11 @@
     X(0x0132, 10, 600, 0) \
     X(0x0133, 10, 600, 0) \
     X(0x0134, 10, 600, 0) \
-    X(0x0135, 10, 600, 0)
+    X(0x0135, 10, 600, 0) \
+    X(0x0141, 10, 600, 0) \
+    X(0x0142, 10, 600, 0) \
+    X(0x0143, 10, 600, 0) \
+    X(0x0144, 10, 600, 0)
 #define MC_REPORTING_POWER_MIN_S 60
 #define MC_REPORTING_POWER_MAX_S 600
 #define MC_REPORTING_POWER_CHANGE 1 /* 100 mV steps, as Zigbee2MQTT configures it */
@@ -147,7 +167,22 @@ typedef enum {
     MC_BOOT_REASON_WATCHDOG = 3,
     MC_BOOT_REASON_BROWNOUT = 4,
     MC_BOOT_REASON_OTHER = 5,
+    MC_BOOT_REASON_DEEP_SLEEP_WAKE = 6,
 } mc_boot_reason_t;
+
+typedef enum {
+    MC_POWER_MODE_ALWAYS_ON = 0,
+    MC_POWER_MODE_LIGHT_SLEEP = 1,
+    MC_POWER_MODE_DEEP_SLEEP = 2,
+} mc_power_mode_t;
+
+typedef enum {
+    MC_WAKE_REASON_NONE = 0,
+    MC_WAKE_REASON_TIMER = 1,
+    MC_WAKE_REASON_BUTTON = 2,
+    MC_WAKE_REASON_PUMP_END = 3,
+    MC_WAKE_REASON_RADIO = 4,
+} mc_wake_reason_t;
 
 typedef enum {
     MC_CFG_RESULT_OK = 0,

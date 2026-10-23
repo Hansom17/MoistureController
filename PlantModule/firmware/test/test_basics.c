@@ -322,7 +322,7 @@ static void test_slot_reading_bytes_as_the_converter_reads_them(void)
 static void test_the_generated_interface_matches_the_hub_and_converter(void)
 {
     TEST_ASSERT_EQUAL_HEX16(0xFC11, MC_CLUSTER_ID);
-    TEST_ASSERT_EQUAL_HEX16(0x0100, MC_INTERFACE_VERSION);
+    TEST_ASSERT_EQUAL_HEX16(0x0101, MC_INTERFACE_VERSION);
     TEST_ASSERT_EQUAL_HEX16(0x0110, MC_ATTR_SLOT_0);
     TEST_ASSERT_EQUAL_HEX16(0x0015, MC_ATTR_SLOT_CFG_5);
     TEST_ASSERT_EQUAL_INT(0, MC_CMD_IN_COMMIT_CONFIG);

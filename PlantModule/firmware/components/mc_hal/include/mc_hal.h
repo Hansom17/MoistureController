@@ -41,6 +41,9 @@ void mc_hal_pump_set(uint8_t port, bool active_high, bool on);
 
 void mc_hal_led_set(mc_led_t pattern);
 
+/* Switches the sensor supply; a no-op on boards without a switched rail. */
+void mc_hal_sensor_power(bool on);
+
 /* Starts the 10 ms poll that decodes the button and posts BTN events. */
 void mc_hal_button_start(void);
 

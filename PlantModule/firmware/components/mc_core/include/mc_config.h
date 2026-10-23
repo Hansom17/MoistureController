@@ -34,6 +34,9 @@ typedef struct {
     uint16_t batt_low_mv;
     uint16_t batt_critical_mv;
     uint16_t batt_cal_permille;
+    uint8_t power_mode;         /* mc_power_mode_t (PlantModule/specs.md 18) */
+    uint16_t poll_interval_ms;  /* light_sleep */
+    uint8_t awake_s;            /* deep_sleep */
     mc_slot_cfg_t slots[MC_NUM_SLOTS];
 } mc_config_t;
 
@@ -64,8 +67,9 @@ static inline uint16_t mc_cfg_err_wire(mc_cfg_err_t e)
 
 /* Stored form of a configuration (NVS blob): schema byte, fields little endian, CRC32 last. Independent of the
  * struct layout so that a firmware update can read what an older one wrote. */
-#define MC_CONFIG_BLOB_SIZE 91    /* schema 2; a schema 1 blob (87 bytes) is migrated on decode */
-#define MC_CONFIG_BLOB_SIZE_V1 87
+#define MC_CONFIG_BLOB_SIZE 95    /* schema 3; older blobs are migrated on decode */
+#define MC_CONFIG_BLOB_SIZE_V2 91 /* schema 2: without the power settings */
+#define MC_CONFIG_BLOB_SIZE_V1 87 /* schema 1: also without the battery thresholds' second half */
 
 size_t mc_config_encode(const mc_config_t *c, uint8_t out[MC_CONFIG_BLOB_SIZE]);
 

@@ -74,6 +74,14 @@ typedef struct {
     bool batt_ok, batt_silent;
     int read_battery_calls;
 
+    /* switched sensor supply */
+    bool rail_on;
+    uint32_t rail_on_since;
+    int rail_on_calls, rail_off_calls;
+    int reads_without_power;     /* slot reads while the rail was off on a board that switches it */
+    int reads_before_settled;    /* ... or before the settle time was over */
+    mc_board_t custom_board;     /* sim_init_board: a copy of the board the core runs on */
+
     /* all action kinds in order, for ordering assertions */
     mc_act_kind_t kinds[SIM_MAX_LOG * 4];
     int n_kinds;
@@ -93,6 +101,7 @@ typedef struct {
 
 /* ---- setup ---- */
 void sim_init(sim_t *s, const char *board_name);
+void sim_init_board(sim_t *s, const mc_board_t *board); /* a board description built by the test */
 void sim_boot(sim_t *s, const sim_boot_opts_t *opts);
 /* boot, stack ready (joined): the module is in the Operational state with the given configuration */
 void sim_to_operational(sim_t *s, const mc_config_t *cfg);

@@ -8,6 +8,9 @@
       "batt_low_mv": 3600,
       "batt_critical_mv": 3400,
       "batt_cal_permille": 1000,
+      "power_mode": 0,
+      "poll_interval_ms": 3000,
+      "awake_s": 5,
       "slots": [
         {
           "slot": 0,

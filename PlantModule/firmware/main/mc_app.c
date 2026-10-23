@@ -93,6 +93,9 @@ static void execute(const mc_action_t *a)
     case MC_ACT_READ_BATTERY:
         read_battery();
         break;
+    case MC_ACT_SENSOR_POWER:
+        mc_hal_sensor_power(a->u.sensor_power.on);
+        break;
     case MC_ACT_PERSIST_CONFIG:
         if (!mc_hal_config_store(&core.cfg)) {
             ESP_LOGE(TAG, "configuration not stored");

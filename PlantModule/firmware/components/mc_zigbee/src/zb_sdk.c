@@ -52,6 +52,10 @@ static struct {
     uint16_t cfg_error;
     uint16_t report_interval_s, fast_report_interval_s, fast_report_hold_s, batt_low_mv;
     uint16_t batt_critical_mv, batt_cal_permille;
+    uint8_t power_mode, awake_s;
+    uint16_t poll_interval_ms;
+    uint8_t wake_reason;               /* owned by the sleep layer: stays 0 in always_on */
+    uint16_t awake_ms, poll_fail_count, next_wake_s;
     uint16_t batt_mv;
     uint8_t batt_state;
     uint8_t slot_cfg[MC_NUM_SLOTS][25]; /* octet string: length byte + up to 24 */
@@ -123,6 +127,10 @@ static esp_zb_attribute_list_t *custom_cluster(void)
     ADD(MC_ATTR_BATT_MV, ESP_ZB_ZCL_ATTR_TYPE_U16, REP, &store.batt_mv);
     ADD(MC_ATTR_BATT_STATE, ESP_ZB_ZCL_ATTR_TYPE_8BIT_ENUM, REP, &store.batt_state);
     ADD(MC_ATTR_BOARD, ESP_ZB_ZCL_ATTR_TYPE_CHAR_STRING, R, store.board);
+    ADD(MC_ATTR_WAKE_REASON, ESP_ZB_ZCL_ATTR_TYPE_8BIT_ENUM, REP, &store.wake_reason);
+    ADD(MC_ATTR_AWAKE_MS, ESP_ZB_ZCL_ATTR_TYPE_U16, REP, &store.awake_ms);
+    ADD(MC_ATTR_POLL_FAIL_COUNT, ESP_ZB_ZCL_ATTR_TYPE_U16, REP, &store.poll_fail_count);
+    ADD(MC_ATTR_NEXT_WAKE_S, ESP_ZB_ZCL_ATTR_TYPE_U16, REP, &store.next_wake_s);
     ADD(MC_ATTR_CFG_REV, ESP_ZB_ZCL_ATTR_TYPE_U16, REP, &store.cfg_rev);
     ADD(MC_ATTR_CFG_RESULT, ESP_ZB_ZCL_ATTR_TYPE_8BIT_ENUM, REP, &store.cfg_result);
     ADD(MC_ATTR_CFG_ERROR, ESP_ZB_ZCL_ATTR_TYPE_U16, REP, &store.cfg_error);
@@ -132,6 +140,9 @@ static esp_zb_attribute_list_t *custom_cluster(void)
     ADD(MC_ATTR_BATT_LOW_MV, ESP_ZB_ZCL_ATTR_TYPE_U16, RW, &store.batt_low_mv);
     ADD(MC_ATTR_BATT_CRITICAL_MV, ESP_ZB_ZCL_ATTR_TYPE_U16, RW, &store.batt_critical_mv);
     ADD(MC_ATTR_BATT_CAL_PERMILLE, ESP_ZB_ZCL_ATTR_TYPE_U16, RW, &store.batt_cal_permille);
+    ADD(MC_ATTR_POWER_MODE, ESP_ZB_ZCL_ATTR_TYPE_8BIT_ENUM, RW, &store.power_mode);
+    ADD(MC_ATTR_POLL_INTERVAL_MS, ESP_ZB_ZCL_ATTR_TYPE_U16, RW, &store.poll_interval_ms);
+    ADD(MC_ATTR_AWAKE_S, ESP_ZB_ZCL_ATTR_TYPE_U8, RW, &store.awake_s);
     for (int i = 0; i < MC_NUM_SLOTS; i++) {
         ADD(MC_ATTR_SLOT_CFG_0 + i, ESP_ZB_ZCL_ATTR_TYPE_OCTET_STRING, RW, store.slot_cfg[i]);
     }
@@ -162,6 +173,9 @@ static void register_endpoint(void)
     store.batt_low_mv = MC_CFG_BATT_LOW_MV_DEFAULT;
     store.batt_critical_mv = MC_CFG_BATT_CRITICAL_MV_DEFAULT;
     store.batt_cal_permille = MC_CFG_BATT_CAL_PERMILLE_DEFAULT;
+    store.power_mode = MC_CFG_POWER_MODE_DEFAULT;
+    store.poll_interval_ms = MC_CFG_POLL_INTERVAL_MS_DEFAULT;
+    store.awake_s = MC_CFG_AWAKE_S_DEFAULT;
     for (int i = 0; i < MC_NUM_SLOTS; i++) {
         store.slot[i][0] = 8;
         store.slot_cfg[i][0] = 0;
@@ -632,6 +646,10 @@ void mc_zb_update_attrs(const mc_attrs_t *a)
     set_attr(MC_ATTR_CFG_RESULT, &store.cfg_result);
     set_attr(MC_ATTR_CFG_ERROR, &store.cfg_error);
     set_attr(MC_ATTR_BATT_MV, &store.batt_mv);
+    set_attr(MC_ATTR_WAKE_REASON, &store.wake_reason);
+    set_attr(MC_ATTR_AWAKE_MS, &store.awake_ms);
+    set_attr(MC_ATTR_POLL_FAIL_COUNT, &store.poll_fail_count);
+    set_attr(MC_ATTR_NEXT_WAKE_S, &store.next_wake_s);
     set_attr(MC_ATTR_BATT_STATE, &store.batt_state);
     esp_zb_zcl_set_attribute_val(EP, ESP_ZB_ZCL_CLUSTER_ID_POWER_CONFIG, SRV, ESP_ZB_ZCL_ATTR_POWER_CONFIG_BATTERY_VOLTAGE_ID,
                                  &store.batt_100mv, false);

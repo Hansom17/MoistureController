@@ -29,6 +29,7 @@ typedef enum {
 
 typedef enum {
     MC_SN_IDLE,
+    MC_SN_SETTLING, /* the switched sensor supply is on, the sensors settle (PlantModule/specs.md 18.4) */
     MC_SN_SAMPLING,
     MC_SN_REPORTING,
 } mc_sn_state_t;
@@ -111,6 +112,7 @@ typedef enum {
     MC_TIMER_STABLE,
     MC_TIMER_IDENTIFY,
     MC_TIMER_BATTERY,
+    MC_TIMER_SETTLE,
 } mc_timer_t;
 
 typedef enum {
@@ -177,6 +179,7 @@ typedef enum {
     MC_ACT_ALL_OUTPUTS_OFF,
     MC_ACT_READ_SLOT,
     MC_ACT_READ_BATTERY,    /* measure the pin of the battery divider, answer with BATT_SAMPLE */
+    MC_ACT_SENSOR_POWER,    /* switch the sensor supply (boards with a switched rail only) */
     MC_ACT_PERSIST_CONFIG,  /* store core->cfg atomically */
     MC_ACT_PERSIST_DIAG,    /* store core->diag */
     MC_ACT_SET_LED,
@@ -202,6 +205,7 @@ typedef struct {
         struct { uint16_t n; uint8_t code; uint8_t slot; uint16_t arg; } event;
         struct { uint8_t slot; uint8_t port; bool active_high; bool on; } pump;
         struct { uint8_t slot; uint8_t port; } read;
+        struct { bool on; } sensor_power;
         mc_led_t led;
         struct { mc_timer_t id; uint8_t arg; uint32_t delay_ms; } timer;
     } u;
@@ -332,6 +336,7 @@ typedef struct mc_core {
     uint8_t bat_n;            /* how many of them are valid */
     uint8_t bat_bad_streak;   /* consecutive samples at or below the threshold of the next worse state */
     bool bat_pending;         /* a READ_BATTERY is out and the sample waits for it */
+    bool sensor_rail_on;      /* the switched sensor supply is on */
     bool have_pump_end;
     uint32_t last_pump_end_ms;
 
@@ -355,5 +360,22 @@ void mc_core_step(mc_core_t *c, const mc_event_t *ev, mc_actions_t *out);
 void mc_core_attrs(const mc_core_t *c, mc_attrs_t *out);
 void mc_encode_slot_reading(const mc_reading_t *r, uint8_t out[8]);
 bool mc_core_pump_running(const mc_core_t *c);
+
+/* ---- sleeping (PlantModule/specs.md 18.4); the core never sleeps itself, the HAL asks ---------------------- */
+
+typedef enum {
+    MC_SLEEP_NONE,  /* stay awake with the receiver on */
+    MC_SLEEP_LIGHT, /* radio off between parent polls, RAM and timers kept */
+    MC_SLEEP_DEEP,  /* chip off until the next wake */
+} mc_sleep_t;
+
+/* What the HAL may do right now: NONE while anything is going on (not operational, sampling or settling, a report in
+ * flight, a configuration transaction, messages waiting for the link, the LED showing a state of its own) and in
+ * `always_on`; with a pump running or in fast mode a configured deep sleep is only light sleep (rule L7). */
+mc_sleep_t mc_core_sleep_allowed(const mc_core_t *c);
+
+/* The parent poll interval to use in light sleep: the configured one, at most 1000 ms while a pump runs so a stop
+ * arrives quickly. */
+uint16_t mc_core_poll_ms(const mc_core_t *c);
 
 #endif

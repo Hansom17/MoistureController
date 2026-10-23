@@ -70,7 +70,7 @@ requests:
   alert_ack: {body: {alert_id: string}}
   backup: {body: {}}
   query:                     # topic kind: query/<name> (e.g. mc/v1/req/hub/query/readings); all paged with limit + cursor, times are unix seconds
-    readings: {body: {plant_id: string, from: datetime, to: datetime, bucket: "raw|hour|day"}}
+    readings: {body: {plant_id: string, from: datetime, to: datetime, bucket: "raw|hour|day"}}   # raw items: ts, value, raw, error, slot; hour/day items: ts, avg, min, max, count, avg_raw
     commands: {body: {plant_id: "optional", device_id: "optional", status: "optional"}}
     command: {body: {command_id: string}}
     device_health: {body: {device_id: string, from: datetime, to: datetime}}
@@ -96,7 +96,7 @@ api_events:                  # api -> hub
 snapshots:                   # retained, republished on every change and on hub start
   installation: {fields: [name, timezone, battery_low_mv, battery_critical_mv, battery_chemistry, telegram_configured]}
   devices: {item: [id, ieee, name, model, fw, board, status, safe_reason, last_seen_at, link_quality, voltage_mv, config_sync, desired_rev, reported_rev, desired_config, reported_config, config_error, latest_readings, diagnostics, battery]}   # battery: {mv, percent, state, present, calibrated, cal_permille}
-  plants: {item: [id, name, notes, sensor, pump, latest_value, latest_ts, trend, archived]}
+  plants: {item: [id, name, notes, sensor, pump, latest_value, latest_raw, latest_ts, trend, archived]}   # latest_raw: raw ADC counts of the same reading
   rules: {item: [id, plant_id, enabled, threshold, water_s, cooldown_s, max_per_day, quiet_from, quiet_to, notify_channels, notify_on]}
   alerts_open: {item: [id, kind, subject, severity, opened_at, acked_by, acked_at, detail]}
   join: {fields: [open, ends_at, devices]}

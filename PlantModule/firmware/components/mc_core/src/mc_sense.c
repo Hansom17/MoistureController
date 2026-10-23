@@ -8,6 +8,21 @@ static uint32_t interval_ms(const mc_core_t *c)
     return (uint32_t)(c->fast ? c->cfg.fast_report_interval_s : c->cfg.report_interval_s) * 1000u;
 }
 
+/* A sample is under way: settling or reading. */
+static bool sampling_busy(const mc_core_t *c)
+{
+    return c->sn == MC_SN_SAMPLING || c->sn == MC_SN_SETTLING;
+}
+
+static void rail(mc_core_t *c, mc_actions_t *out, bool on)
+{
+    if (c->board == NULL || !c->board->sensor_power.present || c->sensor_rail_on == on) {
+        return;
+    }
+    c->sensor_rail_on = on;
+    mc_act(out, MC_ACT_SENSOR_POWER)->u.sensor_power.on = on;
+}
+
 static bool operational_container(const mc_core_t *c)
 {
     return c->lc == MC_LC_INTERVIEWING || c->lc == MC_LC_OPERATIONAL || c->lc == MC_LC_REJOINING;
@@ -37,13 +52,15 @@ void mc_sense_stop(mc_core_t *c, mc_actions_t *out)
     mc_cancel(out, MC_TIMER_REPORT, 0);
     mc_cancel(out, MC_TIMER_FAST_HOLD, 0);
     mc_cancel(out, MC_TIMER_BATTERY, 0);
+    mc_cancel(out, MC_TIMER_SETTLE, 0);
     c->bat_pending = false;
+    rail(c, out, false);
 }
 
 /* A changed interval or fast mode takes effect from now on. */
 void mc_sense_rearm(mc_core_t *c, mc_actions_t *out)
 {
-    if (c->sn_active && c->sn != MC_SN_SAMPLING) {
+    if (c->sn_active && !sampling_busy(c)) {
         mc_arm(out, MC_TIMER_SAMPLE, 0, interval_ms(c));
     }
 }
@@ -52,7 +69,7 @@ void mc_sense_rearm(mc_core_t *c, mc_actions_t *out)
  * ends with one anyway; the interval then continues from the end of this sample. */
 void mc_sense_sample_now(mc_core_t *c, mc_actions_t *out)
 {
-    if (c->sn_active && c->sn != MC_SN_SAMPLING) {
+    if (c->sn_active && !sampling_busy(c)) {
         mc_arm(out, MC_TIMER_SAMPLE, 0, 1);
     }
 }
@@ -170,6 +187,8 @@ static void finish_sample(mc_core_t *c, mc_actions_t *out)
     mc_cancel(out, MC_TIMER_BATTERY, 0);
     mc_cancel(out, MC_TIMER_SAMPLE_WINDOW, 0);
     mc_cancel(out, MC_TIMER_SLOT, 0);
+    mc_cancel(out, MC_TIMER_SETTLE, 0);
+    rail(c, out, false); /* the sensors are off again before anything else happens, also after a timeout */
     c->seq++;
     for (uint8_t i = 0; i < MC_NUM_SLOTS; i++) {
         const mc_slot_cfg_t *s = &c->cfg.slots[i];
@@ -241,15 +260,27 @@ static void read_next(mc_core_t *c, mc_actions_t *out)
     mc_arm(out, MC_TIMER_SLOT, c->sn_cur, MC_SLOT_READ_TIMEOUT_MS);
 }
 
-static void start_sample(mc_core_t *c, mc_actions_t *out)
+/* The sensors are powered and settled (or never switched): read them one after the other. */
+static void begin_reading(mc_core_t *c, mc_actions_t *out)
 {
     c->sn = MC_SN_SAMPLING;
     c->sn_next = 0;
+    mc_arm(out, MC_TIMER_SAMPLE_WINDOW, 0, MC_SAMPLE_WINDOW_MS);
+    read_next(c, out);
+}
+
+static void start_sample(mc_core_t *c, mc_actions_t *out)
+{
     for (int i = 0; i < MC_NUM_SLOTS; i++) {
         c->sample[i] = (mc_sample_t){.error = MC_SENSOR_ERROR_HW_ERROR, .value = 0, .raw = 0};
     }
-    mc_arm(out, MC_TIMER_SAMPLE_WINDOW, 0, MC_SAMPLE_WINDOW_MS);
-    read_next(c, out);
+    if (c->board != NULL && c->board->sensor_power.present) {
+        c->sn = MC_SN_SETTLING;
+        rail(c, out, true);
+        mc_arm(out, MC_TIMER_SETTLE, 0, c->board->sensor_power.settle_ms > 0 ? c->board->sensor_power.settle_ms : 1u);
+        return;
+    }
+    begin_reading(c, out);
 }
 
 static void slot_result(mc_core_t *c, mc_actions_t *out, uint8_t slot, bool ok, uint16_t raw)
@@ -279,8 +310,13 @@ void mc_sense_on_timer(mc_core_t *c, mc_actions_t *out, mc_timer_t id, uint8_t a
 {
     switch (id) {
     case MC_TIMER_SAMPLE:
-        if (c->sn_active && c->sn != MC_SN_SAMPLING && operational_container(c)) {
+        if (c->sn_active && !sampling_busy(c) && operational_container(c)) {
             start_sample(c, out);
+        }
+        break;
+    case MC_TIMER_SETTLE:
+        if (c->sn == MC_SN_SETTLING) {
+            begin_reading(c, out);
         }
         break;
     case MC_TIMER_SLOT:

@@ -102,7 +102,7 @@ The module is always awake. In the operational state it repeats:
 
 ### 6.1 Battery level detection
 
-**Status: implemented** in the portable core (127 host tests), the HAL, the Zigbee layer, the converter, hub, api and app, and **running on the bench module** (new attributes reported, thresholds and calibration pushed and confirmed, config schema 2); **not yet verified with a real cell**. The bench carrier has none and its sense pin **floats**: a few minutes after a reset it still reads up to about 1.9 V (a false "3.7 V, ok"), then decays to 0 and the state becomes `absent`. A pull-down on the sense node (R4 populated and effective, or a firmware-switched one) belongs on the next carrier; until then a module without a cell can show a false level right after a reset. A firmware update that adds attributes also **needs the Zigbee storage erased** (see below). Differences from the plan: the battery read is the **last step of the sensor sample** (so the value is part of the same report as the moisture and `seq`), not a separate timer; the hub **trusts the module's debounced `batt_state`** and does not debounce again. Goal: the user is told **in time** that a cell is getting low, sees a believable level, and a flat cell never makes a pump run half-way. Scope decided with the project owner: **one Li-ion/LiPo cell (1S)**, detection, reporting and alerts **now** on the always-awake firmware; everything that only matters once the module sleeps stays in §18.
+**Status: implemented** in the portable core (153 host tests), the HAL, the Zigbee layer, the converter, hub, api and app, and **running on the bench module** (new attributes reported, thresholds and calibration pushed and confirmed, config schema 2); **not yet verified with a real cell**. The bench carrier has none and its sense pin **floats**: a few minutes after a reset it still reads up to about 1.9 V (a false "3.7 V, ok"), then decays to 0 and the state becomes `absent`. A pull-down on the sense node (R4 populated and effective, or a firmware-switched one) belongs on the next carrier; until then a module without a cell can show a false level right after a reset. A firmware update that adds attributes also **needs the Zigbee storage erased** (see below). Differences from the plan: the battery read is the **last step of the sensor sample** (so the value is part of the same report as the moisture and `seq`), not a separate timer; the hub **trusts the module's debounced `batt_state`** and does not debounce again. Goal: the user is told **in time** that a cell is getting low, sees a believable level, and a flat cell never makes a pump run half-way. Scope decided with the project owner: **one Li-ion/LiPo cell (1S)**, detection, reporting and alerts **now** on the always-awake firmware; everything that only matters once the module sleeps stays in §18.
 
 **6.1.1 What is measured and what limits the accuracy**
 
@@ -448,7 +448,7 @@ Goal: answer the open Zigbee questions on the real board before the real firmwar
 
 ## 18. Low power (plan)
 
-**Status: planned, nothing built.** This section is the design for running the module from a single cell. It replaces the earlier "parked" list; whatever is not decided here is listed in 18.12. Until the phases of 18.10 are done the module stays always-on (`power_mode = always_on`, today's behaviour), so nothing in §6 to §8 changes for existing modules.
+**Status: P1 done (core, interface, generators, board description, host tests; the HAL does not sleep yet), everything else planned.** This section is the design for running the module from a single cell. It replaces the earlier "parked" list; whatever is not decided here is listed in 18.12. Until the phases of 18.10 are done the module stays always-on (`power_mode = always_on`, today's behaviour), so nothing in §6 to §8 changes for existing modules.
 
 ### 18.1 Decisions
 
@@ -505,7 +505,7 @@ stateDiagram-v2
     Sleeping --> Active: timer wake (reports first, then the awake window)
 ```
 
-- **`Active`** is today's behaviour. **`Napping`** (light sleep) and **`Sleeping`** (deep sleep) are entered only when the core says so: a pure function `mc_core_may_sleep(state)` returns the longest time the chip may sleep, or 0 when it must stay awake (sampling or settling in progress, a pump running or in its stop-poll phase, a configuration transaction open, an acknowledgement or event not yet sent, LED pattern running, joining/rejoining, boot). It is host-testable with the fake clock like every other part of the core.
+- **`Active`** is today's behaviour. **`Napping`** (light sleep) and **`Sleeping`** (deep sleep) are entered only when the core says so: a pure function `mc_core_sleep_allowed()` returns what the HAL may do right now (`MC_SLEEP_NONE`, `_LIGHT` or `_DEEP`; the HAL knows the timers and works out for how long), `NONE` when it must stay awake (sampling or settling in progress, a pump running or in its stop-poll phase, a configuration transaction open, an acknowledgement or event not yet sent, LED pattern running, joining/rejoining, boot). It is host-testable with the fake clock like every other part of the core.
 - **New events:** `T_SETTLED`, `WAKE(reason)`, `POLL_DONE`, `AWAKE_WINDOW_OVER`. **New actions:** `ACT_SENSOR_POWER(on/off)`, `ACT_SLEEP(ms, mode)`. The portable core never sleeps itself; the HAL executes `ACT_SLEEP` (ESP-IDF power management with tickless idle for light sleep, `esp_deep_sleep_start` for deep sleep).
 - **Sampling sequence with a switched rail:** rail on → wait `settle_ms` (board description) → read all slots (§5) → rail off, always, also on timeout/error. A pump run never overlaps a rail-off step of a slot that is needed.
 - **Battery measurement** (§6.1) is taken at the end of the sample window, with the radio idle and the rail still off or settled, as it is today ("quiet after pump"); the divider switching of 18.3 adds its own settle time.
@@ -601,7 +601,7 @@ An optional **Nordic PPK2** (about 100 €) or an Otii Arc would replace all of 
 | Phase | Content | Done when |
 |---|---|---|
 | **P0** | Measure run A on v1 with the 3300 mAh cell, with scope and multimeter (18.9): the supply chain alone, the module always on, the sensors and the divider. Write the numbers into 18.2; settle the budget of L4. | Table filled with ±20 % numbers. |
-| **P1** | Core: sleep-aware states (`may_sleep`, `Settling`, events and actions), `power_mode` and the new config/diagnostic attributes in `interface.yaml` and the generators, board description `sensor_power` / `settle_ms`, host tests (no sleep during sampling, pump, transaction; sample sequence with rail; wake bookkeeping). | Host tests pass; behaviour in `always_on` unchanged. |
+| **P1** (done) | Core: sleep-aware states (`mc_core_sleep_allowed`, `mc_core_poll_ms`, the `Settling` state with its `MC_TIMER_SETTLE` and `ACT_SENSOR_POWER`; the `WAKE`/`POLL_DONE` events come with the HAL in P2 and P4), `power_mode` and the new config/diagnostic attributes in `interface.yaml` and the generators, board description `sensor_power` / `settle_ms`, host tests (no sleep during sampling, pump, transaction; sample sequence with rail; wake bookkeeping). | Host tests pass; behaviour in `always_on` unchanged. |
 | **P2** | Zigbee layer + HAL: sleepy end device with poll interval, fast-poll window, parent timeout, power management config, `light_sleep` on the bench with the v1 board (sensors permanently on); verify that the mode switch needs no rejoin and that configure/attribute changes work. Runs B and E. | L5 met on the bench; no rejoin. |
 | **P3** | Hub, converter, app: `power_mode` setting, `powerSource`, availability off for battery modules, status and wording, tests (hub 100+, converter, app). | End to end with the real module in `light_sleep`. |
 | **P4** | `deep_sleep`: RTC state, wake handling, awake window, buffering, the hub check-in sender and `sleeping` status. Run D. | A command is delivered inside the window; no data lost over a link outage. |
@@ -646,7 +646,7 @@ The contract between the PlantModule firmware and the Gateway's Zigbee2MQTT exte
 | Standard clusters | Basic (0x0000), Power Configuration (0x0001), Identify (0x0003) |
 | Custom cluster | `0xFC11`, manufacturer-specific (development uses Espressif's manufacturer code `0x131B`; a production code is decided later) |
 | Identity of a device | The IEEE address |
-| Interface version | `interface_version` attribute, major.minor in one `uint16` (currently 1.0) |
+| Interface version | `interface_version` attribute, major.minor in one `uint16` (currently 1.1) |
 
 ## 2. Encoding rules
 
@@ -665,7 +665,7 @@ The contract between the PlantModule firmware and the Gateway's Zigbee2MQTT exte
 | 0x0121 | `fast_mode` | uint8 | 1 while fast reporting is active |
 | 0x0122 | `safe_reason` | uint8 | 0 none, 1 factory_invalid, 2 board_unknown, 3 crash_loop |
 | 0x0130 | `uptime_s` | uint32 | |
-| 0x0131 | `boot_reason` | uint8 | 0 power_on, 1 software, 2 panic, 3 watchdog, 4 brownout, 5 other |
+| 0x0131 | `boot_reason` | uint8 | 0 power_on, 1 software, 2 panic, 3 watchdog, 4 brownout, 5 other, 6 deep_sleep_wake |
 | 0x0132 | `reset_count` | uint16 | Unexpected resets since the last power-on |
 | 0x0133 | `rejoin_count` | uint16 | |
 | 0x0134 | `last_error` | uint16 | Firmware error code table |
@@ -673,6 +673,10 @@ The contract between the PlantModule firmware and the Gateway's Zigbee2MQTT exte
 | 0x0136 | `interface_version` | uint16 | |
 | 0x0137 | `config_schema` | uint8 | |
 | 0x0140 | `board` | char string (16) | Board name, e.g. `carrier-v1` |
+| 0x0141 | `wake_reason` | uint8 | Why the module woke last: 0 none, 1 timer, 2 button, 3 pump_end, 4 radio (§18; stays 0 in `always_on`) |
+| 0x0142 | `awake_ms` | uint16 | Length of the last awake window |
+| 0x0143 | `poll_fail_count` | uint16 | Parent polls that got no answer |
+| 0x0144 | `next_wake_s` | uint16 | `deep_sleep`: seconds until the next planned wake |
 
 Standard clusters carry battery voltage (0x0001/0x0020, 100 mV units; informational while externally powered). **Planned:** millivolt-resolution `batt_mv`, `batt_state`, `batt_critical_mv`, `batt_cal_permille` and the matching event and reason, see Part A §6.1.5.
 
@@ -686,6 +690,9 @@ Attributes are written with Write Attributes; nothing becomes active until the c
 | 0x0002 | `fast_report_interval_s` | uint16 | 10–300, default 30 |
 | 0x0003 | `fast_report_hold_s` | uint16 | 0–1800, default 120 |
 | 0x0004 | `batt_low_mv` | uint16 | Low-battery threshold |
+| 0x0007 | `power_mode` | enum8 | 0 always_on (default), 1 light_sleep, 2 deep_sleep; a mode the board cannot run is rejected `role_unsupported` (§18) |
+| 0x0008 | `poll_interval_ms` | uint16 | 500–5000, default 3000: `light_sleep` parent poll |
+| 0x0009 | `awake_s` | uint8 | 2–30, default 5: `deep_sleep` window after a report |
 | 0x0010 + n | `slot_cfg_n` (n = 0…5) | octet string (≤ 24) | `module` uint8 (0 empty, 1 moisture, 2 pump, …) · `port` uint8 (0 = P1 … 5 = P6; `0x80 + n` = raw GPIO n on boards that allow it) · `flags` uint8 · parameters by module: moisture `cal_dry` uint16, `cal_wet` uint16, `samples` uint8; pump `max_run_s` uint16, `min_pause_s` uint16 (bit 0 of `flags`: active high) |
 
 Reported back (read-only):

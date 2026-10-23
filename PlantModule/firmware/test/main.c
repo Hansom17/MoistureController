@@ -8,6 +8,7 @@ void run_config_tests(void);
 void run_fuzz_tests(void);
 void run_battery_tests(void);
 void run_hal_logic_tests(void);
+void run_power_tests(void);
 
 void setUp(void) {}
 void tearDown(void) {}
@@ -23,5 +24,6 @@ int main(void)
     run_fuzz_tests();
     run_battery_tests();
     run_hal_logic_tests();
+    run_power_tests();
     return UNITY_END();
 }

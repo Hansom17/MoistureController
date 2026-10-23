@@ -8,6 +8,7 @@ idf_component_register(
         src/mc_core.c
         src/mc_factory.c
         src/mc_moisture.c
+        src/mc_power.c
         src/mc_sense.c
         src/mc_ui.c
     INCLUDE_DIRS include

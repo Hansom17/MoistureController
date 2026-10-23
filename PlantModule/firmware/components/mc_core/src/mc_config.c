@@ -12,6 +12,9 @@ void mc_config_default(mc_config_t *c)
     c->batt_low_mv = MC_CFG_BATT_LOW_MV_DEFAULT;
     c->batt_critical_mv = MC_CFG_BATT_CRITICAL_MV_DEFAULT;
     c->batt_cal_permille = MC_CFG_BATT_CAL_PERMILLE_DEFAULT;
+    c->power_mode = MC_CFG_POWER_MODE_DEFAULT;
+    c->poll_interval_ms = MC_CFG_POLL_INTERVAL_MS_DEFAULT;
+    c->awake_s = MC_CFG_AWAKE_S_DEFAULT;
 }
 
 static uint16_t le16(const uint8_t *p)
@@ -84,8 +87,14 @@ bool mc_config_validate(const mc_config_t *c, const mc_board_t *board, mc_cfg_er
         c->batt_low_mv < MC_CFG_BATT_LOW_MV_MIN || c->batt_low_mv > MC_CFG_BATT_LOW_MV_MAX ||
         c->batt_critical_mv < MC_CFG_BATT_CRITICAL_MV_MIN || c->batt_critical_mv > MC_CFG_BATT_CRITICAL_MV_MAX ||
         c->batt_critical_mv >= c->batt_low_mv ||
-        c->batt_cal_permille < MC_CFG_BATT_CAL_PERMILLE_MIN || c->batt_cal_permille > MC_CFG_BATT_CAL_PERMILLE_MAX) {
+        c->batt_cal_permille < MC_CFG_BATT_CAL_PERMILLE_MIN || c->batt_cal_permille > MC_CFG_BATT_CAL_PERMILLE_MAX ||
+        c->power_mode > MC_CFG_POWER_MODE_MAX ||
+        c->poll_interval_ms < MC_CFG_POLL_INTERVAL_MS_MIN || c->poll_interval_ms > MC_CFG_POLL_INTERVAL_MS_MAX ||
+        c->awake_s < MC_CFG_AWAKE_S_MIN || c->awake_s > MC_CFG_AWAKE_S_MAX) {
         return fail(err, MC_CFG_ERROR_OUT_OF_RANGE, MC_SLOT_NONE);
+    }
+    if (!mc_board_supports_power_mode(board, c->power_mode)) { /* a mode this board cannot run (PlantModule/specs.md 18.5) */
+        return fail(err, MC_CFG_ERROR_ROLE_UNSUPPORTED, MC_SLOT_NONE);
     }
     bool used[MC_MAX_PORTS + 1] = {false};
     bool raw_used[256] = {false};
@@ -134,7 +143,8 @@ bool mc_config_same(const mc_config_t *a, const mc_config_t *b)
 {
     if (a->report_interval_s != b->report_interval_s || a->fast_report_interval_s != b->fast_report_interval_s ||
         a->fast_report_hold_s != b->fast_report_hold_s || a->batt_low_mv != b->batt_low_mv ||
-        a->batt_critical_mv != b->batt_critical_mv || a->batt_cal_permille != b->batt_cal_permille) {
+        a->batt_critical_mv != b->batt_critical_mv || a->batt_cal_permille != b->batt_cal_permille ||
+        a->power_mode != b->power_mode || a->poll_interval_ms != b->poll_interval_ms || a->awake_s != b->awake_s) {
         return false;
     }
     for (int i = 0; i < MC_NUM_SLOTS; i++) {
@@ -167,6 +177,9 @@ size_t mc_config_encode(const mc_config_t *c, uint8_t out[MC_CONFIG_BLOB_SIZE])
     put16(p, c->batt_low_mv), p += 2;
     put16(p, c->batt_critical_mv), p += 2;
     put16(p, c->batt_cal_permille), p += 2;
+    *p++ = c->power_mode;
+    put16(p, c->poll_interval_ms), p += 2;
+    *p++ = c->awake_s;
     for (int i = 0; i < MC_NUM_SLOTS; i++) {
         const mc_slot_cfg_t *s = &c->slots[i];
         *p++ = s->module;
@@ -188,7 +201,8 @@ size_t mc_config_encode(const mc_config_t *c, uint8_t out[MC_CONFIG_BLOB_SIZE])
 bool mc_config_decode(const uint8_t *buf, size_t len, mc_config_t *out)
 {
     bool v1 = len == MC_CONFIG_BLOB_SIZE_V1 && buf[0] == 1;
-    if (!v1 && (len != MC_CONFIG_BLOB_SIZE || buf[0] != MC_CONFIG_SCHEMA)) {
+    bool v2 = len == MC_CONFIG_BLOB_SIZE_V2 && buf[0] == 2;
+    if (!v1 && !v2 && (len != MC_CONFIG_BLOB_SIZE || buf[0] != MC_CONFIG_SCHEMA)) {
         return false;
     }
     uint32_t want = mc_crc32(buf, len - 4);
@@ -215,6 +229,15 @@ bool mc_config_decode(const uint8_t *buf, size_t len, mc_config_t *out)
     } else {
         c.batt_critical_mv = get16(p), p += 2;
         c.batt_cal_permille = get16(p), p += 2;
+    }
+    if (v1 || v2) { /* migration: always on, as before */
+        c.power_mode = MC_CFG_POWER_MODE_DEFAULT;
+        c.poll_interval_ms = MC_CFG_POLL_INTERVAL_MS_DEFAULT;
+        c.awake_s = MC_CFG_AWAKE_S_DEFAULT;
+    } else {
+        c.power_mode = *p++;
+        c.poll_interval_ms = get16(p), p += 2;
+        c.awake_s = *p++;
     }
     for (int i = 0; i < MC_NUM_SLOTS; i++) {
         mc_slot_cfg_t *s = &c.slots[i];

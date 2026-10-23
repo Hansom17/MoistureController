@@ -6,7 +6,10 @@ CONFIG = {'report_interval_s': {'default': 300, 'min': 10, 'max': 3600},
  'fast_report_hold_s': {'default': 120, 'min': 0, 'max': 1800},
  'batt_low_mv': {'default': 3600, 'min': 3000, 'max': 4000},
  'batt_critical_mv': {'default': 3400, 'min': 3000, 'max': 4000},
- 'batt_cal_permille': {'default': 1000, 'min': 900, 'max': 1100}}
+ 'batt_cal_permille': {'default': 1000, 'min': 900, 'max': 1100},
+ 'power_mode': {'default': 0, 'min': 0, 'max': 2},
+ 'poll_interval_ms': {'default': 3000, 'min': 500, 'max': 5000},
+ 'awake_s': {'default': 5, 'min': 2, 'max': 30}}
 
 BATTERY = {'chemistry': 'li-ion-1s',
  'present_min_mv': 500,

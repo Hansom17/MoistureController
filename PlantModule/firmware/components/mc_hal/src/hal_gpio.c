@@ -64,6 +64,15 @@ static void led_apply(uint32_t now_ms)
     gpio_set_level(board->led.gpio, lit == board->led.active_high);
 }
 
+/* The switched sensor supply (boards with `sensor_power`; nothing happens without it). */
+void mc_hal_sensor_power(bool on)
+{
+    if (board == NULL || !board->sensor_power.present) {
+        return;
+    }
+    gpio_set_level(board->sensor_power.gpio, on ? board->sensor_power.active_high : !board->sensor_power.active_high);
+}
+
 void mc_hal_led_set(mc_led_t pattern)
 {
     if (pattern != led_pattern) {
@@ -96,6 +105,11 @@ void mc_hal_gpio_init(const mc_board_t *b)
         gpio_reset_pin(b->led.gpio);
         gpio_set_direction(b->led.gpio, GPIO_MODE_OUTPUT);
         gpio_set_level(b->led.gpio, !b->led.active_high);
+    }
+    if (b->sensor_power.present) { /* off until the first sample asks for it */
+        gpio_reset_pin(b->sensor_power.gpio);
+        gpio_set_level(b->sensor_power.gpio, !b->sensor_power.active_high);
+        gpio_set_direction(b->sensor_power.gpio, GPIO_MODE_OUTPUT);
     }
     if (b->button.gpio >= 0) {
         gpio_reset_pin(b->button.gpio);
