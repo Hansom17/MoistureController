@@ -11,6 +11,7 @@ import '../../data/models.dart';
 import '../../ui/app_scope.dart';
 import '../../ui/common.dart';
 import '../../ui/plant_card.dart';
+import '../plants/plant_detail_screen.dart' show readNow;
 import '../plants/plant_editor.dart';
 
 class DashboardScreen extends StatelessWidget {
@@ -109,6 +110,9 @@ class _PlantGrid extends ConsumerWidget {
                             hasPendingCommand: (ref.watch(commandsProvider(plant.id)).value ?? const <Command>[])
                                 .any((c) => !c.state.isFinal),
                             onTap: () => context.go('/plants/${plant.id}'),
+                            onReadNow: can(role, AppAction.identifyDevice) && (byId[plant.deviceId]?.reachable ?? false)
+                                ? () => readNow(context, ref, byId[plant.deviceId]!)
+                                : null,
                           ),
                         ),
                     ],

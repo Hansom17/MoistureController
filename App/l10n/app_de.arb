@@ -535,5 +535,8 @@
   "commandFailedBattery": "Akku zu schwach zum Gießen",
   "waterBatteryHint": "Der Akku dieses Moduls ist kritisch: Es verweigert das Gießen.",
   "batteryVoltage": "Spannung",
-  "batteryLevel": "Stand (geschätzt)"
+  "batteryLevel": "Stand (geschätzt)",
+  "plantMenu": "Pflanzenmenü",
+  "readNow": "Jetzt messen",
+  "readingRequested": "Messung angefordert. Der Wert kommt in wenigen Sekunden."
 }

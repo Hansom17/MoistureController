@@ -69,6 +69,12 @@ class Ingest:
                     d.model = model_id or d.model
                 if d.deleted_at is not None:
                     d.deleted_at, d.updated_at = None, now   # rejoined
+                if (model_id or d.model) == MODEL and d.desired_config is None:
+                    # first seen before its interview (or before the converter knew the model): it is supported
+                    # now, so it gets the initial configuration it would have had
+                    await s.flush()
+                    low, critical = await self.battery_thresholds(s)
+                    config_sync.initial(d, now, s, low, critical)
                 d.fw = e.get("software_build_id") or d.fw
                 if e.get("friendly_name") != d.id:
                     renames.append((e.get("friendly_name", ieee), d.id))

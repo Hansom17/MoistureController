@@ -132,6 +132,7 @@ and on the other device `docker compose -f docker-compose.api.yml up -d` with th
 | `docker compose up` says port is in use | Another web server on port 80: set `MC_PORT=8080` in `.env`. |
 | The app says the gateway or the hub is unreachable | `docker compose ps`; `docker compose logs hub api mosquitto`. `hub` and `api` need the passwords in `.env` and `mosquitto/passwd` to match (run `scripts/setup.sh` again, then `docker compose up -d`). |
 | A module does not join | Is the join window open (countdown in the app)? Is the module reset (10 s button hold)? Is it near the dongle? Zigbee channel 25 is used; a very noisy 2.4 GHz environment can need a different one (`advanced.channel`, rejoin required). |
+| Zigbee2MQTT says the module "is NOT supported" | The converter was not loaded: `docker compose logs zigbee2mqtt | grep -i converter` should say `Loaded external converter 'mc-plant.mjs'`. Update to the current compose file (the `z2m-init` step copies the converter into the data volume), run `docker compose up -d`, then reset the module (10 s button) so it joins again. |
 | A module joined but shows no readings | The configure step after the join probably failed. Remove the device in the app and join it again (the join runs configure), and check `docker compose logs zigbee2mqtt` for converter errors. |
 | Times are wrong, rules fire at odd hours | The clock or the installation time zone (step 2 and Settings → Installation). |
 | Everything was fine and is gone after a reinstall | `docker compose down -v` deletes the volumes. Restore from the backup (step 9). |
@@ -143,5 +144,5 @@ and on the other device `docker compose -f docker-compose.api.yml up -d` with th
 | Passwords, dongle path, port | `Gateway/firmware/.env` (mode 600, never commit it) |
 | Mosquitto users and rules | `Gateway/firmware/mosquitto/passwd` and `acl` (`hub`, `api` and `z2m` each see only their own topics) |
 | Databases and Zigbee data | Docker volumes `moisture_hub-data`, `moisture_api-data`, `moisture_z2m-data`, `moisture_mosquitto-data` |
-| Zigbee2MQTT converter for the module | `Gateway/firmware/zigbee2mqtt/external_converters/` (mounted read-only into the container) |
+| Zigbee2MQTT converter for the module | `Gateway/firmware/zigbee2mqtt/external_converters/`; the `z2m-init` container copies it into the Zigbee2MQTT data volume on **every** `docker compose up` (Zigbee2MQTT needs a writable folder to load it), so a `git pull` followed by `docker compose up -d` is enough to update it |
 | What is published | Only the `api` port (`MC_PORT`). MQTT, Zigbee2MQTT and the hub stay on the container network. |

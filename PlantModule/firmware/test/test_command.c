@@ -216,6 +216,56 @@ static void test_a_stop_during_link_loss_is_still_honoured(void)
     TEST_ASSERT_FALSE(S.pump_on[2]);
 }
 
+static void test_report_now_samples_at_once_and_reports(void)
+{
+    operational(); /* the first sample is done, the next one is 300 s away */
+    uint16_t seq = S.core.seq;
+    int reports = S.reports;
+    sim_advance(&S, 10000);
+    TEST_ASSERT_EQUAL_UINT16_MESSAGE(seq, S.core.seq, "nothing happens on its own");
+    sim_send(&S, ev_action(7, MC_DEVICE_ACTION_REPORT_NOW));
+    ASSERT_ACK(&S, 7, MC_ACK_STATE_DONE, MC_REASON_NONE);
+    sim_advance(&S, 200);
+    TEST_ASSERT_EQUAL_UINT16(seq + 1, S.core.seq);
+    TEST_ASSERT_EQUAL_INT_MESSAGE(reports + 1, S.reports, "an explicit report with the new sample");
+    TEST_ASSERT_EQUAL_UINT16(seq + 1, S.attrs.seq);
+}
+
+static void test_the_regular_interval_continues_after_a_report_now(void)
+{
+    operational();
+    sim_advance(&S, 10000);
+    sim_send(&S, ev_action(7, MC_DEVICE_ACTION_REPORT_NOW));
+    sim_advance(&S, 200);
+    uint16_t seq = S.core.seq;
+    sim_advance(&S, 299000);
+    TEST_ASSERT_EQUAL_UINT16(seq, S.core.seq);
+    sim_advance(&S, 2000);
+    TEST_ASSERT_EQUAL_UINT16(seq + 1, S.core.seq);
+}
+
+static void test_report_now_during_a_sample_does_not_start_a_second_one(void)
+{
+    mc_config_t cfg;
+    sim_cfg_default(&cfg);
+    sim_init(&S, "carrier-v1");
+    sim_to_operational(&S, &cfg);
+    sim_advance(&S, 1010); /* the first sample is running (its slot read is out) */
+    TEST_ASSERT_EQUAL_INT(MC_SN_SAMPLING, S.core.sn);
+    sim_send(&S, ev_action(7, MC_DEVICE_ACTION_REPORT_NOW));
+    sim_advance(&S, 500);
+    TEST_ASSERT_EQUAL_UINT16(1, S.core.seq);
+}
+
+static void test_report_now_does_nothing_in_safe_mode_but_is_acknowledged(void)
+{
+    sim_init(&S, "carrier-v1");
+    sim_boot(&S, &(sim_boot_opts_t){.factory_invalid = true});
+    sim_send(&S, ev_action(7, MC_DEVICE_ACTION_REPORT_NOW));
+    sim_advance(&S, 5000);
+    TEST_ASSERT_EQUAL_UINT16(0, S.core.seq);
+}
+
 void run_command_tests(void)
 {
     RUN_TEST(test_a_run_starts_the_pump_answers_running_and_ends_on_time);
@@ -235,4 +285,8 @@ void run_command_tests(void)
     RUN_TEST(test_reboot_is_acknowledged_first_then_outputs_are_off_and_reboot_requested);
     RUN_TEST(test_link_loss_does_not_stop_a_run_and_the_result_waits_for_the_link);
     RUN_TEST(test_a_stop_during_link_loss_is_still_honoured);
+    RUN_TEST(test_report_now_samples_at_once_and_reports);
+    RUN_TEST(test_the_regular_interval_continues_after_a_report_now);
+    RUN_TEST(test_report_now_during_a_sample_does_not_start_a_second_one);
+    RUN_TEST(test_report_now_does_nothing_in_safe_mode_but_is_acknowledged);
 }

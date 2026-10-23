@@ -295,3 +295,13 @@ def test_pump_limits_match_the_firmware_ceiling():
         config_sync.validate(slot(max_run_s=301), board)
     with pytest.raises(HubError):
         config_sync.validate(slot(min_pause_s=65536), board)
+
+
+async def test_report_now_is_a_device_action_that_reaches_the_module_even_in_safe_mode(rig):
+    dev, plant = await ready_plant(rig)
+    res = await rig.api.request("device_action", {"device_id": dev, "action": "report_now"})   # no admin needed
+    assert res["ok"], res
+    assert sent(rig, dev)[-1]["device_action"]["action"] == "report_now"
+    await device_report(rig, dev, status="safe_mode", safe_reason="crash_loop")
+    res = await rig.api.request("device_action", {"device_id": dev, "action": "report_now"})
+    assert res["ok"] and sent(rig, dev)[-1]["device_action"]["action"] == "report_now"

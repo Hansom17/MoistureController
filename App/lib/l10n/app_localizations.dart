@@ -2245,6 +2245,24 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Level (estimate)'**
   String get batteryLevel;
+
+  /// No description provided for @plantMenu.
+  ///
+  /// In en, this message translates to:
+  /// **'Plant menu'**
+  String get plantMenu;
+
+  /// No description provided for @readNow.
+  ///
+  /// In en, this message translates to:
+  /// **'Read now'**
+  String get readNow;
+
+  /// No description provided for @readingRequested.
+  ///
+  /// In en, this message translates to:
+  /// **'Reading requested. It arrives in a few seconds.'**
+  String get readingRequested;
 }
 
 class _AppLocalizationsDelegate

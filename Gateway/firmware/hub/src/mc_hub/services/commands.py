@@ -16,7 +16,8 @@ HARD_LIMIT_S = 300           # no pump run longer than this, whatever the device
 OPEN = ("queued", "delivered", "cancelling")
 PUMP_ACTIONS = ("pump.run", "pump.stop")
 NOT_NEW = ("ready", "online", "late", "offline", "safe_mode")
-DEVICE_ACTIONS = {"identify": "device.identify", "reboot": "device.reboot", "clear_safe_mode": "device.clear_safe_mode"}
+DEVICE_ACTIONS = {"identify": "device.identify", "reboot": "device.reboot", "clear_safe_mode": "device.clear_safe_mode",
+                  "report_now": "device.report_now"}
 
 
 def command_view(c: Command) -> dict:

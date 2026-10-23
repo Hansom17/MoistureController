@@ -758,7 +758,16 @@ class FakeMoistureRepository implements MoistureRepository {
 
   @override
   Future<void> deviceAction(String deviceId, DeviceAction action) => _delay(() {
-    _require(action == DeviceAction.identify ? Role.member : Role.admin);
+    _require(action == DeviceAction.identify || action == DeviceAction.reportNow ? Role.member : Role.admin);
+    if (action == DeviceAction.reportNow) { // the module samples again: the readings of its plants are fresh
+      final now = _clock();
+      for (var i = 0; i < _plants.length; i++) {
+        if (_plants[i].sensor.deviceId == deviceId && _plants[i].moisturePercent != null) {
+          _plants[i] = _plants[i].copyWith(lastReadingAt: now);
+          _emit(LiveEvent(LiveEventKind.plant, entityId: _plants[i].id));
+        }
+      }
+    }
     if (action == DeviceAction.clearSafeMode) {
       final i = _devices.indexWhere((d) => d.id == deviceId);
       _devices[i] = _copy(_devices[i], status: DeviceStatus.online);

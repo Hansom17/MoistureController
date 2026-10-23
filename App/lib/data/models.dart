@@ -365,7 +365,7 @@ class JoinState {
 }
 
 /// One-shot device actions.
-enum DeviceAction { identify, reboot, clearSafeMode }
+enum DeviceAction { identify, reboot, clearSafeMode, reportNow }
 
 /// Where a plant's sensor or pump is plugged in.
 class SlotRef {

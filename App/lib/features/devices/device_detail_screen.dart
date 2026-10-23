@@ -163,6 +163,7 @@ class _DeviceBody extends ConsumerWidget {
           runSpacing: Spacing.sm,
           children: [
             actionButton(DeviceAction.identify, Icons.lightbulb_outline, l.identify, AppAction.identifyDevice),
+            actionButton(DeviceAction.reportNow, Icons.refresh, l.readNow, AppAction.identifyDevice),
             actionButton(DeviceAction.reboot, Icons.restart_alt, l.reboot, AppAction.manageDevices),
             if (canManage)
               OutlinedButton.icon(

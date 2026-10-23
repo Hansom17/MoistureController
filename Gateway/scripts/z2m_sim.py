@@ -244,6 +244,8 @@ class Sim:
             elif c["action"] == "clear_safe_mode":
                 m.status = "operational"
             await self._ack(m, c["cmd_id"], "done")
+            if c["action"] == "report_now":            # a fresh sample and an explicit report
+                await self.report(m)
 
     async def _pump_run(self, m: Module, cmd_id: int, slot: int, seconds: int, ttl_s: int) -> None:
         if cmd_id in m.done:                                # a repeated id is never executed twice

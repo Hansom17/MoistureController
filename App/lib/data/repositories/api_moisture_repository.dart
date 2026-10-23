@@ -814,6 +814,7 @@ class ApiMoistureRepository implements MoistureRepository {
           DeviceAction.identify => 'identify',
           DeviceAction.reboot => 'reboot',
           DeviceAction.clearSafeMode => 'clear_safe_mode',
+          DeviceAction.reportNow => 'report_now',
         },
       });
 
