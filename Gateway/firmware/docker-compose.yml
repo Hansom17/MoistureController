@@ -18,13 +18,24 @@ services:
       timeout: 3s
       retries: 5
 
+  # One-shot on every `up`: the configuration is copied once (it then lives in the volume), the module's converter is
+  # copied EVERY time. Zigbee2MQTT writes a temporary copy next to a converter before it loads it, so the converter
+  # must sit in the writable volume, not in a read-only mount of the repository.
   z2m-init:
     image: koenkk/zigbee2mqtt:2.14.2
     restart: "no"
-    entrypoint: ["sh", "-c", "[ -f /app/data/configuration.yaml ] || cp /template/configuration.yaml /app/data/configuration.yaml"]
+    entrypoint:
+      - sh
+      - -c
+      - |
+        set -e
+        [ -f /app/data/configuration.yaml ] || cp /template/configuration.yaml /app/data/configuration.yaml
+        rm -rf /app/data/external_converters
+        cp -r /template/external_converters /app/data/external_converters
     volumes:
       - z2m-data:/app/data
       - ./zigbee2mqtt/configuration.yaml:/template/configuration.yaml:ro
+      - ./zigbee2mqtt/external_converters:/template/external_converters:ro
 
   zigbee2mqtt:
     image: koenkk/zigbee2mqtt:2.14.2
@@ -40,7 +51,6 @@ services:
       ZIGBEE2MQTT_CONFIG_SERIAL_ADAPTER: ${ZIGBEE_ADAPTER:-ember}
     volumes:
       - z2m-data:/app/data
-      - ./zigbee2mqtt/external_converters:/app/data/external_converters:ro
 
   hub:
     build: ./hub
