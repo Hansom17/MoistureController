@@ -182,6 +182,7 @@ async def test_query_readings_buckets(rig):
     items = (await rig.api.request("query/readings", {"plant_id": plant["id"], "bucket": "hour"}))["body"]["items"]
     assert sum(i["count"] for i in items) == 6
     assert all(i["min"] <= i["avg"] <= i["max"] for i in items)
+    assert all(i["avg_raw"] is not None and i["avg_raw"] > 0 for i in items)         # the measured value next to the percent
     assert (await rig.api.request("query/readings", {"plant_id": plant["id"], "bucket": "week"}))["error"]["type"] == "validation"
 
 

@@ -1219,6 +1219,32 @@ class AppLocalizationsDe extends AppLocalizations {
   String get batteryLevel => 'Stand (geschätzt)';
 
   @override
+  String get showMeasured => 'Messwerte anzeigen';
+
+  @override
+  String get showPercent => 'Prozent anzeigen';
+
+  @override
+  String moistureRawSemantics(int value) {
+    return 'Messwert $value';
+  }
+
+  @override
+  String chartSummaryRaw(int min, int max) {
+    return 'Messwert zwischen $min und $max in diesem Zeitraum';
+  }
+
+  @override
+  String measuredAs(int value) {
+    return 'Messwert $value';
+  }
+
+  @override
+  String calibratedAs(int percent) {
+    return 'Kalibriert: $percent %';
+  }
+
+  @override
   String get plantMenu => 'Pflanzenmenü';
 
   @override

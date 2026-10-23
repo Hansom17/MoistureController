@@ -66,7 +66,7 @@ class CannedApi implements HttpClientAdapter {
         return [
           {
             'id': 'p1', 'name': 'Ficus', 'notes': '', 'sensor': {'device_id': 'dev-abc', 'slot': 0},
-            'pump': {'device_id': 'dev-abc', 'slot': 2}, 'latest_value': 41.5, 'latest_ts': '2026-10-09T20:00:00Z',
+            'pump': {'device_id': 'dev-abc', 'slot': 2}, 'latest_value': 41.5, 'latest_raw': 2250, 'latest_ts': '2026-10-09T20:00:00Z',
             'trend': 'falling', 'archived': false,
           },
           {'id': 'p2', 'name': 'Moss', 'sensor': {'device_id': null, 'slot': null}, 'pump': {'device_id': null, 'slot': null},
@@ -84,7 +84,7 @@ class CannedApi implements HttpClientAdapter {
         };
       case 'GET /plants/p1/readings':
         return o.queryParameters['cursor'] == null
-            ? {'items': [{'ts': '2026-10-09T10:00:00Z', 'avg': 40.0, 'min': 38.0, 'max': 42.0, 'count': 12}], 'next_cursor': 'abc'}
+            ? {'items': [{'ts': '2026-10-09T10:00:00Z', 'avg': 40.0, 'min': 38.0, 'max': 42.0, 'count': 12, 'avg_raw': 2280.4}], 'next_cursor': 'abc'}
             : {'items': [{'ts': '2026-10-09T11:00:00Z', 'avg': 38.0, 'min': 37.0, 'max': 39.0, 'count': 12}], 'next_cursor': null};
       case 'GET /plants/p1/rules':
         return [
@@ -222,6 +222,8 @@ void main() {
 
   test('plants: moisture, trend and the pump limit come from the device configuration', () async {
     final plants = await repo.plants();
+    expect(plants[0].rawValue, 2250);
+    expect(plants[1].rawValue, isNull);
     expect(plants.first.moisturePercent, 41.5);
     expect(plants.first.trend, Trend.falling);
     expect(plants.first.maxRunS, 45);
@@ -247,6 +249,7 @@ void main() {
   test('readings: hourly buckets for a week, all pages are followed', () async {
     final r = await repo.readings('p1', ChartRange.week);
     expect(r.map((x) => x.moisturePercent), [40.0, 38.0]);
+    expect(r.map((x) => x.raw), [2280.4, null]); // the second bucket came without a measured value
     final first = api.requests.firstWhere((x) => x.path == '/plants/p1/readings');
     expect(first.queryParameters['bucket'], 'hour');
     expect(first.queryParameters['from'], startsWith('2026-10-02T20'));

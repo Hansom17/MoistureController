@@ -2246,6 +2246,42 @@ abstract class AppLocalizations {
   /// **'Level (estimate)'**
   String get batteryLevel;
 
+  /// No description provided for @showMeasured.
+  ///
+  /// In en, this message translates to:
+  /// **'Show measured values'**
+  String get showMeasured;
+
+  /// No description provided for @showPercent.
+  ///
+  /// In en, this message translates to:
+  /// **'Show percent'**
+  String get showPercent;
+
+  /// No description provided for @moistureRawSemantics.
+  ///
+  /// In en, this message translates to:
+  /// **'Measured value {value}'**
+  String moistureRawSemantics(int value);
+
+  /// No description provided for @chartSummaryRaw.
+  ///
+  /// In en, this message translates to:
+  /// **'Measured value between {min} and {max} in this period'**
+  String chartSummaryRaw(int min, int max);
+
+  /// No description provided for @measuredAs.
+  ///
+  /// In en, this message translates to:
+  /// **'Measured value {value}'**
+  String measuredAs(int value);
+
+  /// No description provided for @calibratedAs.
+  ///
+  /// In en, this message translates to:
+  /// **'Calibrated: {percent} %'**
+  String calibratedAs(int percent);
+
   /// No description provided for @plantMenu.
   ///
   /// In en, this message translates to:

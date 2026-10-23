@@ -415,6 +415,7 @@ class ApiMoistureRepository implements MoistureRepository {
     sensor: _ref(p['sensor']),
     pump: _ref(p['pump']),
     moisturePercent: (p['latest_value'] as num?)?.toDouble(),
+    rawValue: (p['latest_raw'] as num?)?.round(),
     trend: switch (p['trend']) {
       'rising' => Trend.rising,
       'falling' => Trend.falling,
@@ -495,7 +496,7 @@ class ApiMoistureRepository implements MoistureRepository {
       );
       for (final i in _list(r['items']).cast<Map>()) {
         final v = (i['avg'] ?? i['value']) as num?;
-        if (v != null) out.add(Reading(_dt(i['ts'])!, v.toDouble()));
+        if (v != null) out.add(Reading(_dt(i['ts'])!, v.toDouble(), ((i['avg_raw'] ?? i['raw']) as num?)?.toDouble()));
       }
       cursor = r['next_cursor'] as String?;
       if (cursor == null) break;

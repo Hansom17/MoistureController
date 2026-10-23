@@ -7,6 +7,8 @@ import '../../core/actions.dart';
 import '../../core/format.dart';
 import '../../core/app_data.dart';
 import '../../core/permissions.dart';
+import '../../core/settings.dart';
+import '../../ui/value_mode_button.dart';
 import '../../data/models.dart';
 import '../../ui/command_state_tile.dart';
 import '../../ui/common.dart';
@@ -33,6 +35,7 @@ class PlantDetailScreen extends StatelessWidget {
             appBar: AppBar(
               title: Text(plant.value?.name ?? ''),
               actions: [
+                const ValueModeButton(),
                 if (plant.value != null && can(user.role, AppAction.identifyDevice))
                   Consumer(
                     builder: (context, ref, _) {
@@ -140,6 +143,8 @@ class _Overview extends ConsumerWidget {
           children: [
             MoistureGauge(
               percent: plant.moisturePercent,
+              raw: plant.rawValue,
+              mode: ref.watch(valueModeProvider),
               size: GaugeSize.large,
             ),
             const SizedBox(width: Spacing.xl),
@@ -169,6 +174,13 @@ class _Overview extends ConsumerWidget {
                         ),
                     ],
                   ),
+                  if (plant.moisturePercent != null && plant.rawValue != null)
+                    Text(
+                      ref.watch(valueModeProvider) == ValueMode.measured
+                          ? l.calibratedAs(plant.moisturePercent!.round())
+                          : l.measuredAs(plant.rawValue!),
+                      style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+                    ),
                   const SizedBox(height: Spacing.sm),
                   if (device != null) ...[
                     Text(
@@ -251,6 +263,7 @@ class _HistoryState extends ConsumerState<_History> {
             data: (readings) => MoistureChart(
               readings: readings,
               range: _range,
+              mode: ref.watch(valueModeProvider),
               thresholds: [
                 for (final r in rules)
                   if (r.enabled) r.belowPercent,

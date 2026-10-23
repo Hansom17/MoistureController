@@ -536,6 +536,12 @@
   "waterBatteryHint": "Der Akku dieses Moduls ist kritisch: Es verweigert das Gießen.",
   "batteryVoltage": "Spannung",
   "batteryLevel": "Stand (geschätzt)",
+  "showMeasured": "Messwerte anzeigen",
+  "showPercent": "Prozent anzeigen",
+  "moistureRawSemantics": "Messwert {value}",
+  "chartSummaryRaw": "Messwert zwischen {min} und {max} in diesem Zeitraum",
+  "measuredAs": "Messwert {value}",
+  "calibratedAs": "Kalibriert: {percent} %",
   "plantMenu": "Pflanzenmenü",
   "readNow": "Jetzt messen",
   "readingRequested": "Messung angefordert. Der Wert kommt in wenigen Sekunden."

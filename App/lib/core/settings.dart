@@ -26,6 +26,26 @@ class ThemeModeSetting extends Notifier<ThemeMode> {
   }
 }
 
+const _valueModeKey = 'value_mode';
+
+/// How moisture is shown: as a percentage or as the value the sensor measured (raw ADC counts).
+enum ValueMode { percent, measured }
+
+final valueModeProvider = NotifierProvider<ValueModeSetting, ValueMode>(ValueModeSetting.new);
+
+class ValueModeSetting extends Notifier<ValueMode> {
+  @override
+  ValueMode build() {
+    final stored = ref.watch(sharedPreferencesProvider).getString(_valueModeKey);
+    return ValueMode.values.firstWhere((m) => m.name == stored, orElse: () => ValueMode.percent);
+  }
+
+  void toggle() {
+    state = state == ValueMode.percent ? ValueMode.measured : ValueMode.percent;
+    ref.read(sharedPreferencesProvider).setString(_valueModeKey, state.name);
+  }
+}
+
 /// Null = follow the system language.
 final localeProvider = NotifierProvider<LocaleSetting, Locale?>(
   LocaleSetting.new,

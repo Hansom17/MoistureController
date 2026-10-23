@@ -56,7 +56,7 @@ async def test_telemetry_stores_reading_for_assigned_plant(rig):
     d = rig.api.state["state/devices"][0]
     assert d["status"] == "online" and d["link_quality"] == 112 and d["latest_readings"]["0"]["value"] == 41.5
     assert d["board"] == "carrier-v1"
-    assert rig.api.state["state/plants"][0]["latest_value"] == 41.5
+    assert rig.api.state["state/plants"][0]["latest_value"] == 41.5 and rig.api.state["state/plants"][0]["latest_raw"] == 2143
     assert "reading" in [e["kind"] for e in rig.api.events]
 
 

@@ -452,6 +452,7 @@ class FakeMoistureRepository implements MoistureRepository {
           sensor: sensor ?? p.sensor,
           pump: pump ?? p.pump,
           moisturePercent: p.moisturePercent,
+          rawValue: p.rawValue,
           trend: p.trend,
           lastReadingAt: p.lastReadingAt,
           maxRunS: pump == null ? p.maxRunS : _pumpLimit(pump),
@@ -474,7 +475,10 @@ class FakeMoistureRepository implements MoistureRepository {
     final count = range.span.inMinutes ~/ range.bucket.inMinutes;
     return [
       for (var i = count; i >= 0; i--)
-        Reading(now.subtract(range.bucket * i), curve.at(now.subtract(range.bucket * i))),
+        () {
+          final v = curve.at(now.subtract(range.bucket * i));
+          return Reading(now.subtract(range.bucket * i), v, fakeRaw(v).toDouble());
+        }(),
     ];
   });
 
@@ -541,7 +545,7 @@ class FakeMoistureRepository implements MoistureRepository {
     final i = _plants.indexWhere((p) => p.id == plantId);
     final now = _clock();
     final value = min(95.0, (_plants[i].moisturePercent ?? 0) + seconds * 2.5);
-    _plants[i] = _plants[i].copyWith(moisturePercent: value, trend: Trend.rising, lastReadingAt: now);
+    _plants[i] = _plants[i].copyWith(moisturePercent: value, rawValue: fakeRaw(value), trend: Trend.rising, lastReadingAt: now);
     _curves[plantId] = _curves[plantId]!.wateredTo(value, now);
     _emit(LiveEvent(LiveEventKind.reading, entityId: plantId));
   }
@@ -661,7 +665,7 @@ class FakeMoistureRepository implements MoistureRepository {
       final p = _plants[i];
       _plants[i] = Plant(
         id: p.id, name: p.name, notes: p.notes, sensor: p.sensor, pump: p.pump,
-        moisturePercent: p.moisturePercent, trend: p.trend, lastReadingAt: p.lastReadingAt,
+        moisturePercent: p.moisturePercent, rawValue: p.rawValue, trend: p.trend, lastReadingAt: p.lastReadingAt,
         maxRunS: _pumpLimit(p.pump),
       );
     }
@@ -920,7 +924,8 @@ class FakeMoistureRepository implements MoistureRepository {
       return Plant(
         id: id, name: name, sensor: SlotRef(deviceId: device, slot: sensorSlot),
         pump: pump ? SlotRef(deviceId: device, slot: 2) : const SlotRef(),
-        moisturePercent: value, trend: trend, lastReadingAt: value == null ? null : ago(seen), maxRunS: pump ? 30 : 0,
+        moisturePercent: value, rawValue: value == null ? null : fakeRaw(value), trend: trend,
+        lastReadingAt: value == null ? null : ago(seen), maxRunS: pump ? 30 : 0,
       );
     }
 
@@ -976,3 +981,6 @@ class _Curve {
   _Curve wateredTo(double value, DateTime when) =>
       _Curve(current, at0, wateredAt: value, wateredTime: when);
 }
+
+/// The demo sensors' raw counts for a percentage: the default calibration (dry 3000, wet 1200) run backwards.
+int fakeRaw(double percent) => (3000 - percent.clamp(0, 100) / 100 * 1800).round();

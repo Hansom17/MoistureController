@@ -387,6 +387,7 @@ class Plant {
     required this.trend,
     required this.lastReadingAt,
     required this.maxRunS,
+    this.rawValue,
     this.notes = '',
     this.sensor = const SlotRef(),
     this.pump = const SlotRef(),
@@ -400,6 +401,9 @@ class Plant {
 
   /// Null until the first reading arrives.
   final double? moisturePercent;
+
+  /// The same reading as the sensor measured it (raw ADC counts), before the calibration made a percentage of it.
+  final int? rawValue;
   final Trend trend;
   final DateTime? lastReadingAt;
 
@@ -413,6 +417,7 @@ class Plant {
 
   Plant copyWith({
     double? moisturePercent,
+    int? rawValue,
     Trend? trend,
     DateTime? lastReadingAt,
   }) => Plant(
@@ -422,6 +427,7 @@ class Plant {
     sensor: sensor,
     pump: pump,
     moisturePercent: moisturePercent ?? this.moisturePercent,
+    rawValue: rawValue ?? this.rawValue,
     trend: trend ?? this.trend,
     lastReadingAt: lastReadingAt ?? this.lastReadingAt,
     maxRunS: maxRunS,
@@ -429,10 +435,13 @@ class Plant {
 }
 
 class Reading {
-  const Reading(this.at, this.moisturePercent);
+  const Reading(this.at, this.moisturePercent, [this.raw]);
 
   final DateTime at;
   final double moisturePercent;
+
+  /// The measured value (raw ADC counts), when the gateway has it.
+  final double? raw;
 }
 
 /// Chart range with its bucket size (App/specs.md Part A §4, plant detail).
