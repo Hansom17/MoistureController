@@ -1,18 +1,29 @@
 """Battery detection in the hub (Gateway/specs.md 13.1)."""
 import pytest
 
-from .conftest import add_device, ack, device_report, ready_device, ready_plant, sent
+from mc_hub.params import BATTERY
 from mc_hub.services import battery
+
+from .conftest import add_device, ack, device_report, ready_device, ready_plant, sent
 
 
 # ---- the pure parts --------------------------------------------------------------------------------
 
-def test_percent_follows_the_curve_and_interpolates():
-    assert battery.percent(4200) == 100 and battery.percent(4300) == 100
-    assert battery.percent(3840) == 50
-    assert battery.percent(3300) == 0 and battery.percent(3000) == 0
-    assert battery.percent(3855) == 55          # halfway between 3840 (50 %) and 3870 (60 %)
-    values = [battery.percent(mv) for mv in range(3300, 4201, 25)]
+CURVE = BATTERY["percent_curves"][battery.CHEMISTRY]     # the numbers are owned by interface.yaml, not by this test
+
+
+def test_percent_follows_the_configured_curve_and_interpolates():
+    assert CURVE == sorted(CURVE, reverse=True), "the curve is listed from full to empty"
+    (top_mv, top_pct), (bottom_mv, bottom_pct) = CURVE[0], CURVE[-1]
+    assert battery.percent(top_mv + 100) == top_pct == 100
+    assert battery.percent(bottom_mv - 100) == bottom_pct == 0
+    for mv, pct in CURVE:
+        assert battery.percent(mv) == pct, f"{mv} mV is a point of the curve"
+    for (hi_mv, hi_pct), (lo_mv, lo_pct) in zip(CURVE, CURVE[1:]):
+        mid = battery.percent((hi_mv + lo_mv) // 2)
+        assert lo_pct <= mid <= hi_pct
+        assert abs(mid - (hi_pct + lo_pct) / 2) <= 1.5, "halfway in voltage is about halfway in percent"
+    values = [battery.percent(mv) for mv in range(bottom_mv - 50, top_mv + 51, 10)]
     assert values == sorted(values), "monotonic"
 
 
