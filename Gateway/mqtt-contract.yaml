@@ -1,0 +1,124 @@
+# The api <-> hub contract. Human-readable design: Gateway/specs.md section 3.
+# There is no shared code: api and hub each implement their side from this file.
+# Status: design proposal; field lists are the starting point for the first implementation.
+
+contract:
+  version: "1.0"            # major = topic prefix mc/v1; a different major is incompatible
+  encoding: json
+  qos: 1
+
+envelope:
+  request:                   # api -> hub, topic mc/v1/req/hub/<kind>
+    fields:
+      v: {type: int}
+      id: {type: ulid, note: "idempotency key; hub keeps the answer for 10 minutes"}
+      ts: {type: datetime}
+      deadline: {type: datetime, note: "hub ignores the request after this"}
+      reply_to: {type: topic, note: "mc/v1/res/<api-instance>/<id>"}
+      actor: {user_id: ulid, role: "owner|admin|member|viewer"}
+      body: {type: object}
+  response:                  # hub -> api, on reply_to
+    fields:
+      v: {type: int}
+      id: {type: ulid}
+      ok: {type: bool}
+      body: {type: object, when: ok}
+      error: {type: "{type, status, title, detail}", when: not ok}
+  event:                     # hub -> api, topic mc/v1/event/<kind>
+    fields: {v: int, boot_id: int, seq: int, ts: datetime, kind: string, body: object}
+  status:                    # retained, topic mc/v1/status/<service>; last will sets offline
+    fields: {state: "online|offline", contract: string, version: string, boot_id: int}
+
+topics:
+  request:  "mc/v1/req/hub/{kind}"
+  response: "mc/v1/res/{api_instance}/{request_id}"
+  event:    "mc/v1/event/{kind}"
+  api_event: "mc/v1/event/api/{kind}"
+  state:    "mc/v1/state/{name}"          # retained
+  status:   "mc/v1/status/{service}"      # retained
+
+errors:                      # error.type -> HTTP status
+  validation: 422
+  not_found: 404
+  conflict: 409
+  busy: 409
+  device_not_ready: 409
+  device_safe_mode: 409
+  battery_critical: 409        # a rule's pump run is refused for a critical battery (manual runs are left to the module)
+  slot_not_actuator: 422
+  safety_limit: 422
+  unknown_kind: 400
+  expired: 408
+
+requests:
+  installation_set: {body: {name: string, timezone: string, battery_low_mv: int, battery_critical_mv: "int, 3000 <= critical < low <= 4000, pushed into every device configuration", telegram: {token: "string, write-only", chat_id: string, kinds: [string]}}}
+  device_join_open: {body: {install_code: "string, optional", seconds: "int, default 120"}}
+  device_join_close: {body: {}}
+  device_battery_calibrate: {body: {device_id: string, measured_mv: int}, answer: {cal_permille: int, rev: int}}   # new batt_cal_permille from a multimeter reading, 900..1100
+  device_update: {body: {device_id: string, name: string}}
+  device_remove: {body: {device_id: string, force: bool}}
+  device_config_put: {body: {device_id: string, base_rev: int, config: object}, answer: {rev: int}}
+  device_action: {body: {device_id: string, action: "identify|reboot|clear_safe_mode"}, answer: {command: object}}
+  plant_create: {body: {name: string, notes: string, sensor: {device_id: string, slot: int}, pump: {device_id: string, slot: int}}}
+  plant_update: {body: {plant_id: string, fields: object}}
+  plant_delete: {body: {plant_id: string}}
+  water: {body: {plant_id: string, seconds: int, ttl_s: "int, optional"}, answer: {command: object}}
+  command_cancel: {body: {command_id: string}}
+  rule_create: {body: {plant_id: string, threshold: int, water_s: int, cooldown_s: int, max_per_day: int, quiet_from: string, quiet_to: string, notify_channels: [app, telegram], notify_on: [watered, skipped_problem, failed]}}
+  rule_update: {body: {rule_id: string, fields: object}}
+  rule_delete: {body: {rule_id: string}}
+  alert_ack: {body: {alert_id: string}}
+  backup: {body: {}}
+  query:                     # topic kind: query/<name> (e.g. mc/v1/req/hub/query/readings); all paged with limit + cursor, times are unix seconds
+    readings: {body: {plant_id: string, from: datetime, to: datetime, bucket: "raw|hour|day"}}
+    commands: {body: {plant_id: "optional", device_id: "optional", status: "optional"}}
+    command: {body: {command_id: string}}
+    device_health: {body: {device_id: string, from: datetime, to: datetime}}
+    device_events: {body: {device_id: string}}
+    rule_executions: {body: {rule_id: string}}
+    export: {body: {part: "installation|devices|plants|rules|readings|health|events|commands|rule_executions"}}
+
+events:                      # body carries the changed object with rev/updated_at
+  - reading
+  - device
+  - command
+  - config
+  - plant
+  - rule
+  - alert
+  - installation
+  - join
+  - notification             # app-channel notification of a rule
+
+api_events:                  # api -> hub
+  - user_removed
+
+snapshots:                   # retained, republished on every change and on hub start
+  installation: {fields: [name, timezone, battery_low_mv, battery_critical_mv, battery_chemistry, telegram_configured]}
+  devices: {item: [id, ieee, name, model, fw, board, status, safe_reason, last_seen_at, link_quality, voltage_mv, config_sync, desired_rev, reported_rev, desired_config, reported_config, config_error, latest_readings, diagnostics, battery]}   # battery: {mv, percent, state, present, calibrated, cal_permille}
+  plants: {item: [id, name, notes, sensor, pump, latest_value, latest_ts, trend, archived]}
+  rules: {item: [id, plant_id, enabled, threshold, water_s, cooldown_s, max_per_day, quiet_from, quiet_to, notify_channels, notify_on]}
+  alerts_open: {item: [id, kind, subject, severity, opened_at, acked_by, acked_at, detail]}
+  join: {fields: [open, ends_at, devices]}
+  boards: {item: "board description of one PCB revision"}
+  status: {fields: [zigbee2mqtt, coordinator, hub_version, clock_synced, db_size]}
+
+examples:
+  water_request:
+    v: 1
+    id: 01JC0000000000000000000001
+    ts: "2026-10-09T12:00:00Z"
+    deadline: "2026-10-09T12:00:10Z"
+    reply_to: "mc/v1/res/api-1/01JC0000000000000000000001"
+    actor: {user_id: 01J0000000000000000000USER, role: member}
+    body: {plant_id: 01J0000000000000000000PLNT, seconds: 10}
+  water_response:
+    v: 1
+    id: 01JC0000000000000000000001
+    ok: true
+    body: {command: {id: 01JC0000000000000000000002, status: queued}}
+  busy_response:
+    v: 1
+    id: 01JC0000000000000000000003
+    ok: false
+    error: {type: busy, status: 409, title: "Pump is busy", detail: "A pump command for this slot is queued or running."}

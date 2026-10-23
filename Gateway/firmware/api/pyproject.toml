@@ -1,0 +1,39 @@
+[project]
+name = "mc-api"
+version = "0.1.0"
+description = "MoistureController api: login, roles, REST + SSE and web hosting in front of the hub"
+requires-python = ">=3.12"
+dependencies = [
+  "fastapi>=0.110",
+  "uvicorn",
+  "sqlalchemy[asyncio]>=2.0",
+  "aiosqlite",
+  "aiomqtt>=2.0",
+  "alembic",
+  "pydantic>=2",
+  "python-ulid",
+  "argon2-cffi",
+  "tzdata",
+]
+
+[project.optional-dependencies]
+dev = ["pytest", "pytest-asyncio", "httpx"]
+
+[project.scripts]
+mc-api = "mc_api.cli:main"
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+mc_api = ["migrations/*", "migrations/versions/*"]
+
+[tool.pytest.ini_options]
+# the hub's source is on the path for the integration tests only (an in-memory broker and the real hub)
+pythonpath = ["src", "../hub/src"]
+asyncio_mode = "auto"
+testpaths = ["tests"]

@@ -1,0 +1,8 @@
+# Add on the gateway box when the api runs on another device (after scripts/remote-api.sh):
+#   docker compose -f docker-compose.yml -f docker-compose.remote.yml up -d
+services:
+  mosquitto:
+    ports:
+      - "8883:8883"
+    volumes:
+      - ./mosquitto/tls:/mosquitto/config/tls:ro

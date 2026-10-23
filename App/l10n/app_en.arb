@@ -1,0 +1,726 @@
+{
+  "@@locale": "en",
+  "appTitle": "Moisture",
+  "navPlants": "Plants",
+  "navDevices": "Devices",
+  "navAlerts": "Alerts",
+  "navSettings": "Settings",
+  "roleViewer": "Viewer",
+  "roleMember": "Member",
+  "roleAdmin": "Admin",
+  "roleOwner": "Owner",
+  "noPlantsTitle": "Start with your first plant",
+  "retry": "Retry",
+  "errorGeneric": "Something went wrong.",
+  "errorForbidden": "Your role no longer allows this.",
+  "errorSafetyLimit": "That's longer than this pump's limit.",
+  "errorBusy": "The device is busy. Try again shortly.",
+  "moistureSemantics": "Moisture {percent} percent",
+  "@moistureSemantics": {
+    "placeholders": {
+      "percent": {
+        "type": "int"
+      }
+    }
+  },
+  "percentValue": "{value} %",
+  "@percentValue": {
+    "placeholders": {
+      "value": {
+        "type": "int"
+      }
+    }
+  },
+  "secondsValue": "{value} s",
+  "@secondsValue": {
+    "placeholders": {
+      "value": {
+        "type": "int"
+      }
+    }
+  },
+  "hoursValue": "{value} h",
+  "@hoursValue": {
+    "placeholders": {
+      "value": {
+        "type": "int"
+      }
+    }
+  },
+  "justNow": "just now",
+  "minutesAgo": "{n} min ago",
+  "@minutesAgo": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "hoursAgo": "{n} h ago",
+  "@hoursAgo": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "daysAgo": "{n} d ago",
+  "@daysAgo": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "deviceOnline": "Online",
+  "deviceLate": "Late",
+  "deviceOffline": "Offline",
+  "lastSeen": "last seen {ago}",
+  "@lastSeen": {
+    "placeholders": {
+      "ago": {
+        "type": "String"
+      }
+    }
+  },
+  "lastReading": "Last reading {ago}",
+  "@lastReading": {
+    "placeholders": {
+      "ago": {
+        "type": "String"
+      }
+    }
+  },
+  "trendFalling": "Drying",
+  "trendSteady": "Steady",
+  "trendRising": "Rising",
+  "pendingCommand": "Watering pending",
+  "waterNow": "Water now",
+  "waterFor": "Water for {seconds} s",
+  "@waterFor": {
+    "placeholders": {
+      "seconds": {
+        "type": "int"
+      }
+    }
+  },
+  "waterSheetTitle": "Water {plant}",
+  "@waterSheetTitle": {
+    "placeholders": {
+      "plant": {
+        "type": "String"
+      }
+    }
+  },
+  "waterSheetHint": "Watering starts as soon as the module confirms. If it is offline, it is sent when it is back.",
+  "pumpLimit": "Pump limit: {seconds} s",
+  "@pumpLimit": {
+    "placeholders": {
+      "seconds": {
+        "type": "int"
+      }
+    }
+  },
+  "waterQueued": "Watering queued",
+  "cancel": "Cancel",
+  "cancelCommand": "Cancel watering",
+  "cancelCommandHint": "Best effort — it may already have run.",
+  "commandTitle": "{seconds} s watering",
+  "@commandTitle": {
+    "placeholders": {
+      "seconds": {
+        "type": "int"
+      }
+    }
+  },
+  "commandRunning": "Running until {time}",
+  "@commandRunning": {
+    "placeholders": {
+      "time": {
+        "type": "String"
+      }
+    }
+  },
+  "commandDone": "Done",
+  "commandFailed": "Failed",
+  "commandExpired": "Expired",
+  "commandCancelled": "Cancelled",
+  "originUser": "Manual",
+  "originRule": "Rule",
+  "historyTitle": "Moisture history",
+  "range24h": "24 h",
+  "range7d": "7 d",
+  "range30d": "30 d",
+  "range1y": "1 y",
+  "chartSummary": "Moisture between {min} and {max} % in this period",
+  "@chartSummary": {
+    "placeholders": {
+      "min": {
+        "type": "int"
+      },
+      "max": {
+        "type": "int"
+      }
+    }
+  },
+  "commandsTitle": "Watering",
+  "noCommands": "No watering yet.",
+  "rulesTitle": "Rules",
+  "noRules": "Add a rule to water automatically.",
+  "addRule": "Add rule",
+  "editRule": "Edit rule",
+  "ruleSummary": "Below {percent} %: water {seconds} s, at most every {hours} h",
+  "@ruleSummary": {
+    "placeholders": {
+      "percent": {
+        "type": "int"
+      },
+      "seconds": {
+        "type": "int"
+      },
+      "hours": {
+        "type": "int"
+      }
+    }
+  },
+  "ruleBelow": "Water when moisture is below",
+  "ruleDuration": "Watering duration",
+  "ruleInterval": "At most every",
+  "ruleEnabled": "Rule enabled",
+  "save": "Save",
+  "delete": "Delete",
+  "noDevices": "Add your first device",
+  "firmwareValue": "Firmware {version}",
+  "@firmwareValue": {
+    "placeholders": {
+      "version": {
+        "type": "String"
+      }
+    }
+  },
+  "configInSync": "Config in sync",
+  "configPending": "Config pending (rev {rev})",
+  "@configPending": {
+    "placeholders": {
+      "rev": {
+        "type": "int"
+      }
+    }
+  },
+  "configRejected": "Config rejected",
+  "deviceDetails": "Details",
+  "board": "Board",
+  "slots": "Slots",
+  "slotLabel": "Slot {index}",
+  "@slotLabel": {
+    "placeholders": {
+      "index": {
+        "type": "int"
+      }
+    }
+  },
+  "identify": "Identify",
+  "reboot": "Reboot",
+  "deviceActionSent": "Sent to the device.",
+  "openAlerts": "Open",
+  "closedAlerts": "Closed",
+  "noAlerts": "All plants are fine",
+  "alertDeviceOffline": "{subject} is offline",
+  "@alertDeviceOffline": {
+    "placeholders": {
+      "subject": {
+        "type": "String"
+      }
+    }
+  },
+  "alertBatteryLow": "{subject}: battery low",
+  "@alertBatteryLow": {
+    "placeholders": {
+      "subject": {
+        "type": "String"
+      }
+    }
+  },
+  "alertSensorSuspect": "{subject}: sensor readings look wrong",
+  "@alertSensorSuspect": {
+    "placeholders": {
+      "subject": {
+        "type": "String"
+      }
+    }
+  },
+  "alertCommandFailed": "{subject}: watering failed",
+  "@alertCommandFailed": {
+    "placeholders": {
+      "subject": {
+        "type": "String"
+      }
+    }
+  },
+  "acknowledge": "Acknowledge",
+  "acknowledgedAgo": "Acknowledged {ago}",
+  "@acknowledgedAgo": {
+    "placeholders": {
+      "ago": {
+        "type": "String"
+      }
+    }
+  },
+  "appearance": "Appearance",
+  "themeSystem": "System",
+  "themeLight": "Light",
+  "themeDark": "Dark",
+  "language": "Language",
+  "timezone": "Time zone",
+  "demoSection": "Demo",
+  "demoRole": "Demo role in this household",
+  "demoRoleHint": "Only in the dev build without a backend.",
+  "notAllowed": "Your role doesn't allow this.",
+  "signal": "Signal",
+  "firmware": "Firmware",
+  "noReading": "No reading yet",
+  "alertOther": "{subject}: {kind}",
+  "@alertOther": {
+    "placeholders": {
+      "subject": {
+        "type": "String"
+      },
+      "kind": {
+        "type": "String"
+      }
+    }
+  },
+  "gatewayClock": "Clock",
+  "gatewayClockOk": "Synced",
+  "gatewayClockBad": "Not synced: no automatic watering",
+  "errorReauth": "Sign in again to do this.",
+  "serverTitle": "Server",
+  "connSearching": "Looking for the server on your network …",
+  "connUnreachable": "Can't reach the server.",
+  "connChoose": "Several servers found. Choose one.",
+  "connEnterAddress": "Enter address",
+  "serverCurrent": "Connected to",
+  "serverFound": "Servers on your network",
+  "serverSearchAgain": "Search again",
+  "serverAddress": "Server address",
+  "serverAddressHint": "192.168.1.10:8000",
+  "serverAddressInvalid": "That is not a valid address.",
+  "serverAddressNotLocal": "Only addresses on your home network are allowed.",
+  "serverAddressNoAnswer": "No Moisture server answers there.",
+  "serverAuthDev": "Dev login (no password)",
+  "serverAuthFirebase": "Firebase login",
+  "serverDevWarningTitle": "Unsigned dev login",
+  "serverDevWarningBody": "This server accepts logins without a password. Only continue if it is your own development server.",
+  "serverContinue": "Connect",
+  "serverUseThis": "Use this server",
+  "commandQueued": "Queued",
+  "signalValue": "Link quality {quality}",
+  "@signalValue": {
+    "placeholders": {
+      "quality": {
+        "type": "int"
+      }
+    }
+  },
+  "noPlantsBody": "Create a plant for a sensor of one of your devices.",
+  "serverSubtitle": "The gateway this app talks to",
+  "gatewayTitle": "Gateway",
+  "commandDelivered": "Running",
+  "account": "Account",
+  "addDevice": "Add device",
+  "addPlant": "Add plant",
+  "editPlant": "Edit plant",
+  "plantName": "Name",
+  "plantSensor": "Moisture sensor",
+  "plantPump": "Pump",
+  "plantNoSlots": "No device has a sensor or pump configured yet. Set up a device first.",
+  "alertSafeMode": "{subject} is in safe mode",
+  "@alertSafeMode": {
+    "placeholders": {
+      "subject": {
+        "type": "String"
+      }
+    }
+  },
+  "alertZigbeeOffline": "Zigbee is not running",
+  "auditTitle": "Activity",
+  "noAudit": "Nothing yet.",
+  "backupTitle": "Backup",
+  "backupBody": "Makes a consistent copy of the gateway databases on the gateway. The Zigbee network data has to be copied separately (scripts/backup.sh).",
+  "backupNow": "Back up now",
+  "backupDone": "Backup written on the gateway.",
+  "bannerHubDown": "The watering service is not reachable. You see the last known data; changes are not possible.",
+  "bannerZigbeeDown": "Zigbee is not running. Data and commands are paused.",
+  "batteryThreshold": "Battery low (mV)",
+  "calDry": "Dry value (raw)",
+  "calWet": "Wet value (raw)",
+  "changePassword": "Change password",
+  "currentPassword": "Current password",
+  "newPassword": "New password",
+  "passwordChangeHint": "Changing it signs out your other devices.",
+  "passwordChanged": "Password changed.",
+  "changeRole": "Change role",
+  "channelApp": "In the app",
+  "channelTelegram": "Telegram",
+  "clearSafeMode": "Clear safe mode",
+  "commandQueuedOffline": "Queued · device offline",
+  "configApplyNote": "The change is applied as soon as the device confirms it.",
+  "configConflict": "Someone else changed this device meanwhile. The current configuration was loaded; please check and save again.",
+  "configNoBoard": "This device has not reported its board yet.",
+  "configPendingBody": "Revision {rev} is waiting for the device to confirm it.",
+  "@configPendingBody": {
+    "placeholders": {
+      "rev": {
+        "type": "int"
+      }
+    }
+  },
+  "configRejectedBody": "The device rejected the configuration: {error}",
+  "@configRejectedBody": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "configRevert": "Use the running configuration",
+  "configRevision": "Configuration (running / sent)",
+  "configSaved": "Configuration sent to the device.",
+  "confirm": "Confirm",
+  "copied": "Copied.",
+  "copyLink": "Copy link",
+  "createInvite": "Create invite",
+  "dataTitle": "Backup and export",
+  "deviceJoinFailed": "Join failed",
+  "deviceJoining": "Joining",
+  "deviceName": "Device name",
+  "deviceReady": "Waiting for first report",
+  "deviceSafeMode": "Safe mode",
+  "deviceUnsupported": "Unsupported device",
+  "diagBootReason": "Last start",
+  "diagFreeHeap": "Free memory",
+  "diagLastError": "Last error code",
+  "diagRejoins": "Network rejoins",
+  "diagResets": "Restarts",
+  "diagUptime": "Running for",
+  "diagnostics": "Diagnostics",
+  "disableUser": "Disable",
+  "enableUser": "Enable",
+  "userDisabled": "disabled",
+  "displayName": "Display name",
+  "done": "Done",
+  "editConfig": "Edit configuration",
+  "errorAlreadySetUp": "This gateway is already set up.",
+  "errorConflict": "That is not possible right now.",
+  "errorDeviceNotReady": "The device is not ready yet.",
+  "errorDeviceSafeMode": "The device is in safe mode and does not water.",
+  "errorHubTimeout": "The gateway did not answer in time. It may still have worked; check again in a moment.",
+  "errorHubUnavailable": "The watering service is not reachable right now.",
+  "errorIncompatibleHub": "The gateway parts do not fit together. Update the gateway.",
+  "errorInvalidCredentials": "Wrong username or password.",
+  "errorInvalidInvite": "This invite is not valid (anymore).",
+  "errorInvalidSetupCode": "The setup code is wrong.",
+  "errorNetwork": "Can't reach the gateway.",
+  "errorRateLimited": "Too many attempts. Wait a moment and try again.",
+  "errorSlotNotActuator": "That slot is not a pump.",
+  "eventsTitle": "Events",
+  "noEvents": "No events yet.",
+  "executionsTitle": "Recent decisions",
+  "noExecutions": "The rule has not decided anything yet.",
+  "executionWatered": "Watered",
+  "executionSkipped": "Skipped: {reason}",
+  "@executionSkipped": {
+    "placeholders": {
+      "reason": {
+        "type": "String"
+      }
+    }
+  },
+  "skipClock": "clock not synced",
+  "skipCooldown": "too soon after the last watering",
+  "skipDailyLimit": "daily limit reached",
+  "skipNoPump": "no pump available",
+  "skipPending": "a watering is already pending",
+  "skipQuietHours": "quiet hours",
+  "skipSensorError": "sensor problem",
+  "exportTitle": "Export",
+  "exportBody": "A ZIP file with all plants, devices, readings, commands and users (without passwords). Your password is needed.",
+  "exportStart": "Export data",
+  "exportDone": "Export downloaded.",
+  "exportUnsupported": "Downloading is only supported in the web app for now.",
+  "fastReportHold": "Keep fast reports after watering",
+  "fastReportInterval": "Report interval while watering",
+  "reportInterval": "Report interval",
+  "reportIntervals": "Reports",
+  "gatewayApiVersion": "Web service version",
+  "gatewayCoordinator": "Zigbee coordinator",
+  "gatewayDatabase": "Database size",
+  "gatewayHub": "Watering service",
+  "gatewayHubVersion": "Watering service version",
+  "gatewayServices": "Services",
+  "gatewayZigbee": "Zigbee",
+  "statusUnknown": "Unknown",
+  "installCode": "Install code (optional)",
+  "installCodeHint": "From the label on the module. Needed for deployed modules.",
+  "installation": "Installation",
+  "installationName": "Name of this installation",
+  "installationSettings": "Installation settings",
+  "inviteAs": "Invite as",
+  "inviteCreated": "Invite created",
+  "inviteExpires": "valid until {time}",
+  "@inviteExpires": {
+    "placeholders": {
+      "time": {
+        "type": "String"
+      }
+    }
+  },
+  "inviteShownOnce": "Send this link to the person. It is shown only once.",
+  "invitesTitle": "Invites",
+  "noInvites": "No open invites.",
+  "revokeInvite": "Revoke invite",
+  "joinAccept": "Create account",
+  "joinClose": "Close",
+  "joinConfigure": "Name and configure",
+  "joinCountdown": "Open for {time}",
+  "@joinCountdown": {
+    "placeholders": {
+      "time": {
+        "type": "String"
+      }
+    }
+  },
+  "joinFailedBody": "The module could not be set up. Remove it, power-cycle the module and try again.",
+  "joinIdleTitle": "Add a device",
+  "joinInstallation": "Join {name}",
+  "@joinInstallation": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "joinInstructions": "Open the join window, then power up the module or hold its button for 3 seconds.",
+  "joinOpen": "Open join window",
+  "joinOpenTitle": "Waiting for the module…",
+  "joinRemoveRetry": "Remove and try again",
+  "joinRole": "You were invited as {role}.",
+  "@joinRole": {
+    "placeholders": {
+      "role": {
+        "type": "String"
+      }
+    }
+  },
+  "joinTitle": "Join",
+  "joinUnsupportedBody": "This is not a PlantModule ({model}). Remove it.",
+  "@joinUnsupportedBody": {
+    "placeholders": {
+      "model": {
+        "type": "String"
+      }
+    }
+  },
+  "stepJoined": "Joined the network",
+  "stepInterviewing": "Interviewing",
+  "stepConfiguring": "Configuring",
+  "stepReady": "Ready",
+  "lastSeenLabel": "Last seen",
+  "lastUsedAgo": "last used {ago}",
+  "@lastUsedAgo": {
+    "placeholders": {
+      "ago": {
+        "type": "String"
+      }
+    }
+  },
+  "neverUsed": "never used",
+  "loginSubtitle": "Sign in to continue",
+  "username": "Username",
+  "password": "Password",
+  "passwordHint": "At least 8 characters",
+  "signIn": "Sign in",
+  "signOut": "Sign out",
+  "thisDevice": "this device",
+  "thisDeviceName": "Name of this device",
+  "thisDeviceHint": "Shown in the list of your logins",
+  "moduleEmpty": "Empty",
+  "moduleMoisture": "Moisture sensor",
+  "modulePump": "Pump",
+  "slotModule": "Module",
+  "slotPort": "Port",
+  "portLabel": "Port {port}",
+  "@portLabel": {
+    "placeholders": {
+      "port": {
+        "type": "String"
+      }
+    }
+  },
+  "myDevices": "My devices",
+  "revokeToken": "Sign this device out",
+  "noDevicesBody": "Open the join window and power up a module.",
+  "noPlantsNoDevices": "Add a device first, then create your plants.",
+  "noRulesNoPump": "This plant has no pump, so it cannot be watered by a rule.",
+  "noSlots": "Nothing is configured yet.",
+  "notifyFailed": "When it fails",
+  "notifySkipped": "When it cannot decide",
+  "notifyWatered": "When it waters",
+  "ruleNotify": "Notify",
+  "outOfRange": "Out of range",
+  "pumpActiveHigh": "Pump switches on with a high signal",
+  "pumpMaxRun": "Longest run",
+  "pumpMinPause": "Shortest pause between runs",
+  "quietFrom": "From {time}",
+  "@quietFrom": {
+    "placeholders": {
+      "time": {
+        "type": "String"
+      }
+    }
+  },
+  "quietTo": "Until {time}",
+  "@quietTo": {
+    "placeholders": {
+      "time": {
+        "type": "String"
+      }
+    }
+  },
+  "reauthBody": "Enter your password to continue.",
+  "reauthTitle": "Confirm with your password",
+  "removeDevice": "Remove device",
+  "removeDeviceBody": "{name} is removed from the network and its plants lose their sensor and pump. History is kept.",
+  "@removeDeviceBody": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "removeUser": "Remove user",
+  "removeUserBody": "{name} loses access immediately.",
+  "@removeUserBody": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "renameDevice": "Rename",
+  "ruleMaxPerDay": "At most per day",
+  "ruleMaxPerDayValue": "at most {count} a day",
+  "@ruleMaxPerDayValue": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "ruleQuietHours": "Quiet hours",
+  "ruleQuietValue": "quiet {from} – {to}",
+  "@ruleQuietValue": {
+    "placeholders": {
+      "from": {
+        "type": "String"
+      },
+      "to": {
+        "type": "String"
+      }
+    }
+  },
+  "safeModeBody": "The module stopped itself ({reason}) and does not water until it is reset.",
+  "@safeModeBody": {
+    "placeholders": {
+      "reason": {
+        "type": "String"
+      }
+    }
+  },
+  "safeModeTitle": "Safe mode",
+  "saved": "Saved.",
+  "setupCode": "Setup code",
+  "setupCodeHint": "Shown in the log of the web service: docker compose logs api",
+  "setupCreate": "Set up this gateway",
+  "setupNeedsHub": "The watering service is not running yet. Setup needs it.",
+  "setupSubtitle": "Create the owner account. This is only needed once.",
+  "setupTitle": "Set up this gateway",
+  "telegramChat": "Chat id",
+  "telegramConfigured": "Telegram is set up.",
+  "telegramNotConfigured": "Telegram is not set up.",
+  "telegramTitle": "Telegram",
+  "telegramToken": "Bot token",
+  "telegramTokenHint": "Leave empty to keep the saved token",
+  "timezoneHint": "For example Europe/Berlin",
+  "transferOwnership": "Make owner",
+  "transferOwnershipBody": "{name} becomes the owner. You become an admin.",
+  "@transferOwnershipBody": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "usersTitle": "Users",
+  "waterQueuedDeviceOffline": "Watering queued. The device is offline and gets it when it is back.",
+  "noReadings": "No readings in this period yet.",
+  "batteryTitle": "Battery",
+  "batteryStateOk": "OK",
+  "batteryStateLow": "Low",
+  "batteryStateCritical": "Critical",
+  "batteryStateAbsent": "No battery",
+  "batteryPercent": "about {percent} %",
+  "@batteryPercent": {
+    "placeholders": {
+      "percent": {
+        "type": "int"
+      }
+    }
+  },
+  "batteryVolts": "{volts} V",
+  "@batteryVolts": {
+    "placeholders": {
+      "volts": {
+        "type": "String"
+      }
+    }
+  },
+  "batteryChargingHint": "Charging cannot be detected.",
+  "batteryCalibrated": "Calibrated ({delta})",
+  "@batteryCalibrated": {
+    "placeholders": {
+      "delta": {
+        "type": "String"
+      }
+    }
+  },
+  "calibrateBattery": "Calibrate battery",
+  "calibrateBatteryBody": "Measure the cell with a multimeter and enter the value. The module reports {volts} V now. Values more than 10 % off are refused.",
+  "@calibrateBatteryBody": {
+    "placeholders": {
+      "volts": {
+        "type": "String"
+      }
+    }
+  },
+  "measuredVolts": "Measured voltage",
+  "calibrate": "Calibrate",
+  "batteryCalibrationSent": "Calibration sent to the device.",
+  "batteryNoData": "No battery readings yet.",
+  "batteryCriticalThreshold": "Battery critical (mV)",
+  "batteryThresholdsHint": "Applied to all devices as soon as they confirm it.",
+  "batteryThresholdsInvalid": "Critical must be below low, both between 3000 and 4000 mV.",
+  "batteryCell": "Li-ion / LiPo, one cell",
+  "alertBatteryCritical": "{subject}: battery critical",
+  "@alertBatteryCritical": {
+    "placeholders": {
+      "subject": {
+        "type": "String"
+      }
+    }
+  },
+  "commandFailedBattery": "Battery too low to water",
+  "waterBatteryHint": "This module's battery is critical: it will refuse to water.",
+  "batteryVoltage": "Voltage",
+  "batteryLevel": "Level (estimate)"
+}

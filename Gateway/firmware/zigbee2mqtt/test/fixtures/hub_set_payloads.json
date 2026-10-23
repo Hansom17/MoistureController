@@ -1,0 +1,58 @@
+{
+  "config": {
+    "config": {
+      "rev": 9,
+      "report_interval_s": 300,
+      "fast_report_interval_s": 30,
+      "fast_report_hold_s": 120,
+      "batt_low_mv": 3600,
+      "batt_critical_mv": 3400,
+      "batt_cal_permille": 1000,
+      "slots": [
+        {
+          "slot": 0,
+          "module": "moisture",
+          "port": "P1",
+          "cal_dry": 3000,
+          "cal_wet": 1200,
+          "samples": 16
+        },
+        {
+          "slot": 2,
+          "module": "pump",
+          "port": "P3",
+          "max_run_s": 60,
+          "min_pause_s": 600,
+          "active_high": true
+        }
+      ]
+    }
+  },
+  "pump_run": {
+    "pump_run": {
+      "cmd_id": 1048577,
+      "slot": 2,
+      "seconds": 10,
+      "ttl_s": 900
+    }
+  },
+  "pump_stop": {
+    "pump_stop": {
+      "cmd_id": 1048578,
+      "slot": 2
+    }
+  },
+  "cancel": {
+    "cancel": {
+      "cmd_id": 1048579,
+      "target": 1048577
+    }
+  },
+  "device_action": {
+    "device_action": {
+      "cmd_id": 1048580,
+      "action": "identify",
+      "arg": 0
+    }
+  }
+}

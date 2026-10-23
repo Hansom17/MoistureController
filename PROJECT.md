@@ -1,334 +1,206 @@
 # MoistureController — System Overview
 
-This is the top-level plan for the whole system. It defines **what the parts are, what each is responsible for, and how they talk to each other**. Implementation details live in the spec file of each component's subfolder:
+The top-level document: **what the parts are, what each is responsible for, and how they talk to each other.** Implementation details live in the `specs.md` of each product folder. If this document and a spec disagree about *how* something is implemented, the spec wins. If they disagree about *what a component is responsible for* or *how components talk to each other*, this document wins and the spec gets fixed.
 
-| Component | Folder | Spec |
+| Product | Folder | What it is |
 |---|---|---|
-| Plant device (ESP32 firmware) | [`firmware/`](firmware/) | [`Firmware_Specs.md`](firmware/Firmware_Specs.md) |
-| Cloud backend (API, users, households, rules, cloud broker) | [`server/`](server/) | [`Server_Specs.md`](server/Server_Specs.md) |
-| Home hub (optional local agent: broker + rules, outbound only) | [`hub/`](hub/) | [`Hub_Specs.md`](hub/Hub_Specs.md) |
-| Firebase project (login, push, web hosting) | [`firebase/`](firebase/) | [`Firebase_Specs.md`](firebase/Firebase_Specs.md) |
-| MQTT broker configuration (cloud + hub) | [`broker/`](broker/) | [`Broker_Specs.md`](broker/Broker_Specs.md) |
-| Client app (Flutter: web + mobile) | [`app/`](app/) | [`App_Specs.md`](app/App_Specs.md) |
-| Shared interfaces | [`contracts/`](contracts/) | [`mqtt.md`](contracts/mqtt.md) (device ↔ backend), [`hub.md`](contracts/hub.md) (hub ↔ cloud), [`ble.md`](contracts/ble.md) (app ↔ device pairing), `api.yaml` *(generated)* |
+| **PlantModule** | `PlantModule/` | Battery-powered ESP32-C6 Zigbee end device: firmware (ESP-IDF, `esp-zigbee-sdk`), carrier board, scripts |
+| **Gateway** | `Gateway/` | The box at home: Zigbee coordinator, Zigbee2MQTT, Mosquitto and our two services: `hub` (devices, commands, rules, alerts) and `api` (users, REST, web app hosting) |
+| **App** | `App/` | Flutter: runs as web app served by the Gateway; later also as Android/iOS app |
 
-If this document and a component spec disagree about *how* something is implemented, the component spec wins. If they disagree about *what a component is responsible for* or *how components talk to each other*, this document wins and the spec gets fixed.
+> **Status:** this document is the **design**. The repository currently holds the specs, the carrier board and the Flutter app; the hub, the Zigbee firmware and the Zigbee2MQTT converter are still to be written. The previous WiFi/MQTT implementation is in git history at commit `eb97b07`.
 
 ---
 
 ## 1. Goal
 
-Monitor soil moisture (and later other values) of plants with small battery-powered devices, show the data in an app, and water plants either manually from the app or automatically based on rules.
+Monitor soil moisture (and later other values) of plants with small battery-powered devices, show the data in a web app, and water plants manually or by rules, all running **locally at home, at no cost**.
 
 **Primary user stories**
 
-- I can see the current moisture of each plant and its history.
-- I can water a plant from the app, and I can see whether the device actually did it.
-- I can set a rule like *"if moisture < 30 %, water for 10 s, at most once every 6 h"*.
+- I see the current moisture of each plant and its history.
+- I can water a plant from the app, and see whether the device actually did it.
+- I can set a rule like *"if moisture < 30 %, water for 10 s, at most once every 6 h"*, and it keeps working whatever else is down.
 - I get told when a device is offline, its battery is low, or a sensor looks broken.
-- I can change which sensor/pump is plugged into which pin of a device without reflashing it.
-- I can have several households (home, office, parents' garden …) and switch between them in the app.
-- I can share a household with other people and decide what they are allowed to do.
-- Optionally I put a small **home hub** (a Raspberry Pi or any Linux box with Docker) next to my plants, so watering keeps working when the internet is down.
+- I can change which sensor/pump is plugged into which port of a device without reflashing it.
+- I can let other people in the household use the app and decide what they may do.
+- Later: reach the system from outside (VPN or tunnel), get Telegram notifications, install it as a mobile app, add other Zigbee devices.
+
+**Out of scope for now:** remote access, push notifications (Telegram comes later), multiple households, cloud services.
 
 ---
 
 ## 2. System architecture
 
-**One cloud, optional hubs.** Everything about people — accounts, households, memberships, roles, invites — and the app's API live in one place: our cloud backend. A home hub is an optional *agent* for one household: it runs the local MQTT broker and the watering rules, and connects **outbound** to the cloud. Nothing is ever exposed from a user's home.
+One box at home does everything. Plant devices join its Zigbee network; people open the web app served by the box on the home network. Nothing is hosted elsewhere and no account with any provider is needed.
 
 ```mermaid
 flowchart LR
-    subgraph HomeA["Household A — with hub"]
-        DA1["Plant device"]
-        DA2["Plant device"]
-        HUB["Home hub<br/>local broker · rules<br/>offline buffer"]
-        DA1 & DA2 <-- "MQTT, TLS-PSK, LAN" --> HUB
+    subgraph Plants["Plants"]
+        D1["PlantModule<br/>ESP32-C6, Zigbee end device"]
+        D2["PlantModule"]
+        ZO["later: other Zigbee devices"]
     end
 
-    subgraph HomeB["Household B — no hub"]
-        DB1["Plant device"]
+    subgraph GW["Gateway (one box, docker compose)"]
+        CO["Zigbee coordinator<br/>(USB stick)"]
+        Z2M["Zigbee2MQTT"]
+        MQ["Mosquitto<br/>(internal only)"]
+        HUB["hub<br/>devices · command queue · rules · alerts"]
+        HDB[("hub.db")]
+        CO <--> Z2M <--> MQ <--> HUB
+        HUB <--> HDB
     end
 
-    subgraph Cloud["Cloud (operated by us)"]
-        CB["Cloud MQTT broker<br/>(TLS-PSK)"]
-        API["Cloud backend<br/>API · users · households<br/>rules · commands · history"]
-        DB[("PostgreSQL")]
+    subgraph Edge["Any device on the LAN (default: the box)"]
+        API["api<br/>users · tokens · REST + SSE · web app hosting"]
+        ADB[("api.db")]
+        API <--> ADB
+    end
+    API <-- "MQTT only" --> MQ
+
+    subgraph Users["People, on the home network"]
+        W["Flutter web app<br/>(in a browser)"]
+        M["later: Flutter mobile app"]
     end
 
-    subgraph FB["Firebase"]
-        AUTH["Authentication"]
-        FCM["Cloud Messaging"]
-        HOST["Hosting<br/>official web app"]
-    end
-
-    subgraph Users["Users"]
-        W["Flutter web app"]
-        M["Flutter mobile app"]
-    end
-
-    HUB -- "MQTT bridge, TLS-PSK<br/>outbound only" --> CB
-    DB1 -- "MQTT, TLS-PSK" --> CB
-    CB <--> API
-    API <--> DB
-    W & M -- "HTTPS · Firebase ID token" --> API
-    W & M -- "login" --> AUTH
-    API -- "push" --> FCM
-    HOST -. "serves" .-> W
+    D1 & D2 & ZO <-- "Zigbee" --> CO
+    W & M -- "HTTP, login token" --> API
+    HUB -. "Telegram bot (outbound)" .-> TG["Telegram"]
 ```
 
 ### Core architectural rules
 
-1. **Devices only speak MQTT, clients only speak the API.** The app never connects to a broker. The cloud backend is the only bridge between users and devices. This keeps auth, validation and history in one place, and lets the MQTT topic scheme change without touching the app.
-2. **Devices are asleep most of the time.** Nothing can reach a device in deep sleep. Every interaction with a device is **asynchronous**: the backend records an intent, and the device picks it up the next time it wakes (minutes later). The whole stack — API design and app UI included — must treat "pending until the device wakes" as a normal state, not an error.
-3. **The cloud is the source of truth for intent; the device is the source of truth for reality.** The cloud stores *desired* state (config, commands, rules), the device reports *actual* state (readings, config it is really running, command results). The app shows both, and where they differ.
-4. **The device stays dumb and safe.** Business logic (rules, schedules, thresholds) runs in the cloud or on the hub. The device measures, reports, executes commands, and enforces hard safety limits locally (e.g. maximum pump run time) so a bad command can never flood a plant.
-5. **One trust boundary for people.** Users log in via Firebase and talk only to the cloud backend, which we operate. There are no user accounts, logins or user-facing endpoints anywhere else — not on hubs, not on devices.
-6. **Hubs are agents, not servers.** A hub has no inbound ports (except MQTT on the LAN for its devices), no users and no web pages. It authenticates to the cloud with its own key and can only reach the MQTT topics of its own household's devices.
-7. **Everything on the wire is encrypted.** All MQTT connections — device ↔ hub, device ↔ cloud, hub ↔ cloud — use TLS with per-client pre-shared keys; all HTTP is HTTPS.
-8. **Every request is scoped to a household.** Every API call that touches data names a household, and the backend checks membership + role before doing anything.
+1. **One box, one trust boundary.** Devices talk only to the coordinator; apps talk only to the `api` service; nothing else is exposed. Each service opens only its own database, and the services talk to each other only over MQTT (`Gateway/specs.md` §3).
+2. **Every interaction with a device is asynchronous.** The hub records an intent and sends it when the device can receive it: at once while the device is online, later if it is offline. "Pending" is a normal state in the API and the UI. Today the module is always awake; sleepy low-power devices are possible later and use the same model.
+3. **The hub is the source of truth for intent; the device for reality.** The hub stores *desired* state (config, commands, rules); the device reports *actual* state (readings, running config, command results). The app shows both, and where they differ.
+4. **Rules run in `hub`**, next to the data. Watering does not depend on any browser being open, on `api` or on the internet.
+5. **The device stays dumb and safe.** It measures, reports, executes commands and enforces hard safety limits locally. The hub checks commands again before sending them.
+6. **Zigbee handles the radio side.** Joining, network keys, routing and delivery belong to Zigbee and Zigbee2MQTT. We add only what Zigbee has no standard for (custom settings, a command queue for devices that are offline).
+7. **Extensible by design.** Other Zigbee devices known to Zigbee2MQTT can appear as further device types; the hub works on normalized readings and commands, not on one device model.
 
 ---
 
-## 3. Users, households and hubs
+## 3. Users, access and joining devices
 
 ### 3.1 Concepts
 
 | Concept | Meaning |
 |---|---|
-| **User** | A person with a Firebase account. |
-| **Household** | The unit of ownership and sharing. Contains devices, plants, rules, history. Lives in the cloud backend. |
-| **Membership** | A user's role in one household. A user can be member of many households, a household can have many members. |
-| **Invite** | One-time code with a role and an expiry, created by an admin, shared as a link/QR. |
-| **Hub** | Optional agent at the household's location. Belongs to exactly one household; **a household has at most one hub**. Runs the local broker for all of that household's devices, executes its rules locally, buffers data while offline. A second location (e.g. a garden shed with its own WiFi) is a second household, shared with the same people. |
-| **Gateway** | Where a household's devices connect: the **hub** (LAN) if the household has one, otherwise the **cloud broker** (internet). |
-
-```mermaid
-flowchart TB
-    Alice(("Alice")) --> App1["App"]
-    Bob(("Bob")) --> App2["App"]
-
-    subgraph Cloud["Cloud backend"]
-        H1["Household: Alice's flat<br/>gateway: hub"]
-        H2["Household: Parents' garden<br/>gateway: cloud broker"]
-        H3["Household: Bob's office<br/>gateway: cloud broker"]
-    end
-
-    App1 -- "owner" --> H1
-    App1 -- "member" --> H2
-    App2 -- "viewer (invited by Alice)" --> H1
-    App2 -- "owner" --> H2
-    App2 -- "owner" --> H3
-
-    HubA["Alice's hub"] -- "bridge, only H1's device topics" --> H1
-```
+| **Gateway** | The box. There is one per installation; it defines the household. |
+| **User** | A person with a username and password stored on the gateway. |
+| **Role** | Owner, Admin, Member or Viewer; one household per gateway. |
+| **Invite** | One-time code with a role and expiry, created by an admin and shared as a link. |
+| **Browser/app token** | A random token issued at login, bound to that browser or phone. It is stored there; only its hash is stored on the gateway. |
 
 ### 3.2 Roles
 
-Per household; a user has exactly one role per household. Enforced by the cloud backend on every request.
+Enforced by the hub on every request.
 
 | Action | Owner | Admin | Member | Viewer |
 |---|:-:|:-:|:-:|:-:|
 | See plants, readings, history, alerts | ✔ | ✔ | ✔ | ✔ |
 | Water manually, cancel commands | ✔ | ✔ | ✔ | |
 | Create/edit plants and rules | ✔ | ✔ | ✔ | |
-| Add/remove/configure devices, add/remove the hub | ✔ | ✔ | | |
+| Add/remove/configure devices, open the Zigbee network for joining | ✔ | ✔ | | |
 | Invite members, change roles (up to Member), remove members/viewers | ✔ | ✔ | | |
-| Promote/demote admins, rename/delete household, transfer ownership, export data | ✔ | | | |
+| Promote/demote admins, transfer ownership, export data | ✔ | | | |
 
-Exactly one owner per household.
+Exactly one owner.
 
-### 3.3 Login and API access
+### 3.3 Login and tokens
 
-- The user signs in with **Firebase** (e-mail, Google, Apple) — always online.
-- The app sends its **Firebase ID token** to the cloud backend with every request. The backend is the only party that ever receives it and we operate it, so no token exchange is needed.
-- The backend verifies the token, then checks membership + role for the household in the URL.
-- **Sensitive actions** (delete household, transfer ownership, export, remove the hub, change admin roles) additionally require a **recent login** (≤ 5 min, from the token's `auth_time`) and a check against Firebase for revoked sessions. The app asks the user to re-authenticate first.
-- The web app runs only on the **official origin** (Firebase Hosting); the API accepts browser requests only from there.
+- **First setup:** the first user (the owner) is created when the gateway starts for the first time, using a one-time setup code shown in the gateway's log.
+- **Login:** username and password in the web app (or later the mobile app) returns a **device token**. The token is stored in that browser, and every request carries it. Passwords are stored hashed.
+- **My devices:** a user sees the browsers/phones that hold a token and can revoke any of them. Changing the password revokes all.
+- **Sensitive actions** (delete device, change admin roles, transfer ownership, export, reset the gateway) additionally ask for the password again.
+- **Discovery:** the web app is opened at the gateway's address (e.g. `http://moisture.local`). A future mobile app finds the gateway on the LAN through mDNS and registers itself with username and password, which issues its token.
+- Over plain HTTP the token travels unencrypted on the home network. That is accepted for now and goes away with HTTPS when remote access is added.
 
-```mermaid
-sequenceDiagram
-    participant App as Flutter app
-    participant FA as Firebase Auth
-    participant API as Cloud backend
+### 3.4 Sharing (invites)
 
-    App->>FA: sign in
-    FA-->>App: Firebase ID token (1 h, auto-refreshed)
-    App->>API: GET /me/households (ID token)
-    API->>API: verify token → uid
-    API-->>App: households + my role in each
-    Note over App: user picks "Alice's flat"
-    App->>API: GET /households/h1/plants (ID token)
-    API->>API: membership(uid, h1) → role
-    API-->>App: 200 plants (404 if not a member)
-```
+An admin creates an invite with a role and expiry; the app shows a link/QR to the gateway (`http://moisture.local/join#c=<code>`). The invited person opens it, chooses a username and password, and gets a token. Invites are single-use, expire and can be revoked.
 
-### 3.4 Sharing a household (invites)
+### 3.5 Adding a plant device
 
-An admin creates an **invite** with a role; the app shows it as a link and QR code pointing to the official app: `https://app.<our-domain>/join#c=<code>` (the code after `#` never reaches any server log).
+Zigbee replaces pairing over Bluetooth and WiFi credentials: a device needs neither.
 
 ```mermaid
 sequenceDiagram
-    participant A as Alice's app (admin)
-    participant API as Cloud backend
-    participant B as Bob's app
+    participant A as Admin (web app)
+    participant H as Hub
+    participant Z as Zigbee2MQTT
+    participant D as New PlantModule
 
-    A->>API: POST /households/h1/invites {role: viewer}
-    API-->>A: code (expires in 48 h) → link / QR
-    A-->>B: share link (chat, QR in person …)
-    B->>B: open link → sign in or sign up (Firebase)
-    B->>API: GET /invites/{code} → preview (household, role, inviter)
-    B->>API: POST /invites/{code}/accept
-    API->>API: code valid + unused → membership(Bob, h1, viewer)
-    API-->>B: joined — household appears in Bob's switcher
+    A->>H: "Add device" (optionally with the install code from the device label)
+    H->>Z: permit join, 2 minutes
+    D->>Z: factory state or button press → scans, joins the network
+    Z-->>H: device joined (IEEE address, model)
+    H-->>A: new device appears, awaiting name
+    A->>H: name it, assign plants, configure slots
+    Z->>D: interview, then configure (bindings + reporting)
+    H->>Z: send the initial configuration
 ```
 
-- Invites are single-use, expire, and can be revoked. Opening the link (GET) never consumes an invite; only the explicit accept does.
-- Removing a member takes effect on the next request.
+- **Install codes:** a per-device code printed on the label lets the coordinator accept only that device while the network is open. It plays the role the proof-of-possession code played before.
+- The device ID is the Zigbee IEEE address; the hub keeps its own record per device.
+- Joining is possible only while permit-join is open (a few minutes, started by an admin).
 
-### 3.5 With or without a hub
+### 3.6 What happens when parts are down
 
-| | Without hub | With hub |
-|---|---|---|
-| Devices connect to | Cloud broker over the internet | Hub's broker on the LAN |
-| Encryption | TLS-PSK | TLS-PSK (same firmware code path) |
-| Wake window | TLS-PSK handshake is cheap (no public-key math); the internet round trips add some time | Shortest: LAN round trips only |
-| Rules run | In the cloud | **On the hub** — keep watering without internet |
-| Manual watering / config from the app | Cloud → cloud broker → device | Cloud → bridge → hub broker → device |
-| Internet down at the plants | Devices can't report; no automatic watering (device safety limits only) | Hub keeps collecting data and running rules; data and results are uploaded when the connection returns |
-| Our cloud down | Nothing works remotely | Same for the app; the hub keeps watering |
-| Setup effort | None | Run the hub (Docker on any Linux box), enroll it in the app (§3.7) |
+| Situation | Effect |
+|---|---|
+| Home internet down | None. Everything is local. (Only the later Telegram notifications need internet.) |
+| Browser closed | Rules, the command queue and data collection keep running on the gateway. |
+| Gateway box down | Devices keep their local safety limits and retry; no data is collected; the app is unreachable. Data from that period is lost except what devices still hold themselves. |
+| `hub` restarts | Zigbee2MQTT and the network keep running; `hub` resumes from SQLite; `api` shows the last state as stale and refuses changes meanwhile. |
+| `api` down or on another device and unreachable | Rules, commands in flight, data collection and Telegram alerts keep running; only the web app is unavailable. |
 
-Moving a household from "no hub" to "hub" (or back) means re-pairing each device to the new gateway (button + BLE, §3.8); history, plants and rules stay where they are — in the cloud.
-
-### 3.6 What happens without internet
-
-- **With a hub:** devices, data collection and rules keep running on the hub. The app can't reach the household (it only talks to the cloud). Anyone with shell access to the hub can check status and trigger watering via the hub CLI (`mc-hub status`, `mc-hub water <plant> <seconds>`). Everything the hub did is uploaded when the connection returns.
-- **Without a hub:** devices keep sleeping and waking; each wake without a connection buffers its readings (a few cycles, firmware spec); there is no automatic watering until the connection is back.
-- **Logins** always need internet (Firebase). There is no local login anywhere.
-
-### 3.7 Adding a hub (enrollment)
-
-Device-code style pairing, like signing in a TV: the hub never needs any inbound connection, and the user never types a secret into the hub.
-
-```mermaid
-sequenceDiagram
-    participant Hub as Hub (first start)
-    participant API as Cloud backend
-    participant App as Admin's app
-
-    Hub->>Hub: generate enrollment secret
-    Hub->>API: POST /hub/v1/enroll/start (hash of secret)
-    API-->>Hub: enroll_id + short user code (e.g. K7QM-2XPA), 15 min
-    Hub->>Hub: show code + QR on the console
-    App->>API: POST /households/h1/hub {user_code} (admin, recent login)
-    API->>API: create hub, bridge PSK on the cloud broker,<br/>ACL = only h1's device topics
-    loop every 5 s
-        Hub->>API: POST /hub/v1/enroll/poll {enroll_id, secret}
-    end
-    API-->>Hub: hub_id, bridge PSK, broker address
-    Hub->>API: MQTT bridge connects (TLS-PSK, outbound)
-    API-->>App: hub online
-```
-
-Details: [`contracts/hub.md`](contracts/hub.md), [`hub/Hub_Specs.md`](hub/Hub_Specs.md).
-
-### 3.8 Device identity and pairing
-
-- **Device IDs are random and assigned by the cloud** when an admin adds a device. The chip's MAC address is not an identity (it is visible over Bluetooth and often printed on the board).
-- Every device has a **proof-of-possession code (PoP)** generated when it is flashed and printed as a QR label. Pairing over BLE requires it, so a neighbour in Bluetooth range cannot take over the device, and the encrypted pairing session keeps the WiFi password and the device's MQTT key from being sniffed.
-- A device accepts pairing **only** when unprovisioned or after the BOOT button is held for 3 s (maintenance mode). There is no remote way to open pairing.
-- Holding BOOT for 10 s is a factory reset (credentials + config wiped, PoP kept).
-- During pairing the app sends the gateway's address and the device's **MQTT pre-shared key** (256 bit, generated by the cloud, never shown to the user).
-
-Protocol: [`contracts/ble.md`](contracts/ble.md).
-
-### 3.9 Security model in one table
+### 3.7 Security model
 
 | Party | Trusted with | Cannot |
 |---|---|---|
-| **Cloud backend** (us) | Everything: users, households, all data, Firebase and FCM credentials, all MQTT keys | — |
-| **Hub** | Its own household's device topics (read telemetry, send commands/config), its devices' MQTT keys, a read-only copy of that household's plants and rules | See users, other households, or any API; accept inbound connections from the internet |
-| **Device** | Its own MQTT topics and key | See any other device |
-| **App** | The user's Firebase login | Talk to brokers or hubs (except BLE pairing with a device the user physically holds) |
-| **Home network / WiFi** | Nothing | Sniff or inject MQTT (TLS-PSK), reach any login — there is none |
+| **Gateway** | Everything of its household: users (hashed), tokens (hashed), data | — |
+| **Device** | Its own Zigbee link and its own sensor/pump | Reach anything except through the coordinator (but shares the network key with other devices) |
+| **Browser/app** | The user's token | Talk to Zigbee2MQTT, Mosquitto or the database |
+| **Home network** | Reaches the web port | Join the Zigbee network without permit-join (+ install code); tokens are readable on plain HTTP, see 3.3 |
+
+The Zigbee network key protects the radio side; the web port is the only service meant for people.
 
 ---
 
 ## 4. Components and responsibilities
 
-### 4.1 Plant device — `firmware/`
+Each product has its own `specs.md` (design) and `readme.md` (build, run, test).
 
-Battery-powered ESP32 running Zephyr. Details: [`Firmware_Specs.md`](firmware/Firmware_Specs.md).
+### 4.1 PlantModule — `PlantModule/`
 
-- Wakes on a timer (default ~10 min), reads all configured sensor slots, connects WiFi + MQTT, publishes readings, processes queued commands, goes back to deep sleep.
-- Pluggable module slots (moisture sensor, pump, …) configurable at runtime via MQTT.
-- Reports its own health on every wake: battery voltage, WiFi RSSI, firmware version, wake reason.
-- Enforces local safety limits independent of what the backend says.
-- MQTT over **TLS-PSK** to whichever gateway it was paired with — one code path for hub and cloud.
+ESP32-C6 firmware on **ESP-IDF with `esp-zigbee-sdk`**, plus the carrier board (KiCad) and scripts.
 
-### 4.2 MQTT brokers — `broker/`
+- An **always-awake Zigbee end device** (receiver on): samples all configured sensor slots every 5 minutes (every 30 s while watering), reports to the coordinator, and executes commands as they arrive. It is written as explicit state machines. Low power (deep sleep) comes later.
+- Standard Zigbee clusters where they exist (soil moisture, temperature, battery, on/off with timed off for the pump); a manufacturer-specific cluster for what has no standard (slot configuration, calibration, safety limits, report intervals).
+- Enforces local safety limits independent of what the hub says.
+- No WiFi, no MQTT, no Bluetooth pairing and no TLS keys on the device.
 
-Off-the-shelf **Mosquitto**, only configuration. Two deployments:
+### 4.2 Gateway — `Gateway/`
 
-- **Cloud broker** — public on port 8883 (TLS-PSK). Clients: devices of households without a hub, hub bridges. The backend connects on an internal listener. Keys and ACLs are files written by the backend; the broker reloads them on change.
-- **Hub broker** — on the hub, LAN port 8883 (TLS-PSK). Clients: the household's devices and the hub agent. Bridges the household's device topics to the cloud broker.
+One box (Raspberry Pi 4/5, a mini PC or any 64-bit Linux with Docker, plus a Zigbee USB coordinator of about €20) running Docker Compose.
 
-Both: persistent sessions (queued commands for sleeping devices survive), persistence to disk, PSK identity = client ID = MQTT username, ACL patterns so a device only reaches `mc/v1/<own-id>/…` ([`contracts/mqtt.md`](contracts/mqtt.md)).
-
-### 4.3 Cloud backend — `server/`
-
-Our service, **Python (FastAPI)**, operated by us. Details: [`Server_Specs.md`](server/Server_Specs.md).
-
-| Responsibility | What it means |
+| Part | Responsibility |
 |---|---|
-| **Accounts & access** | Verifies Firebase ID tokens; households, memberships, roles, invites; recent-login checks for sensitive actions. |
-| **Ingest** | Subscribes to all device topics on the cloud broker (direct devices and bridged ones), validates, stores history, tracks online state. |
-| **Device & hub registry** | Devices, hubs, their MQTT keys and ACLs on the cloud broker; hands device keys to hubs through the hub channel. |
-| **Command queue** | Turns API requests into MQTT commands with ID and expiry, tracks them until acked or expired. |
-| **Config sync** | Desired vs. reported device config; the household snapshot for its hub. |
-| **Rules** | Evaluates rules for households **without** a hub. For hub households it only records what the hub reports. |
-| **Alerts & push** | Offline, battery, sensor errors, failed commands → in-app list + FCM push (the backend holds the FCM credentials). |
-| **API** | REST + Server-Sent Events for the app. All data endpoints scoped `/households/{id}/…`. Hub enrollment endpoints. |
+| **Zigbee coordinator + Zigbee2MQTT** | Runs the Zigbee network, joins and talks to devices, publishes their messages on MQTT. Needs one external converter that describes the PlantModule's custom cluster. |
+| **Mosquitto** | The only channel between Zigbee2MQTT, `hub` and `api`; per-service users and ACLs; TLS listener only when `api` runs on another device. |
+| **`hub`** (Python) | Everything about plants and devices: ingest and normalization; SQLite history; device and plant records; the **command queue** (sent at once while a device is online, held while it is offline); **rules**; alerts and the Telegram notifier; export and backup of its data. Talks to Zigbee2MQTT and `api` over MQTT; no HTTP port. |
+| **`api`** (Python) | The edge: login, tokens, roles, invites and audit (own SQLite file); REST API and SSE live updates; serves the Flutter web build. Decides who may do something and asks `hub` over MQTT; can run on another device. |
+| **Contract** | `Gateway/mqtt-contract.yaml` describes the `api` ↔ `hub` messages; there is no shared code library. |
 
-### 4.4 Home hub — `hub/`
+### 4.3 App — `App/`
 
-Optional. **Docker Compose on any 64-bit Linux box** (Raspberry Pi 3B+/4/5, a NAS with Docker, an old PC; ≥ 1 GB RAM): Mosquitto + the hub agent (Python, sharing the rules and contract code with the backend). Details: [`Hub_Specs.md`](hub/Hub_Specs.md).
+**Flutter**, one codebase: the web build is served by the gateway today, Android/iOS builds come later.
 
-- Local broker for the household's devices; bridge to the cloud broker (outbound TLS-PSK, queues in both directions while offline).
-- Receives the household snapshot (plants, rules, device limits) from the cloud; runs the **same rules engine** as the cloud; reports every rule decision and rule-created command.
-- Installs/removes device keys on its broker when the cloud asks.
-- CLI for local status and manual watering with shell access.
-
-### 4.5 Client app — `app/`
-
-**Flutter**, one codebase for web and Android/iOS. Talks to Firebase (login) and to the cloud backend only. The web build is served only from the official origin on Firebase Hosting.
-
-- Login and a **household switcher**.
-- Household management: members, roles, invites (link/QR), accept invite, add/remove hub (enter/scan the hub's code).
-- Dashboard: all plants of the current household, current moisture, battery, online state, hub state.
-- Plant detail: history chart, water-now button, rules.
-- Device detail: slot configuration, wake interval, health.
-- Clearly shows **pending** actions ("Watering queued — device next expected ~14:32") and "hub offline — data will arrive later".
-- Push notifications (FCM).
-- **Device pairing over BLE** (mobile app only).
-
-### 4.6 Firebase project — `firebase/`
-
-Only managed services, no own code. Details: [`Firebase_Specs.md`](firebase/Firebase_Specs.md).
-
-- **Authentication** — the only login.
-- **Cloud Messaging** — push, sent by the cloud backend.
-- **Hosting** — official web app, `/join` invite links, mobile app-link files.
-
-### 4.7 Shared contracts — `contracts/`
-
-- **[`mqtt.md`](contracts/mqtt.md)** — device ↔ backend (via hub or cloud broker): connection and keys, topics, payloads, QoS/retain, command and config semantics.
-- **[`hub.md`](contracts/hub.md)** — hub ↔ cloud: enrollment, bridge topics, household snapshot, key requests, rule reports.
-- **[`ble.md`](contracts/ble.md)** — app ↔ device pairing.
-- **`api.yaml`** — OpenAPI between backend and app. **Code-first:** generated from FastAPI, committed, and the Dart client is generated from it.
-
-Shared Python code (contract models, rules engine, command checks, pin rules) lives in one package, [`core/`](core/), used by both backend and hub, so rules behave identically wherever they run.
+- Login, dashboard, plant detail (history, water now, rules), device detail (slots, health, report interval), alerts, users and invites, "add device" (opens the join window), gateway status.
+- Clearly shows **pending** actions ("device expected ~14:32").
+- Talks only to the hub's REST/SSE API on its own origin.
 
 ---
 
@@ -336,123 +208,98 @@ Shared Python code (contract models, rules engine, command checks, pin rules) li
 
 ```mermaid
 erDiagram
-    USER ||--o{ MEMBERSHIP : has
-    HOUSEHOLD ||--|{ MEMBERSHIP : has
-    HOUSEHOLD ||--o{ INVITE : issues
-    HOUSEHOLD ||--o| HUB : "has (optional)"
-    HOUSEHOLD ||--o{ DEVICE : contains
-    HOUSEHOLD ||--o{ PLANT : contains
+    USER ||--o{ TOKEN : "has"
+    USER ||--o| ROLE : "has one"
+    INVITE }o--|| ROLE : "grants"
     DEVICE ||--|{ SLOT : has
     SLOT }o--o| PLANT : "assigned to"
     SLOT ||--o{ READING : produces
     DEVICE ||--o{ COMMAND : receives
     PLANT ||--o{ RULE : "watered by"
-    RULE }o--|| SLOT : "reads sensor slot"
-    RULE }o--|| SLOT : "drives pump slot"
+    RULE ||--o{ RULE_EXECUTION : records
     DEVICE ||--o{ HEALTH_REPORT : sends
+    ALERT }o--o| DEVICE : about
 ```
 
-- **User** — Firebase identity; the backend stores its UID, display name, verified e-mail.
-- **Household** — unit of ownership and sharing; everything below belongs to exactly one household.
-- **Membership** — (user, household, role), role ∈ owner / admin / member / viewer.
-- **Invite** — one-time code with role and expiry, created by an admin.
-- **Hub** — optional agent of one household; has a bridge key and a status.
-- **Device** — one ESP32, random ID and MQTT key assigned by the cloud; connects to the household's gateway.
-- **Slot** — one physical connector/pin on a device with a module type. Desired vs. reported config.
-- **Plant** — linked to a sensor slot and optionally a pump slot. *Users think in plants, devices think in slots — the backend maps between them.*
-- **Reading** — timestamped value from a sensor slot.
-- **Command** — a request sent to a device with a lifecycle (§6.4); created by a user, the cloud rules engine or the hub.
-- **Rule** — automation attached to a plant; executed by the hub if the household has one, otherwise by the cloud.
-- **Health report** — battery, RSSI, firmware version, per wake.
+- **User**, **Role**, **Token**, **Invite**: access to the gateway.
+- **Device**: Zigbee IEEE address, model, name, desired and reported configuration.
+- **Slot**: one physical connector with a module type (moisture sensor, pump, …). *Users think in plants, devices think in slots; the hub maps between them.*
+- **Plant**: linked to a sensor slot and optionally a pump slot.
+- **Reading**, **Health report**, **Command**, **Rule** (+ executions), **Alert**.
 
 ---
 
 ## 6. Key flows
 
-### 6.1 Device wake cycle (summary)
+### 6.1 Device run loop (summary)
 
-Full detail in the firmware spec; shown here because every other flow depends on it.
+Full detail in `PlantModule/specs.md` Part A §6 and §7.
 
 ```mermaid
 flowchart TD
-    A([Deep sleep]) -->|RTC timer| B[Wake up]
-    B --> C["Read all sensor slots<br/>(before WiFi — ADC2 constraint)"]
-    C --> D[Connect WiFi + MQTT over TLS-PSK<br/>persistent session]
-    D -->|fail| R[Keep readings for next cycle]
-    R --> Z
-    D -->|ok| E[Publish readings + health]
-    E --> F{Queued commands<br/>from broker?}
-    F -->|yes| G[Validate & execute<br/>apply safety limits]
-    G --> H[Publish ack / result]
-    H --> F
-    F -->|no| I{Config changed?}
-    I -->|yes| J[Publish config/state]
-    I -->|no| K
-    J --> K[Disconnect MQTT, WiFi off]
-    K --> L{Pump still running?}
-    L -->|yes| M[Hold pump pin,<br/>wake early to switch off]
-    L -->|no| Z[Schedule normal wake]
-    M --> A
-    Z --> A
+    A([Operational]) -->|every 300 s,<br/>30 s while watering| B[Sample all sensor slots]
+    B --> C[Convert, update attributes]
+    C --> D[Report to the coordinator]
+    D --> A
+    A -->|command from the hub| E[Validate, apply safety limits]
+    E -->|rejected| F[Acknowledge with reason]
+    E -->|ok| G[Run the pump for a bounded time]
+    G --> H[Acknowledge running, then done]
+    H --> A
+    A -->|config writes + commit| I[Validate, apply atomically, persist]
+    I --> J[Report the configuration it runs]
+    J --> A
+    A -->|link lost| K[Rejoin with back-off, bounded runs continue]
+    K --> A
 ```
 
-### 6.2 Sensor reading → app (household with hub)
-
-Without a hub the same flow applies, minus the hub: the device publishes directly to the cloud broker and the cloud runs the rules.
+### 6.2 Sensor reading → app
 
 ```mermaid
 sequenceDiagram
     participant Dev as Device
-    participant Hub as Hub (broker + agent)
-    participant CB as Cloud broker
-    participant API as Cloud backend
-    participant App as Flutter app
+    participant Z as Zigbee2MQTT
+    participant Hub as hub
+    participant App as Web app
 
-    Dev->>Hub: publish telemetry (LAN)
-    Hub->>Hub: agent: evaluate rules locally
-    Hub->>CB: bridge forwards telemetry<br/>(queued while offline)
-    CB->>API: deliver
-    API->>API: validate, map slot → plant, store
-    API-->>App: live update (SSE)
-    App->>API: GET /households/{h}/plants/{id}/readings
-    API-->>App: history
+    Dev->>Z: Zigbee report (moisture, battery, link quality)
+    Z->>Hub: MQTT message
+    Hub->>Hub: map slot → plant, store, run rules
+    Hub-->>App: live update (SSE)
+    App->>Hub: GET readings (history)
 ```
 
-### 6.3 Manual watering (household with hub)
+### 6.3 Manual watering
 
-The app gets an answer **immediately** ("queued"); the real result arrives **minutes later** when the device wakes.
+The app gets an answer **immediately** ("queued"); the result arrives within moments when the device is online. If the device is offline the command stays queued until it returns or its time to live ends, and the app shows "queued, device offline".
 
 ```mermaid
 sequenceDiagram
-    participant App as Flutter app
-    participant API as Cloud backend
-    participant CB as Cloud broker
-    participant Hub as Hub broker
-    participant Dev as Device (asleep)
+    participant App as Web app
+    participant Hub as hub
+    participant Z as Zigbee2MQTT
+    participant Dev as Device
 
-    App->>API: POST /households/{h}/plants/{id}/water {seconds: 10}
-    API->>API: role ≥ member, limits, create command (id, exp)
-    API->>CB: publish mc/v1/‹dev›/cmd (QoS 1)
-    API-->>App: 202 {command_id, status: queued}
-    CB->>Hub: bridge (queued if hub offline)
-    Note over Hub: held in the device's persistent session
-    Note over Dev: … timer wake …
-    Dev->>Hub: connect
-    Hub->>Dev: queued cmd
-    Dev->>Dev: check expiry + safety limit, run pump
-    Dev->>Hub: cmd/ack
-    Hub->>CB: bridge
-    CB->>API: ack
-    API-->>App: live update: watering done
+    App->>Hub: POST water {seconds: 10}
+    Hub->>Hub: role ≥ member, limits, store command (id, ttl)
+    Hub-->>App: 202 queued
+    Hub->>Z: pump_run (device online: sent at once)
+    Z->>Dev: cluster command
+    Dev->>Z: cmd_ack running (ends in 10 s)
+    Z->>Hub: state with cmd_ack
+    Hub-->>App: live update: running
+    Dev->>Z: cmd_ack done
+    Z->>Hub: state with cmd_ack
+    Hub-->>App: live update: done
 ```
 
 ### 6.4 Command lifecycle
 
 ```mermaid
 stateDiagram-v2
-    [*] --> Queued: created via API, cloud rule or hub rule
-    Queued --> Delivered: device ack received
-    Queued --> Expired: device did not wake before expires_at
+    [*] --> Queued: created in the app or by a rule
+    Queued --> Delivered: device confirmed
+    Queued --> Expired: device did not come back before the ttl
     Queued --> Cancelled: user cancels (best effort)
     Delivered --> Done: result = ok
     Delivered --> Failed: result = error / rejected by safety limit
@@ -462,62 +309,31 @@ stateDiagram-v2
     Cancelled --> [*]
 ```
 
-Because an MQTT message cannot be taken back once the broker has queued it, **every command carries an ID and an expiry**, and the device ignores expired commands. "Cancel" is best effort: a cancel command only helps if it arrives before the device has executed the original one (D7).
+Every command carries an ID and an expiry; the device ignores expired commands. "Cancel" is best effort.
 
 ### 6.5 Automatic watering (rule)
 
-Runs on the **hub** if the household has one (works offline), otherwise in the **cloud**. Same code, same decisions.
-
 ```mermaid
 flowchart TD
-    A[New moisture reading arrives] --> B{Plant has<br/>active rule?}
+    A[New moisture reading] --> B{Plant has<br/>active rule?}
     B -->|no| Z([done])
     B -->|yes| C{Value below<br/>threshold?}
     C -->|no| Z
     C -->|yes| D{Cooldown passed &<br/>daily limit not reached?}
     D -->|no| Z
     D -->|yes| E{Reading plausible?<br/>sensor not broken}
-    E -->|no| F[Raise sensor alert] --> Z
+    E -->|no| F[Record skip] --> Z
     E -->|yes| G[Create water command<br/>same checks as manual]
-    G --> H[Log rule execution<br/>hub: report to cloud]
-    H --> Z
+    G --> H[Record decision] --> Z
 ```
-
-Because the device measures first and only then receives commands, a rule triggered by a reading is executed on the **next** wake — acceptable for plants.
 
 ### 6.6 Changing a device's configuration
 
-```mermaid
-sequenceDiagram
-    participant App as Flutter app
-    participant API as Cloud backend
-    participant GW as Gateway (cloud broker, or bridge → hub broker)
-    participant Dev as Device
-
-    App->>API: PUT /households/{h}/devices/{id}/config
-    API->>API: validate against pin rules, save as DESIRED (rev+1)
-    API->>GW: publish config/desired (QoS 1, retained)
-    API-->>App: 202 {status: pending}
-    Note over Dev: next wake
-    GW->>Dev: config/desired
-    Dev->>Dev: apply + persist
-    Dev->>GW: config/state
-    GW->>API: config/state
-    API->>API: save as REPORTED, compare with DESIRED
-    API-->>App: live update: in sync / rejected
-```
+The app saves the **desired** configuration (revision + 1, validated against the pin rules). The hub sends it to the device at once (or when the device returns): the converter writes the configuration attributes and sends `commit_config`; the device validates, applies atomically, persists and reports the configuration it runs. The app shows *Pending (rev 8)* until the reported revision matches, or *Rejected* with the device's reason.
 
 ### 6.7 Adding a new device
 
-```mermaid
-flowchart LR
-    A["Flash firmware<br/>+ print PoP label"] --> A1["Admin taps 'add device',<br/>scans the QR label"]
-    A1 --> A2["Cloud creates device record,<br/>random ID + MQTT key<br/>(installed on the hub broker if there is a hub,<br/>otherwise on the cloud broker)"]
-    A2 --> B["App pairs over BLE (PoP-authenticated,<br/>encrypted), sends WiFi + gateway + key,<br/>device tests the connection"]
-    B --> C[Device connects, publishes status]
-    C --> E[Admin names it, assigns plants,<br/>configures slots]
-    E --> G([Normal operation])
-```
+See 3.5: open the join window, the device joins, name it, assign plants, configure slots.
 
 ---
 
@@ -525,87 +341,88 @@ flowchart LR
 
 | Topic | Direction |
 |---|---|
-| **Security** | One trust boundary for people: Firebase login, cloud backend only (§3.9). HTTPS for all HTTP; TLS-PSK for all MQTT, including on the LAN. Per-device and per-hub keys + ACLs. Recent-login check for sensitive actions. The only listening port in a user's home is the hub's MQTT port on the LAN. |
-| **Time** | Devices have no reliable clock right after wake; they sync via SNTP when needed (contract). The backend accepts device timestamps within a plausibility window, otherwise uses receive time. Hub-buffered data keeps its original timestamps. |
-| **Offline detection** | Backend knows each device's wake interval → *late* / *offline*. For hub households, "hub offline" is shown instead of marking every device offline. |
-| **Power** | Every feature is judged by what it adds to the wake window. TLS-PSK keeps encryption cheap; a hub additionally avoids internet round trips. |
-| **Safety** | Hard maximum pump duration and minimum pause, enforced on the device *and* wherever commands are created (cloud and hub). |
-| **Deployment** | Cloud: one Docker Compose stack (Caddy, backend, Mosquitto, PostgreSQL). **Development and first operation on a Raspberry Pi at home, later the same stack on a cloud VM** (D32); provider still open (§10). Hub: Docker Compose on any 64-bit Linux box, multi-arch images (arm64 + amd64). Web app on Firebase Hosting. Mobile via the stores. |
-| **Privacy** | All household data is stored in our cloud (EU region). A hub does not change that — it adds local execution, not local-only storage. Owners can export their household's data. |
-| **Observability** | Every command and rule decision is logged (including where it ran). Device health history is kept to analyse battery drain. |
-| **Updates (later)** | OTA firmware updates — not in v1, keep the flash layout (MCUboot) in mind. Hub updates via `docker compose pull`; the cloud tells the admin when the hub is outdated. |
+| **Security** | One service for people (the hub's web port); everything else is internal to the box. Passwords and tokens hashed. Zigbee network key plus install codes on the radio side. HTTPS and rate limiting come with remote access. |
+| **Time** | The hub stamps every message with its own receive time; the device sends only relative information unless the Zigbee Time cluster is used. The gateway needs NTP. |
+| **Offline detection** | The hub marks a device *late* after 3 missed reports and *offline* when Zigbee2MQTT's availability check fails; link quality and the last report are shown. |
+| **Power** | The module is externally powered for now. Low power (sleepy end device, deep sleep, switched sensor supply) is a planned later step and is parked in `PlantModule/specs.md` Part A §18; the design keeps the hooks for it. |
+| **Safety** | Hard maximum pump duration and minimum pause, enforced on the device and again in the hub. |
+| **Data** | SQLite on the gateway. History stays local; the owner can export. Backup is copying the database file (documented, automatable later). |
+| **Notifications** | In-app alerts are sent by `api`; Telegram messages are sent by `hub` itself (set per rule), so they work without `api`. Web push needs HTTPS and comes with remote access. |
+| **Deployment** | Docker Compose, multi-arch (arm64 + amd64): Zigbee2MQTT, Mosquitto, `hub`, `api` (serving the web build); `api` can be deployed on another device. |
+| **Updates** | `hub`, `api` and Zigbee2MQTT via `docker compose pull`. Device firmware over Zigbee OTA (supported by Zigbee2MQTT) later. |
+| **Remote access** | Not part of this design. Later through a VPN or a tunnel in front of the same web port, together with HTTPS. |
 
 ---
 
-## 8. Repository layout
+## 8. Repository layout (target)
 
 ```
 MoistureController/
 ├── PROJECT.md              ← this file
-├── contracts/
-│   ├── mqtt.md             ← device ↔ backend
-│   ├── hub.md              ← hub ↔ cloud
-│   ├── ble.md              ← app ↔ device pairing
-│   └── api.yaml            ← OpenAPI (backend ↔ app), generated
-├── firmware/               ← Zephyr / ESP32
-├── core/                   ← shared Python package: contract models, rules engine, command checks, pin rules
-├── server/                 ← cloud backend (FastAPI) + cloud docker-compose
-├── hub/                    ← hub agent + hub docker-compose
-├── broker/                 ← Mosquitto configs (cloud + hub)
-├── firebase/               ← Firebase config (auth, hosting)
-└── app/                    ← Flutter (web + mobile)
+├── readme.md
+├── PlantModule/            ← firmware/ (ESP-IDF) · hardware/ (KiCad) · scripts/ · specs.md · readme.md
+├── Gateway/                ← hub + api services, compose (Zigbee2MQTT, Mosquitto, hub, api), converter, mqtt-contract.yaml · scripts/ · specs.md · readme.md
+└── App/                    ← Flutter (web, later mobile) · specs.md · readme.md
 ```
+
+The interfaces are described in the spec of the component that serves them: the custom Zigbee cluster in `PlantModule/specs.md`, the REST/SSE API and the Zigbee2MQTT message handling in `Gateway/specs.md`.
 
 ---
 
-## 9. Milestones (whole system)
+## 9. Status and plan
 
-Each milestone ends with something working end-to-end. The hub comes last because it is optional — everything before it works with devices talking to the cloud broker directly.
+| Product | State |
+|---|---|
+| **PlantModule** | Carrier board designed (KiCad, not fabricated). No firmware yet. |
+| **Gateway** | Specified. No code yet. |
+| **App** | Flutter app exists against the previous API (dashboard, plant detail, rules, devices, alerts, gateway screen, connection handling); it has to be adapted to the hub API. |
 
-| # | Milestone | Firmware | Broker | Backend | Hub | App |
-|---|---|---|---|---|---|---|
-| **M1** | Readings on a screen | Always-on, one moisture sensor, credentials via Kconfig | Cloud broker running locally, plain TCP (dev only) | Ingest + store + `GET` readings; one fixed household, household-scoped URLs from day one | — | Single screen: list + chart |
-| **M2** | Water from the app | Pump driver, `cmd` + ack | Persistent sessions | Command queue + lifecycle | — | Water button, pending state |
-| **M3** | Battery life | Deep sleep, health report, **TLS-PSK** | PSK listener | Late/offline detection | — | Battery + last seen |
-| **M4** | Configure remotely | `config/desired` / `config/state` | — | Desired vs. reported config | — | Slot config UI |
-| **M5** | Automation | Local safety limits | — | Rules engine (in `core/`), alerts, FCM push | — | Rule editor, push |
-| **M6** | Accounts & sharing | BLE pairing | Key/ACL files managed by the backend, deployed on the cloud VM | Firebase auth, households, roles, invites, device creation, rate limiting | — | Login, household switcher, invites, BLE onboarding |
-| **M7** | Home hub | — | Hub broker + bridge | Hub enrollment, hub channel, snapshot, rule reports | Agent: enrollment, bridge, local rules, CLI | Add/remove hub, hub state |
+The previous implementation (WiFi/MQTT firmware, gateway service, central FastAPI server, BLE pairing) was removed; what can be reused from it is listed in `Gateway/specs.md` §19 and `PlantModule/specs.md` §11.
+
+Planned order of work:
+
+1. Prove the radio side on the real board (carrier v1 with the SONOFF Dongle Plus MG24 coordinator, already brought up with Zigbee2MQTT 2.14.2): a minimal ESP32-C6 always-listening end device that joins, is interviewed and configured by Zigbee2MQTT, reports moisture and executes a command. The checklist is in `PlantModule/specs.md` Part A §17.1.
+2. Write the hub: SQLite, local login with device tokens, command queue (online/offline), Zigbee2MQTT ingest, REST + SSE API, hosting of the web build.
+3. Adapt the app to the hub API.
+4. Write the real firmware on ESP-IDF and the Zigbee2MQTT converter.
+5. Later: Telegram, HTTPS and remote access, mobile builds, OTA.
 
 ---
 
 ## 10. Decisions
 
-Last change 2026-09-28 (architecture reworked to "cloud + optional hub agent", D23; open points D29–D31). Change only deliberately, and update this table when you do.
-
 | # | Topic | Decision | Consequences |
 |---|---|---|---|
-| D1 | Backend language | **Python + FastAPI** | Mature MQTT and data libraries; OpenAPI generated for free; the Dart client is generated from it (§4.7). Hub agent in Python too, sharing `core/`. |
-| D2 | Database | **PostgreSQL in the cloud, SQLite on the hub** | The cloud is multi-tenant and central, so a real database server; the hub only keeps a small local state. Both via SQLAlchemy + Alembic. |
-| D4 | Live updates | **Server-Sent Events** | One-way push over HTTP, usable from Flutter web and mobile. Everything the app sends goes through REST. |
-| D5 | Provisioning | **BLE from the Flutter app** | BLE stack in the firmware (flash/RAM, BLE + WiFi coexistence must be verified early), pairing protocol (D17), BLE flow in the app. **Mobile only.** Until M6, credentials come from Kconfig. |
-| D6 | Rules | **Run on the hub if there is one, otherwise in the cloud — same code** | Watering keeps working offline with a hub. Rules are edited in the app and stored in the cloud; the hub gets a read-only copy. |
-| D7 | Commands | **Expiry + best-effort cancel** | Every command has `id` + `exp`; device drops expired ones. Cancel = follow-up cancel command, no guarantee. |
-| D8 | Notifications | **Firebase Cloud Messaging, sent by the cloud backend** | FCM credentials only in the cloud. Web push depends on browser support; in-app alert list as fallback. |
-| D9 | Tenancy | **Users ↔ households many-to-many, all in the cloud** | Household switcher is just a list from the API. |
-| D10 | Identity | **Firebase Authentication, always online; the cloud verifies Firebase ID tokens directly** | One trust boundary, no token exchange. No login without internet — anywhere. |
-| D11 | Roles | **Owner / Admin / Member / Viewer** per household | Matrix in §3.2, enforced by the backend on every request. |
-| D12 | Sharing | **Invite link / QR to the official app** (`/join#c=<code>`), one-time code + role + expiry | No addresses involved at all. |
-| D13 | Identity provider | **Firebase Authentication** | Ready Flutter SDK (e-mail, Google, Apple); no own password handling. |
-| D17 | Device identity & pairing | **Cloud-assigned random device IDs; BLE pairing authenticated by a PoP code on the device label, only on first boot or after a button press** | Label-printing step when flashing; encrypted session protocol ([`contracts/ble.md`](contracts/ble.md)). |
-| D23 | Architecture | **Cloud control plane + optional home hub as an outbound-only agent** | Replaces self-hosted home servers. Removes port forwarding, home-server logins, emergency login, per-server tokens, instance registry, push relay, directory, import. We operate the cloud for everyone; all data is stored there. |
-| D24 | Hub ↔ cloud channel | **Mosquitto bridge** (hub broker → cloud broker), plus a few hub-specific topics | Reuses persistent sessions and offline queueing in both directions; the backend handles bridged devices exactly like direct ones ([`contracts/hub.md`](contracts/hub.md)). |
-| D25 | Hub enrollment | **Device-code flow**: hub shows a short code, admin enters it in the app | No inbound connection to the hub, no secrets typed into the hub. |
-| D26 | Local access without internet | **None via the app; hub CLI with shell access** | No local login surface at all. |
-| D27 | Data export | **Owner-only export (backup / GDPR); no import** | Data never moves between servers, so import isn't needed. |
-| D28 | Sensitive actions | **Recent login (≤ 5 min) + revocation check** | Delete household, transfer ownership, export, remove hub, admin role changes. |
-| D29 | MQTT encryption | **TLS-PSK for every MQTT connection** (device ↔ hub, device ↔ cloud, hub bridge ↔ cloud); 256-bit key per client, identity = client ID | Handshake without public-key math (ms instead of ~1 s on the ESP32), one firmware code path, no certificates on devices. No forward secrecy: a leaked key exposes that client's recorded traffic — acceptable for sensor data. Keys delivered only via the encrypted BLE pairing (devices) or enrollment (hubs). |
-| D30 | Hubs per household | **At most one** | Simple routing: one gateway per household. A second location = a second household with the same members. |
-| D31 | Hub hardware | **Any 64-bit Linux with Docker** (multi-arch images arm64 + amd64), ≥ 1 GB RAM | Raspberry Pi 3B+/4/5, NAS, old PC. A ready-to-flash Pi image may come later. |
-| D32 | Where the cloud stack runs first | **On a Raspberry Pi at home for development and testing; moved to a cloud VM later with the same Docker Compose stack** | Devices and hubs are always paired with **hostnames** (`api.` / `mqtt.<domain>`), never IPs, so the move is a DNS change — no re-pairing. The API is exposed via Cloudflare Tunnel (no port forwarding); devices on the LAN reach the broker directly. Migration = backup/restore (Server_Specs §13.4). |
-
-**Superseded by D23** (kept for history): D3 home server first · D14 router port forwarding · D15 emergency login · D16 export/import between servers · D18 home-server exposure hardening · D19 per-server tokens · D20 push relay · D21 official web origin as a fix for home servers (the official origin itself stays, §3.3) · D22 directory in Firestore.
+| D1 | Scope | **All local, free, one box at home.** No cloud services, no accounts with providers. | Remote access, push and mobile builds are later additions. |
+| D2 | Radio | **Zigbee**, ESP32-C6 as end device with the receiver on (low power later), **`esp-zigbee-sdk` on ESP-IDF** | Firmware moves from Zephyr to ESP-IDF; no WiFi/MQTT/TLS on the device. Going to a sleepy end device later is a configuration change, not a new role. |
+| D3 | Zigbee side of the gateway | **Zigbee2MQTT** with a Zigbee USB coordinator and one external converter for the PlantModule | Standard clusters where possible; a custom cluster for slots, calibration, limits and report intervals. |
+| D4 | Hub | **One Python service** (rules, command queue, API, SSE, hosting of the web build) with **SQLite** | PostgreSQL, the WebSocket uplink and the separate Server are dropped. |
+| D5 | Commands to devices | **The hub sends at once while the device is online and queues while it is offline** (until the ttl ends) | A sleepy low-power mode later adds a check-in sender (`Gateway/specs.md` 9.4). |
+| D6 | Rules | **Evaluated in the hub**, next to the data | No dependency on any browser or the internet. |
+| D7 | Login | **Username + password on the gateway; per-device (per-browser) tokens**, hashed at rest, revocable | Plain HTTP on the LAN until remote access brings HTTPS. |
+| D8 | Roles | **Owner / Admin / Member / Viewer**, one household per gateway | Matrix in 3.2. |
+| D9 | Sharing | **Invite links**, one-time code + role + expiry | |
+| D10 | Joining devices | **Permit-join on the coordinator**, optional install code from the device label | No BLE and no credentials on the device. |
+| D11 | Client | **Flutter**, web build served by the gateway; mobile builds later | One codebase; same origin, no CORS. |
+| D12 | Notifications | **In-app alert list now, Telegram bot later** | Web push needs HTTPS; native push would need an Apple developer account. |
+| D13 | Live updates | **Server-Sent Events** | One-way push over HTTP; everything the app sends goes through REST. |
+| D14 | Commands | **Expiry + best-effort cancel** | Every command has `id` + `exp`; the device drops expired ones. |
+| D15 | Safety | **Hard pump limits on the device and again in the hub** | The device is the final authority. |
+| D16 | Remote access | **Not now.** Later a VPN or tunnel in front of the same web port, with HTTPS | Nothing in this design may depend on it. |
+| D17 | Zigbee interface definition | **One machine-readable file** (`PlantModule/interface.yaml`) is the source for the firmware header, the Zigbee2MQTT converter and the hub models | The spec describes it; generators are future work. |
+| D18 | Reporting | **Zigbee2MQTT configures bindings and attribute reporting during the join**; the module adds explicit reports every 30 s while watering | The module only answers the configure step; reports are tied to the module's own sampling. |
+| D19 | Firmware structure | **Explicit state machines** (lifecycle, sensing/report, command, configuration) in a portable core, tested on the host with Unity | Every state has a timeout; a safe mode covers invalid factory data, an unknown board and crash loops. |
+| D20 | Install code | **Required for deployed devices**, optional with a development flag | The hub registers the code before opening the join window. |
+| D21 | Hub split | **Two services, `api` and `hub`, that talk only over MQTT**; each has its own SQLite file; no shared code library, a contract file instead | Watering and alerts do not depend on the web side; `api` can run on another device. `api` decides who may do something, `hub` decides whether it can be done. |
+| D22 | Notifications | **`api` sends in-app notifications, `hub` sends Telegram** (chosen per rule) | Telegram alerts work while `api` is down. |
+| D23 | Battery level detection | **Built (not yet verified with a real cell):** the module measures and classifies a **1S Li-ion/LiPo** cell (`batt_mv`, `batt_state`, thresholds 3600 / 3400 mV, calibration per device), the hub raises `battery_low` / `battery_critical` alerts and computes an estimated percentage, the app shows "about NN %" with the volts in the device detail; a critical cell refuses pump runs | The module stays cell-agnostic and honest (no charge detection on carrier v1); interpretation lives where it can be changed without reflashing. Low-power effects stay parked. Details: `PlantModule/specs.md` §6.1, `Gateway/specs.md` §13.1, `App/specs.md` §10.1. |
 
 ### Still open
 
-- **Cloud hosting provider** for the later move (D32). The stack is a plain Docker Compose setup, so the provider doesn't affect any code. Candidates: Oracle Cloud *Always Free* (Frankfurt, arm64 like the Pi, free), Hetzner (Germany, ~€4–5/month).
+- **`esp-zigbee-sdk` on the ESP32-C6:** end device with the receiver on, reporting configuration kept across a reset, reporting for custom-cluster attributes; to verify in the first prototype.
+- **Custom cluster vs. standard clusters only:** how much configuration really needs a manufacturer-specific cluster, and whether the first moisture slot also appears as the standard soil-moisture cluster.
+- **Zigbee2MQTT with the custom device:** publication of transient acknowledgements/events, install-code registration, repeated interview/configure requests (`Gateway/specs.md` §7).
+- **Data retention** on the gateway: keep raw readings forever, or downsample after N months.
+- **Backup** of the SQLite file and the Zigbee network settings (losing the coordinator's network data forces re-joining every device).
+- **Low power later:** everything parked in `PlantModule/specs.md` Part A §18.
+- **Battery (D23):** final thresholds and the percentage curve after a measured discharge of the real cell with the real pump; a charger-status input on the next carrier revision.

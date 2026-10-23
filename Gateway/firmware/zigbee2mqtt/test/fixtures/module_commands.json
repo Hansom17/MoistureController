@@ -1,0 +1,28 @@
+{
+  "ack": {
+    "cmd_ack": {
+      "n": 17,
+      "cmd_id": 1048577,
+      "state": "done",
+      "reason": "none",
+      "ends_in_s": 0
+    }
+  },
+  "running": {
+    "cmd_ack": {
+      "n": 16,
+      "cmd_id": 1048577,
+      "state": "running",
+      "reason": "none",
+      "ends_in_s": 10
+    }
+  },
+  "event": {
+    "event": {
+      "n": 4,
+      "code": "sensor_fault",
+      "slot": 1,
+      "arg": 0
+    }
+  }
+}

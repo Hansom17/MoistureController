@@ -1,0 +1,120 @@
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+
+import '../../app/theme/tokens.dart';
+import '../../core/actions.dart';
+import '../../core/format.dart';
+import '../../data/models.dart';
+import '../../ui/common.dart';
+
+/// "Water now" with a seconds picker within the pump's limit (App/specs.md Part A §4).
+Future<void> showWaterSheet(
+  BuildContext context,
+  WidgetRef ref,
+  Plant plant, {
+  bool deviceOffline = false,
+  bool batteryCritical = false,
+}) async {
+  final seconds = await showModalBottomSheet<int>(
+    context: context,
+    showDragHandle: true,
+    isScrollControlled: true,
+    builder: (context) => _WaterSheet(plant: plant, batteryCritical: batteryCritical),
+  );
+  if (seconds == null || !context.mounted) return;
+
+  final l = context.l10n;
+  try {
+    await ref.read(actionsProvider).waterNow(plant.id, seconds);
+    if (!context.mounted) return;
+    showSnackBar(context, deviceOffline ? l.waterQueuedDeviceOffline : l.waterQueued);
+  } catch (e) {
+    if (context.mounted) showErrorSnackBar(context, e);
+  }
+}
+
+class _WaterSheet extends StatefulWidget {
+  const _WaterSheet({required this.plant, this.batteryCritical = false});
+
+  final Plant plant;
+
+  /// The module's battery is critical: it will refuse the run (the button stays enabled, the module decides).
+  final bool batteryCritical;
+
+  @override
+  State<_WaterSheet> createState() => _WaterSheetState();
+}
+
+class _WaterSheetState extends State<_WaterSheet> {
+  late double _seconds = widget.plant.maxRunS < 10
+      ? widget.plant.maxRunS.toDouble()
+      : 10;
+
+  @override
+  Widget build(BuildContext context) {
+    final l = context.l10n;
+    final theme = Theme.of(context);
+    final max = widget.plant.maxRunS;
+    final value = _seconds.round();
+
+    return SafeArea(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(
+          Spacing.xl,
+          0,
+          Spacing.xl,
+          Spacing.xl,
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(
+              l.waterSheetTitle(widget.plant.name),
+              style: theme.textTheme.titleLarge,
+            ),
+            const SizedBox(height: Spacing.sm),
+            Text(
+              l.waterSheetHint,
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
+            ),
+            if (widget.batteryCritical) ...[
+              const SizedBox(height: Spacing.sm),
+              Text(l.waterBatteryHint, style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.error)),
+            ],
+            const SizedBox(height: Spacing.xl),
+            Center(
+              child: Text(
+                l.secondsValue(value),
+                style: theme.textTheme.displaySmall?.copyWith(
+                  fontFeatures: const [FontFeature.tabularFigures()],
+                ),
+              ),
+            ),
+            Slider(
+              value: _seconds,
+              min: 1,
+              max: max.toDouble(),
+              divisions: max > 1 ? max - 1 : null,
+              label: l.secondsValue(value),
+              onChanged: (v) => setState(() => _seconds = v),
+            ),
+            Text(
+              l.pumpLimit(max),
+              textAlign: TextAlign.end,
+              style: theme.textTheme.bodySmall,
+            ),
+            const SizedBox(height: Spacing.lg),
+            FilledButton.icon(
+              icon: const Icon(Icons.water_drop),
+              label: Text(l.waterFor(value)),
+              onPressed: () => Navigator.pop(context, value),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}

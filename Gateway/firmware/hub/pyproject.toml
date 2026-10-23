@@ -1,0 +1,35 @@
+[project]
+name = "mc-hub"
+version = "0.1.0"
+description = "MoistureController hub: devices, commands, rules and alerts behind MQTT"
+requires-python = ">=3.12"
+dependencies = [
+  "sqlalchemy[asyncio]>=2.0",
+  "aiosqlite",
+  "aiomqtt>=2.0",
+  "alembic",
+  "pydantic>=2",
+  "python-ulid",
+  "tzdata",
+]
+
+[project.optional-dependencies]
+dev = ["pytest", "pytest-asyncio", "pyyaml"]
+
+[project.scripts]
+mc-hub = "mc_hub.cli:main"
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+mc_hub = ["migrations/*", "migrations/versions/*", "boards/*.json"]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+asyncio_mode = "auto"
+testpaths = ["tests"]

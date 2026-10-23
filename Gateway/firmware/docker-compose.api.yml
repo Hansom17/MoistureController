@@ -1,0 +1,26 @@
+# Only the api, on another device. Needs: .env (MC_MQTT_HOST of the gateway box, MQTT_API_PASSWORD,
+# WEB_DIR) and mosquitto/tls/ca.pem copied from the box (scripts/remote-api.sh prints the steps):
+#   docker compose -f docker-compose.api.yml up -d
+name: moisture-api
+
+services:
+  api:
+    build: ./api
+    image: mc-api:${MC_VERSION:-dev}
+    restart: unless-stopped
+    ports:
+      - "${MC_PORT:-80}:8000"
+    environment:
+      MC_MQTT_HOST: ${MC_MQTT_HOST:?set the address of the gateway box}
+      MC_MQTT_PORT: "8883"
+      MC_MQTT_USER: api
+      MC_MQTT_PASSWORD: ${MQTT_API_PASSWORD}
+      MC_MQTT_CA: /certs/ca.pem
+      MC_INSTANCE_ID: ${MC_INSTANCE_ID:-api-1}
+    volumes:
+      - api-data:/data
+      - ./mosquitto/tls/ca.pem:/certs/ca.pem:ro
+      - ${WEB_DIR:-../../App/build/web}:/web:ro
+
+volumes:
+  api-data:

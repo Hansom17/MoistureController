@@ -1,0 +1,79 @@
+# The whole gateway on one box. Setup: scripts/setup.sh, then `docker compose up -d`.
+# Only the api publishes a port; hub, Zigbee2MQTT and Mosquitto stay on the container network.
+name: moisture
+
+services:
+  mosquitto:
+    image: eclipse-mosquitto:2.0.20
+    restart: unless-stopped
+    volumes:
+      - ./mosquitto/mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
+      - ./mosquitto/acl:/mosquitto/config/acl:ro
+      - ./mosquitto/passwd:/mosquitto/config/passwd:ro
+      - ./mosquitto/conf.d:/mosquitto/config/conf.d:ro
+      - mosquitto-data:/mosquitto/data
+    healthcheck:
+      test: ["CMD-SHELL", "nc -z 127.0.0.1 1883"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
+  z2m-init:
+    image: koenkk/zigbee2mqtt:2.14.2
+    restart: "no"
+    entrypoint: ["sh", "-c", "[ -f /app/data/configuration.yaml ] || cp /template/configuration.yaml /app/data/configuration.yaml"]
+    volumes:
+      - z2m-data:/app/data
+      - ./zigbee2mqtt/configuration.yaml:/template/configuration.yaml:ro
+
+  zigbee2mqtt:
+    image: koenkk/zigbee2mqtt:2.14.2
+    restart: unless-stopped
+    depends_on:
+      mosquitto: {condition: service_healthy}
+      z2m-init: {condition: service_completed_successfully}
+    devices:
+      - ${ZIGBEE_DEVICE}:/dev/ttyZigbee
+    environment:
+      ZIGBEE2MQTT_CONFIG_MQTT_USER: z2m
+      ZIGBEE2MQTT_CONFIG_MQTT_PASSWORD: ${MQTT_Z2M_PASSWORD}
+      ZIGBEE2MQTT_CONFIG_SERIAL_ADAPTER: ${ZIGBEE_ADAPTER:-ember}
+    volumes:
+      - z2m-data:/app/data
+      - ./zigbee2mqtt/external_converters:/app/data/external_converters:ro
+
+  hub:
+    build: ./hub
+    image: mc-hub:${MC_VERSION:-dev}
+    restart: unless-stopped
+    depends_on:
+      mosquitto: {condition: service_healthy}
+    environment:
+      MC_MQTT_HOST: mosquitto
+      MC_MQTT_USER: hub
+      MC_MQTT_PASSWORD: ${MQTT_HUB_PASSWORD}
+    volumes:
+      - hub-data:/data
+
+  api:
+    build: ./api
+    image: mc-api:${MC_VERSION:-dev}
+    restart: unless-stopped
+    depends_on:
+      mosquitto: {condition: service_healthy}
+    ports:
+      - "${MC_PORT:-80}:8000"
+    environment:
+      MC_MQTT_HOST: mosquitto
+      MC_MQTT_USER: api
+      MC_MQTT_PASSWORD: ${MQTT_API_PASSWORD}
+      MC_INSTANCE_ID: ${MC_INSTANCE_ID:-api-1}
+    volumes:
+      - api-data:/data
+      - ${WEB_DIR:-../../App/build/web}:/web:ro
+
+volumes:
+  mosquitto-data:
+  z2m-data:
+  hub-data:
+  api-data:

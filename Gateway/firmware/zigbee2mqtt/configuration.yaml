@@ -1,0 +1,25 @@
+# Template: copied into the zigbee2mqtt data volume on the first start (the z2m-init service).
+# Keys marked GENERATE are filled in by Zigbee2MQTT and then live in the volume - back it up
+# (scripts/backup.sh): losing the network key means joining every module again.
+# The MQTT user and password and the serial port come from the environment (see docker-compose.yml).
+version: 5
+homeassistant:
+  enabled: false
+frontend:
+  enabled: false
+mqtt:
+  base_topic: zigbee2mqtt
+  server: mqtt://mosquitto:1883
+serial:
+  port: /dev/ttyZigbee
+  adapter: ember
+availability:
+  enabled: true
+  active:
+    timeout: 5          # minutes between availability checks of always-listening devices
+advanced:
+  channel: 25           # away from the usual WiFi channels 1/6/11
+  network_key: GENERATE
+  pan_id: GENERATE
+  ext_pan_id: GENERATE
+  log_level: info
