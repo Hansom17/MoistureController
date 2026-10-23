@@ -1,0 +1,4 @@
+# Bench build: runs as the carrier-v1 board without factory data and joins with the default link key.
+# Never use for a deployed module (the factory data and install code then decide).
+CONFIG_MC_DEV_BOARD="carrier-v1"
+CONFIG_MC_DEV_JOIN=y
