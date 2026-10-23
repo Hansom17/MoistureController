@@ -4,9 +4,14 @@ The box at home that runs the whole system: Zigbee coordinator with Zigbee2MQTT,
 
 **State:** specification, plus the `hub` (`firmware/hub`) and the `api` (`firmware/api`) services (see `specs.md` §18); Dockerfiles and compose files are in `firmware/`. The target layout is in `specs.md` §15.3 (`firmware/hub`, `firmware/api`, compose files, `mqtt-contract.yaml`, `scripts/`, `hardware/`). The previous gateway and server implementation is in git history at commit `eb97b07`; `specs.md` §19 lists what to take from it.
 
-## Run (not tried on a real box yet)
+## Run
+
+**Setting it up on a separate device:** [`INSTALL.md`](INSTALL.md) is the step-by-step guide, and `scripts/install.sh` does the checks, the setup and the start (`--check` only looks). The short version:
 
 ```bash
+Gateway/scripts/install.sh --check && Gateway/scripts/install.sh      # everything below in one go
+
+# or by hand:
 cd Gateway/firmware
 ../scripts/setup.sh          # .env with generated MQTT passwords, Mosquitto password file
 # edit .env: ZIGBEE_DEVICE (ls /dev/serial/by-id/), WEB_DIR (flutter build web in App/)
