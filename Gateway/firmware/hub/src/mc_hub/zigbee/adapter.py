@@ -4,7 +4,8 @@ import re
 from .messages import CmdAck, ConfigState, Event, SlotReading, Status, Telemetry
 
 SLOT = re.compile(r"^slot(\d)_(type|value|raw|error)$")
-DIAG = ("uptime_s", "boot_reason", "reset_count", "rejoin_count", "last_error", "free_heap")
+DIAG = ("uptime_s", "boot_reason", "reset_count", "rejoin_count", "last_error", "free_heap",
+        "wake_reason", "awake_ms", "poll_fail_count", "next_wake_s")
 
 
 def normalize(p: dict) -> list:

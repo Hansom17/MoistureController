@@ -625,6 +625,7 @@ class FakeMoistureRepository implements MoistureRepository {
     () => Board(
       name: name,
       ports: [for (var i = 1; i <= 4; i++) BoardPort(id: 'P$i', roles: const ['moisture', 'pump'])],
+      powerModes: PowerMode.values.toSet(), // the demo board can do everything
     ),
   );
 
@@ -646,6 +647,9 @@ class FakeMoistureRepository implements MoistureRepository {
       reportIntervalS: config.reportIntervalS,
       fastReportIntervalS: config.fastReportIntervalS,
       fastReportHoldS: config.fastReportHoldS,
+      powerMode: config.powerMode,
+      pollIntervalMs: config.pollIntervalMs,
+      awakeS: config.awakeS,
       slots: config.slots,
     );
     _devices[i] = _copy(d, desiredRev: rev, sync: ConfigSync.pending);
@@ -653,7 +657,7 @@ class FakeMoistureRepository implements MoistureRepository {
     _after(deviceDelay, () {
       final j = _devices.indexWhere((x) => x.id == deviceId);
       if (j < 0) return;
-      _devices[j] = _copy(_devices[j], reportedRev: rev, sync: ConfigSync.inSync, slots: config.slots);
+      _devices[j] = _copy(_devices[j], reportedRev: rev, sync: ConfigSync.inSync, slots: config.slots, powerMode: config.powerMode);
       _syncPlantLimits();
       _emit(LiveEvent(LiveEventKind.device, entityId: deviceId));
     });
@@ -723,6 +727,7 @@ class FakeMoistureRepository implements MoistureRepository {
     String? name,
     String? configError,
     Battery? battery,
+    PowerMode? powerMode,
   }) => Device(
     id: d.id,
     name: name ?? d.name,
@@ -741,6 +746,8 @@ class FakeMoistureRepository implements MoistureRepository {
     configError: configError ?? d.configError,
     slots: slots ?? d.slots,
     diagnostics: d.diagnostics,
+    powerMode: powerMode ?? d.powerMode,
+    latestRaw: d.latestRaw,
   );
 
   @override
@@ -906,7 +913,9 @@ class FakeMoistureRepository implements MoistureRepository {
         diagnostics: const {
           'uptime_s': 86400, 'boot_reason': 'power_on', 'reset_count': 0, 'rejoin_count': 1,
           'last_error': 0, 'free_heap': 143000,
+          'wake_reason': 'none', 'awake_ms': 0, 'poll_fail_count': 0, 'next_wake_s': 0,
         },
+        latestRaw: {0: fakeRaw(18), 1: fakeRaw(47)},
       );
     }
 

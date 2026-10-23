@@ -128,6 +128,24 @@ class _DeviceBody extends ConsumerWidget {
               row(l.diagRejoins, diag('rejoin_count')),
               row(l.diagLastError, diag('last_error')),
               row(l.diagFreeHeap, diag('free_heap', fmt: (v) => '${((v as num) / 1024).round()} kB')),
+              row(l.diagPowerMode, switch (device.powerMode) {
+                PowerMode.alwaysOn => l.powerAlwaysOn,
+                PowerMode.lightSleep => l.powerLightSleep,
+                PowerMode.deepSleep => l.powerDeepSleep,
+              }),
+              if (device.powerMode != PowerMode.alwaysOn) ...[
+                row(l.diagWakeReason, diag('wake_reason', fmt: (v) => switch (v) {
+                  'timer' => l.wakeTimer,
+                  'button' => l.wakeButton,
+                  'pump_end' => l.wakePumpEnd,
+                  'radio' => l.wakeRadio,
+                  _ => l.wakeNone,
+                })),
+                row(l.diagAwake, diag('awake_ms', fmt: (v) => '$v ms')),
+                row(l.diagPollFails, diag('poll_fail_count')),
+                if (device.powerMode == PowerMode.deepSleep)
+                  row(l.diagNextWake, diag('next_wake_s', fmt: (v) => formatDuration(l, Duration(seconds: (v as num).toInt())))),
+              ],
             ],
           ),
         ),

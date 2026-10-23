@@ -13,6 +13,7 @@ from .views import alert_view
 SCALARS = tuple(CONFIG)                      # the device-level attributes, in interface order
 DEFAULTS = {k: v["default"] for k, v in CONFIG.items()}
 BATTERY_KEYS = ("batt_low_mv", "batt_critical_mv", "batt_cal_permille")
+KEPT_KEYS = BATTERY_KEYS + ("power_mode", "poll_interval_ms", "awake_s")   # an editor that does not know them leaves them alone
 MODULES = ("moisture", "pump")
 
 
@@ -25,9 +26,9 @@ def _int(v, name, lo, hi):
 def validate(body: dict, board: dict, current: dict | None = None) -> dict:
     """Returns the normalized configuration (without `rev`); raises validation errors.
 
-    A battery value the caller leaves out keeps the one of `current` (the installation's thresholds and the
-    calibration of the device must not be reset by an editor that does not know them)."""
-    base = {k: (current or {}).get(k, DEFAULTS[k]) for k in BATTERY_KEYS}
+    A battery or power value the caller leaves out keeps the one of `current` (the installation's thresholds, the
+    calibration and the power mode of the device must not be reset by an editor that does not know them)."""
+    base = {k: (current or {}).get(k, DEFAULTS[k]) for k in KEPT_KEYS}
     cfg = {k: _int(body.get(k, base.get(k, c["default"])), k, c["min"], c["max"]) for k, c in CONFIG.items()}
     if cfg["batt_critical_mv"] >= cfg["batt_low_mv"]:
         raise HubError("validation", detail="batt_critical_mv must be below batt_low_mv")

@@ -668,6 +668,9 @@ class ApiMoistureRepository implements MoistureRepository {
       fastReportIntervalS: (v['fast_report_interval_s'] as int?) ?? 30,
       fastReportHoldS: (v['fast_report_hold_s'] as int?) ?? 120,
       battLowMv: (v['batt_low_mv'] as int?) ?? 3500,
+      powerMode: PowerMode.fromWire(v['power_mode']),
+      pollIntervalMs: (v['poll_interval_ms'] as int?) ?? 3000,
+      awakeS: (v['awake_s'] as int?) ?? 5,
       slots: [
         for (final s in _list(v['slots']).cast<Map>())
           SlotConfig(
@@ -729,6 +732,12 @@ class ApiMoistureRepository implements MoistureRepository {
       configError: _configError(d['config_error']),
       slots: reported?.slots ?? const [],
       diagnostics: (_map(d['diagnostics'])).cast<String, Object?>(),
+      powerMode: reported?.powerMode ?? PowerMode.alwaysOn,
+      latestRaw: {
+        for (final e in _map(d['latest_readings']).entries)
+          if (int.tryParse('${e.key}') != null && e.value is Map && (e.value as Map)['raw'] is num)
+            int.parse('${e.key}'): ((e.value as Map)['raw'] as num).toInt(),
+      },
     );
   }
 
@@ -761,6 +770,11 @@ class ApiMoistureRepository implements MoistureRepository {
           for (final p in _list(b['ports']).cast<Map>())
             BoardPort(id: p['id'] as String, roles: [for (final r in _list(p['roles'])) r as String]),
         ],
+        powerModes: {
+          PowerMode.alwaysOn,
+          for (final m in _list(_map(b['low_power'])['modes']))
+            if (m == 'light_sleep') PowerMode.lightSleep else if (m == 'deep_sleep') PowerMode.deepSleep,
+        },
       );
     } on ApiProblem catch (e) {
       if (e.status == 404) return null;
@@ -793,6 +807,9 @@ class ApiMoistureRepository implements MoistureRepository {
           'fast_report_interval_s': config.fastReportIntervalS,
           'fast_report_hold_s': config.fastReportHoldS,
           'batt_low_mv': config.battLowMv,
+          'power_mode': config.powerMode.wire,
+          'poll_interval_ms': config.pollIntervalMs,
+          'awake_s': config.awakeS,
           'slots': [for (final s in config.slots) _slotJson(s)],
         },
       }),

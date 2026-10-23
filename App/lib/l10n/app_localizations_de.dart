@@ -1245,6 +1245,91 @@ class AppLocalizationsDe extends AppLocalizations {
   }
 
   @override
+  String get powerTitle => 'Energie';
+
+  @override
+  String get powerAlwaysOn => 'Immer an';
+
+  @override
+  String get powerLightSleep => 'Leichter Schlaf';
+
+  @override
+  String get powerDeepSleep => 'Tiefschlaf';
+
+  @override
+  String get powerAlwaysOnBody =>
+      'Für USB- oder Netzstrom. Das Modul hört dauernd zu; Befehle kommen sofort an.';
+
+  @override
+  String get powerLightSleepBody =>
+      'Für Akkubetrieb. Das Funkmodul ruht zwischen kurzen Abfragen, Befehle kommen nach wenigen Sekunden an.';
+
+  @override
+  String get powerDeepSleepBody =>
+      'Geringster Strom. Das Modul schläft zwischen den Messungen; Befehle warten auf sein nächstes Melden.';
+
+  @override
+  String get powerNotSupported =>
+      'Ausgegraute Modi laufen auf dieser Platine noch nicht.';
+
+  @override
+  String get powerAdminOnly => 'Nur ein Admin kann den Energiemodus ändern.';
+
+  @override
+  String get pollInterval => 'Nachrichten abfragen alle';
+
+  @override
+  String get awakeWindow => 'Nach jedem Bericht zuhören für';
+
+  @override
+  String calCurrent(int raw) {
+    return 'Aktueller Messwert: $raw';
+  }
+
+  @override
+  String get calNoReading => 'Noch kein Messwert von diesem Sensor';
+
+  @override
+  String get calUseDry => 'Als trocken übernehmen';
+
+  @override
+  String get calUseWet => 'Als nass übernehmen';
+
+  @override
+  String get calHint =>
+      'Sensor trocken (an der Luft) halten, auf der Pflanzenseite \'Jetzt messen\' drücken und den Wert als trocken übernehmen. Im Wasser genauso für nass.';
+
+  @override
+  String get diagPowerMode => 'Energiemodus';
+
+  @override
+  String get diagWakeReason => 'Letztes Aufwachen';
+
+  @override
+  String get diagAwake => 'Letztes Wachfenster';
+
+  @override
+  String get diagPollFails => 'Verpasste Abfragen';
+
+  @override
+  String get diagNextWake => 'Nächstes Aufwachen in';
+
+  @override
+  String get wakeNone => '—';
+
+  @override
+  String get wakeTimer => 'Timer';
+
+  @override
+  String get wakeButton => 'Taste';
+
+  @override
+  String get wakePumpEnd => 'Ende eines Pumpenlaufs';
+
+  @override
+  String get wakeRadio => 'Funk';
+
+  @override
   String get plantMenu => 'Pflanzenmenü';
 
   @override

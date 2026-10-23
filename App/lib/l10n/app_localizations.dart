@@ -2282,6 +2282,162 @@ abstract class AppLocalizations {
   /// **'Calibrated: {percent} %'**
   String calibratedAs(int percent);
 
+  /// No description provided for @powerTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Power'**
+  String get powerTitle;
+
+  /// No description provided for @powerAlwaysOn.
+  ///
+  /// In en, this message translates to:
+  /// **'Always on'**
+  String get powerAlwaysOn;
+
+  /// No description provided for @powerLightSleep.
+  ///
+  /// In en, this message translates to:
+  /// **'Light sleep'**
+  String get powerLightSleep;
+
+  /// No description provided for @powerDeepSleep.
+  ///
+  /// In en, this message translates to:
+  /// **'Deep sleep'**
+  String get powerDeepSleep;
+
+  /// No description provided for @powerAlwaysOnBody.
+  ///
+  /// In en, this message translates to:
+  /// **'For USB or mains power. The module listens all the time; commands arrive at once.'**
+  String get powerAlwaysOnBody;
+
+  /// No description provided for @powerLightSleepBody.
+  ///
+  /// In en, this message translates to:
+  /// **'For a battery. The radio rests between short checks, so commands arrive within a few seconds.'**
+  String get powerLightSleepBody;
+
+  /// No description provided for @powerDeepSleepBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Smallest current. The module sleeps between readings; commands wait for its next check-in.'**
+  String get powerDeepSleepBody;
+
+  /// No description provided for @powerNotSupported.
+  ///
+  /// In en, this message translates to:
+  /// **'Greyed-out modes cannot run on this board yet.'**
+  String get powerNotSupported;
+
+  /// No description provided for @powerAdminOnly.
+  ///
+  /// In en, this message translates to:
+  /// **'Only an admin can change the power mode.'**
+  String get powerAdminOnly;
+
+  /// No description provided for @pollInterval.
+  ///
+  /// In en, this message translates to:
+  /// **'Check for messages every'**
+  String get pollInterval;
+
+  /// No description provided for @awakeWindow.
+  ///
+  /// In en, this message translates to:
+  /// **'Listen after each report for'**
+  String get awakeWindow;
+
+  /// No description provided for @calCurrent.
+  ///
+  /// In en, this message translates to:
+  /// **'Current reading: {raw}'**
+  String calCurrent(int raw);
+
+  /// No description provided for @calNoReading.
+  ///
+  /// In en, this message translates to:
+  /// **'No reading from this sensor yet'**
+  String get calNoReading;
+
+  /// No description provided for @calUseDry.
+  ///
+  /// In en, this message translates to:
+  /// **'Use as dry'**
+  String get calUseDry;
+
+  /// No description provided for @calUseWet.
+  ///
+  /// In en, this message translates to:
+  /// **'Use as wet'**
+  String get calUseWet;
+
+  /// No description provided for @calHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Hold the sensor dry (in air), press Read now on the plant page, then use the reading as dry. Do the same in water for wet.'**
+  String get calHint;
+
+  /// No description provided for @diagPowerMode.
+  ///
+  /// In en, this message translates to:
+  /// **'Power mode'**
+  String get diagPowerMode;
+
+  /// No description provided for @diagWakeReason.
+  ///
+  /// In en, this message translates to:
+  /// **'Last wake'**
+  String get diagWakeReason;
+
+  /// No description provided for @diagAwake.
+  ///
+  /// In en, this message translates to:
+  /// **'Last awake window'**
+  String get diagAwake;
+
+  /// No description provided for @diagPollFails.
+  ///
+  /// In en, this message translates to:
+  /// **'Missed polls'**
+  String get diagPollFails;
+
+  /// No description provided for @diagNextWake.
+  ///
+  /// In en, this message translates to:
+  /// **'Next wake in'**
+  String get diagNextWake;
+
+  /// No description provided for @wakeNone.
+  ///
+  /// In en, this message translates to:
+  /// **'—'**
+  String get wakeNone;
+
+  /// No description provided for @wakeTimer.
+  ///
+  /// In en, this message translates to:
+  /// **'Timer'**
+  String get wakeTimer;
+
+  /// No description provided for @wakeButton.
+  ///
+  /// In en, this message translates to:
+  /// **'Button'**
+  String get wakeButton;
+
+  /// No description provided for @wakePumpEnd.
+  ///
+  /// In en, this message translates to:
+  /// **'End of a pump run'**
+  String get wakePumpEnd;
+
+  /// No description provided for @wakeRadio.
+  ///
+  /// In en, this message translates to:
+  /// **'Radio'**
+  String get wakeRadio;
+
   /// No description provided for @plantMenu.
   ///
   /// In en, this message translates to:

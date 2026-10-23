@@ -1239,6 +1239,91 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String get powerTitle => 'Power';
+
+  @override
+  String get powerAlwaysOn => 'Always on';
+
+  @override
+  String get powerLightSleep => 'Light sleep';
+
+  @override
+  String get powerDeepSleep => 'Deep sleep';
+
+  @override
+  String get powerAlwaysOnBody =>
+      'For USB or mains power. The module listens all the time; commands arrive at once.';
+
+  @override
+  String get powerLightSleepBody =>
+      'For a battery. The radio rests between short checks, so commands arrive within a few seconds.';
+
+  @override
+  String get powerDeepSleepBody =>
+      'Smallest current. The module sleeps between readings; commands wait for its next check-in.';
+
+  @override
+  String get powerNotSupported =>
+      'Greyed-out modes cannot run on this board yet.';
+
+  @override
+  String get powerAdminOnly => 'Only an admin can change the power mode.';
+
+  @override
+  String get pollInterval => 'Check for messages every';
+
+  @override
+  String get awakeWindow => 'Listen after each report for';
+
+  @override
+  String calCurrent(int raw) {
+    return 'Current reading: $raw';
+  }
+
+  @override
+  String get calNoReading => 'No reading from this sensor yet';
+
+  @override
+  String get calUseDry => 'Use as dry';
+
+  @override
+  String get calUseWet => 'Use as wet';
+
+  @override
+  String get calHint =>
+      'Hold the sensor dry (in air), press Read now on the plant page, then use the reading as dry. Do the same in water for wet.';
+
+  @override
+  String get diagPowerMode => 'Power mode';
+
+  @override
+  String get diagWakeReason => 'Last wake';
+
+  @override
+  String get diagAwake => 'Last awake window';
+
+  @override
+  String get diagPollFails => 'Missed polls';
+
+  @override
+  String get diagNextWake => 'Next wake in';
+
+  @override
+  String get wakeNone => '—';
+
+  @override
+  String get wakeTimer => 'Timer';
+
+  @override
+  String get wakeButton => 'Button';
+
+  @override
+  String get wakePumpEnd => 'End of a pump run';
+
+  @override
+  String get wakeRadio => 'Radio';
+
+  @override
   String get plantMenu => 'Plant menu';
 
   @override

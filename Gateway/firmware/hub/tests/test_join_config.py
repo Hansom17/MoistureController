@@ -52,3 +52,15 @@ async def test_the_power_settings_are_part_of_every_configuration_and_validated(
     for bad in ({"power_mode": 3}, {"poll_interval_ms": 100}, {"awake_s": 31}):
         res = await rig.api.request("device_config_put", {"device_id": dev, "base_rev": 3, "config": {**CFG, **bad}})
         assert res["error"]["type"] == "validation", bad
+
+
+async def test_an_editor_that_does_not_send_the_power_settings_keeps_them(rig):
+    from .conftest import CFG, ready_device
+    dev = await ready_device(rig)
+    await rig.api.request("device_config_put", {"device_id": dev, "base_rev": 2,
+                                                "config": {**CFG, "power_mode": 2, "awake_s": 9}})
+    body = {k: v for k, v in CFG.items() if k not in ("power_mode", "poll_interval_ms", "awake_s")}
+    res = await rig.api.request("device_config_put", {"device_id": dev, "base_rev": 3, "config": body})
+    assert res["ok"], res
+    cfg = (await device(rig))["desired_config"]
+    assert [cfg[k] for k in ("power_mode", "poll_interval_ms", "awake_s")] == [2, 3000, 9]
