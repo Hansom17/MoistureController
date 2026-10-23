@@ -1,0 +1,108 @@
+name: CI
+
+# Every job runs the same commands as the local checks listed in the pull request description.
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  firmware-host:
+    name: Firmware core host tests (ASan/UBSan)
+    runs-on: ubuntu-latest
+    env:
+      CC: clang
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - run: pip install pyyaml
+      # also checks that the generated files (firmware header, board table, converter data, hub parameters) are current
+      - run: PlantModule/scripts/test_host.sh
+
+  gateway:
+    name: Hub and api tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: pip
+          cache-dependency-path: |
+            Gateway/firmware/hub/pyproject.toml
+            Gateway/firmware/api/pyproject.toml
+      - run: pip install -e "Gateway/firmware/hub[dev]" -e "Gateway/firmware/api[dev]"
+      - name: hub
+        working-directory: Gateway/firmware/hub
+        run: python -m pytest -q
+      - name: api (runs against the real hub on an in-memory broker)
+        working-directory: Gateway/firmware/api
+        run: python -m pytest -q
+
+  converter:
+    name: Zigbee2MQTT converter tests
+    runs-on: ubuntu-latest
+    env:
+      Z2M_VERSION: "2.14.2"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - run: pip install pyyaml
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      # the converter is tested against the real libraries of the pinned Zigbee2MQTT release
+      - name: Zigbee2MQTT ${{ env.Z2M_VERSION }} with its dependencies
+        run: |
+          git clone --depth 1 --branch "$Z2M_VERSION" https://github.com/Koenkk/zigbee2mqtt.git "$RUNNER_TEMP/z2m"
+          cd "$RUNNER_TEMP/z2m"
+          corepack enable
+          pnpm install --frozen-lockfile
+      - run: Z2M_DIR="$RUNNER_TEMP/z2m" Gateway/scripts/test_converter.sh
+
+  app:
+    name: App analysis and tests
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: App
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: "3.41.6"
+          channel: stable
+          cache: true
+      - run: flutter pub get
+      - name: the committed translations are current
+        run: |
+          flutter gen-l10n
+          git diff --exit-code -- lib/l10n
+      - run: dart analyze
+      - run: flutter test
+
+  firmware-build:
+    name: Firmware builds for the ESP32-C6
+    runs-on: ubuntu-latest
+    container: espressif/idf:v6.0.2
+    steps:
+      - uses: actions/checkout@v4
+      - name: build
+        shell: bash
+        working-directory: PlantModule/firmware
+        run: |
+          git config --global --add safe.directory '*'
+          . "$IDF_PATH/export.sh"
+          idf.py set-target esp32c6
+          idf.py build
