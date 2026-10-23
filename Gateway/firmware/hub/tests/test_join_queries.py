@@ -4,7 +4,7 @@ from pathlib import Path
 
 from sqlalchemy import select
 
-from mc_hub.db.models import Command, Plant, Rule
+from mc_hub.db.models import Alert, Command, ConfigRevision, Device, Plant, Rule
 
 from .conftest import CFG, ack, add_device, device_report, plant_entry, ready_device, ready_plant, sent
 
@@ -108,6 +108,42 @@ async def test_remove_device_cancels_commands_and_frees_plants(rig):
     assert c.status == "cancelled" and c.reason == "device_removed"
     assert (await rig.api.request("device_remove", {"device_id": dev}))["error"]["type"] == "not_found"
     await device_report_unknown(rig, dev)
+
+
+async def test_removed_device_that_joins_again_is_a_new_device_with_the_initial_configuration(rig):
+    dev = await ready_device(rig)                       # runs a configuration of its own (revision 2)
+    await rig.z2m.availability(dev, "offline")
+    await rig.api.settle()
+    assert (await rig.api.request("device_remove", {"device_id": dev}))["ok"]
+    await rig.z2m.devices([])
+    await rig.api.settle()
+    async with rig.sessions() as s:
+        old = await s.get(Device, dev)
+        assert old.deleted_at is not None and old.ieee != "0x00124b0001" and "0x00124b0001" in old.ieee
+        assert old.desired_config is None and old.reported_config is None and old.desired_rev == 0
+        assert (await s.execute(select(ConfigRevision).where(ConfigRevision.device_id == dev))).first() is None
+        assert (await s.execute(select(Alert).where(Alert.subject_id == dev, Alert.resolved_at.is_(None)))).first() is None
+    new = await add_device(rig)                         # the same module joins again
+    assert new != dev
+    async with rig.sessions() as s:
+        d = await s.get(Device, new)
+        assert d.desired_config is not None and d.desired_config != CFG and d.desired_rev == 1
+        assert d.reported_config is None and d.deleted_at is None
+
+
+async def test_device_left_behind_by_an_older_hub_is_buried_when_it_joins_again(rig):
+    dev = await ready_device(rig)
+    async with rig.sessions() as s:                      # the old behaviour: flagged as deleted, address and config kept
+        d = await s.get(Device, dev)
+        d.deleted_at = 1
+        await s.commit()
+    await rig.z2m.devices([plant_entry()])
+    await rig.api.settle()
+    ids = [x["id"] for x in rig.api.state["state/devices"]]
+    assert len(ids) == 1 and ids[0] != dev
+    async with rig.sessions() as s:
+        old = await s.get(Device, dev)
+        assert old.desired_config is None and "~" in old.ieee
 
 
 async def device_report_unknown(rig, dev):

@@ -384,7 +384,7 @@ sequenceDiagram
 
 ### 7.4 Removal
 
-`DELETE /devices/{d}` (reauth in `api`, then request `device_remove`) asks Zigbee2MQTT to remove the device (`device/remove`; the always-listening module is told to leave and erases its configuration), cancels its open commands and soft-deletes the record (history is kept). A module that cannot be reached is removed with the `force` option.
+`DELETE /devices/{d}` (reauth in `api`, then request `device_remove`) asks Zigbee2MQTT to remove the device (`device/remove`; the always-listening module is told to leave and erases its configuration), cancels its open commands and removes the device from the working set. Nothing of its configuration survives: the configuration revisions are deleted, the desired and reported configuration, the latest readings, diagnostics and battery state are cleared, its open alerts are resolved and its plants and rules lose it. Only a tombstone row stays for the history that points at it (readings, commands, events); its Zigbee address is renamed `<ieee>~<id>`, so a module that joins later with the same address is a **new device** with a new id and the initial configuration, never the old one. Rows flagged as deleted by an older hub are buried the same way at the next device list. A module that cannot be reached is removed with the `force` option.
 
 ### 7.5 Message paths
 
