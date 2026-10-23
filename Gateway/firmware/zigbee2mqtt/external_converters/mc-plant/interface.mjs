@@ -5,7 +5,7 @@ export default {
     1,
     0
   ],
-  "configSchema": 1,
+  "configSchema": 2,
   "identity": {
     "manufacturer": "MoistureController",
     "model": "MC-PLANT",
@@ -281,6 +281,34 @@ export default {
       "default": null
     },
     {
+      "id": 312,
+      "name": "batt_mv",
+      "type": "uint16",
+      "access": [
+        "r",
+        "report"
+      ],
+      "mqtt": "batt_mv",
+      "layout": null,
+      "enum": null,
+      "range": null,
+      "default": null
+    },
+    {
+      "id": 313,
+      "name": "batt_state",
+      "type": "enum8",
+      "access": [
+        "r",
+        "report"
+      ],
+      "mqtt": "batt_state",
+      "layout": null,
+      "enum": "batt_state",
+      "range": null,
+      "default": null
+    },
+    {
       "id": 320,
       "name": "board",
       "type": "char16",
@@ -393,8 +421,43 @@ export default {
       "mqtt": null,
       "layout": null,
       "enum": null,
-      "range": null,
-      "default": 3500
+      "range": [
+        3000,
+        4000
+      ],
+      "default": 3600
+    },
+    {
+      "id": 5,
+      "name": "batt_critical_mv",
+      "type": "uint16",
+      "access": [
+        "rw"
+      ],
+      "mqtt": null,
+      "layout": null,
+      "enum": null,
+      "range": [
+        3000,
+        4000
+      ],
+      "default": 3400
+    },
+    {
+      "id": 6,
+      "name": "batt_cal_permille",
+      "type": "uint16",
+      "access": [
+        "rw"
+      ],
+      "mqtt": null,
+      "layout": null,
+      "enum": null,
+      "range": [
+        900,
+        1100
+      ],
+      "default": 1000
     },
     {
       "id": 16,
@@ -675,7 +738,8 @@ export default {
       "4": "min_pause",
       "5": "slot_not_actuator",
       "6": "slot_not_sensor",
-      "7": "hw_error"
+      "7": "hw_error",
+      "8": "battery_low"
     },
     "device_action": {
       "1": "identify",
@@ -689,7 +753,14 @@ export default {
       "4": "sensor_ok",
       "5": "safety_stop",
       "6": "safe_mode",
-      "7": "config_rejected"
+      "7": "config_rejected",
+      "8": "battery_critical"
+    },
+    "batt_state": {
+      "0": "absent",
+      "1": "ok",
+      "2": "low",
+      "3": "critical"
     },
     "cfg_error": {
       "1": "port_invalid",
@@ -712,9 +783,19 @@ export default {
     },
     {
       "attributes": [
+        "batt_mv"
+      ],
+      "min_s": 60,
+      "max_s": 600,
+      "change": "20 mV",
+      "change_value": 20
+    },
+    {
+      "attributes": [
         "status",
         "fast_mode",
         "safe_reason",
+        "batt_state",
         "cfg_rev",
         "cfg_result",
         "cfg_error"

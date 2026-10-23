@@ -135,6 +135,8 @@ function buildExposes() {
   out.push(e.enum('cfg_result', ea.STATE, enumValues('cfg_result')));
   out.push(e.text('cfg_error', ea.STATE));
   out.push(e.numeric('voltage_mv', ea.STATE).withUnit('mV'));
+  out.push(e.numeric('batt_mv', ea.STATE).withUnit('mV').withDescription('Cell voltage, filtered; 0 without a cell'));
+  out.push(e.enum('batt_state', ea.STATE, enumValues('batt_state')).withDescription('Battery state of the module'));
   for (const [name, unit] of [['uptime_s', 's'], ['reset_count', null], ['rejoin_count', null], ['last_error', null], ['free_heap', 'B']]) {
     const x = e.numeric(name, ea.STATE).withCategory('diagnostic');
     out.push(unit ? x.withUnit(unit) : x);
@@ -157,7 +159,7 @@ export function reportingPlan() {
         power = {attribute: attr.split('.')[1], minimumReportInterval: r.min_s, maximumReportInterval: r.max_s, reportableChange: 1};
       } else {
         // octet strings and enums are reported whole: a change threshold only applies to analog values
-        custom.push({attribute: attr, minimumReportInterval: r.min_s, maximumReportInterval: r.max_s, reportableChange: 0});
+        custom.push({attribute: attr, minimumReportInterval: r.min_s, maximumReportInterval: r.max_s, reportableChange: r.change_value ?? 0});
       }
     }
   }

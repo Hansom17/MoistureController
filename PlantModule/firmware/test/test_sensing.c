@@ -31,7 +31,7 @@ static void test_the_first_sample_comes_one_second_after_start_and_reads_the_moi
     sim_advance(&S, 2);
     TEST_ASSERT_EQUAL_INT(1, S.read_slot_calls);
     TEST_ASSERT_EQUAL_INT(MC_SN_SAMPLING, S.core.sn);
-    sim_advance(&S, 30);
+    sim_advance(&S, 60);
     TEST_ASSERT_EQUAL_INT_MESSAGE(MC_SN_REPORTING, S.core.sn, "every sample is sent");
     sim_send(&S, ev_bool(MC_EV_ZB_REPORT_RESULT, true));
     TEST_ASSERT_EQUAL_INT(MC_SN_IDLE, S.core.sn);
@@ -116,6 +116,8 @@ static void test_a_slot_that_does_not_answer_times_out_after_500_ms(void)
     sim_advance(&S, 499);
     TEST_ASSERT_EQUAL_INT(MC_SN_SAMPLING, S.core.sn);
     sim_advance(&S, 2);
+    TEST_ASSERT_EQUAL_INT_MESSAGE(MC_SN_SAMPLING, S.core.sn, "the battery is read after the slot timed out");
+    sim_advance(&S, 30);
     TEST_ASSERT_EQUAL_INT(MC_SN_REPORTING, S.core.sn);
     TEST_ASSERT_EQUAL_UINT8(MC_SENSOR_ERROR_HW_ERROR, S.attrs.readings[0].error);
     TEST_ASSERT_EQUAL_UINT16(1, S.attrs.seq);
@@ -285,28 +287,6 @@ static void test_the_pump_reading_shows_the_output_at_once_and_after_the_run(voi
     TEST_ASSERT_EQUAL_INT16_MESSAGE(0, S.attrs.readings[2].value, "off right when it ends");
 }
 
-/* ---- battery ---- */
-
-static void test_low_battery_event_once_with_hysteresis(void)
-{
-    operational();
-    sim_send(&S, ev_battery(0)); /* externally powered: the divider reads nothing */
-    TEST_ASSERT_EQUAL_INT(0, sim_count_events(&S, MC_EVENT_CODE_LOW_BATTERY));
-    sim_send(&S, ev_battery(3900));
-    TEST_ASSERT_EQUAL_INT(0, sim_count_events(&S, MC_EVENT_CODE_LOW_BATTERY));
-    sim_send(&S, ev_battery(3400));
-    TEST_ASSERT_EQUAL_INT(1, sim_count_events(&S, MC_EVENT_CODE_LOW_BATTERY));
-    sim_send(&S, ev_battery(3300));
-    TEST_ASSERT_EQUAL_INT(1, sim_count_events(&S, MC_EVENT_CODE_LOW_BATTERY));
-    sim_send(&S, ev_battery(3550)); /* above the threshold but not by 100 mV */
-    sim_send(&S, ev_battery(3300));
-    TEST_ASSERT_EQUAL_INT(1, sim_count_events(&S, MC_EVENT_CODE_LOW_BATTERY));
-    sim_send(&S, ev_battery(3700));
-    sim_send(&S, ev_battery(3300));
-    TEST_ASSERT_EQUAL_INT(2, sim_count_events(&S, MC_EVENT_CODE_LOW_BATTERY));
-    TEST_ASSERT_EQUAL_UINT16(3300, S.core.voltage_mv);
-}
-
 void run_sensing_tests(void)
 {
     RUN_TEST(test_the_first_sample_comes_one_second_after_start_and_reads_the_moisture_slot);
@@ -326,5 +306,4 @@ void run_sensing_tests(void)
     RUN_TEST(test_reporting_does_not_wait_forever_for_a_result);
     RUN_TEST(test_no_explicit_report_while_the_link_is_down);
     RUN_TEST(test_the_pump_reading_shows_the_output_at_once_and_after_the_run);
-    RUN_TEST(test_low_battery_event_once_with_hysteresis);
 }

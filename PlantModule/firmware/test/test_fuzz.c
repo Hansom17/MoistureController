@@ -23,7 +23,7 @@ static void random_event(void)
     case 6: sim_send(&S, ev_commit((uint16_t)(S.core.cfg.rev + rnd() % 3))); break;
     case 7: sim_send(&S, ev_bool(MC_EV_ZB_REPORT_RESULT, rnd() % 2)); break;
     case 8: sim_send(&S, ev_simple(MC_EV_BTN_SHORT)); break;
-    case 9: sim_send(&S, ev_battery((uint16_t)(rnd() % 5000))); break;
+    case 9: sim_send(&S, ev_battery((uint16_t)(rnd() % 2600))); break;
     case 10: sim_send(&S, ev_action(rnd() % 40, (uint8_t)(rnd() % 4))); break;
     default: sim_advance(&S, rnd() % 20000); break;
     }

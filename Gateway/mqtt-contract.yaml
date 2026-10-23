@@ -44,15 +44,17 @@ errors:                      # error.type -> HTTP status
   busy: 409
   device_not_ready: 409
   device_safe_mode: 409
+  battery_critical: 409        # a rule's pump run is refused for a critical battery (manual runs are left to the module)
   slot_not_actuator: 422
   safety_limit: 422
   unknown_kind: 400
   expired: 408
 
 requests:
-  installation_set: {body: {name: string, timezone: string, battery_low_mv: int, telegram: {token: "string, write-only", chat_id: string, kinds: [string]}}}
+  installation_set: {body: {name: string, timezone: string, battery_low_mv: int, battery_critical_mv: "int, 3000 <= critical < low <= 4000, pushed into every device configuration", telegram: {token: "string, write-only", chat_id: string, kinds: [string]}}}
   device_join_open: {body: {install_code: "string, optional", seconds: "int, default 120"}}
   device_join_close: {body: {}}
+  device_battery_calibrate: {body: {device_id: string, measured_mv: int}, answer: {cal_permille: int, rev: int}}   # new batt_cal_permille from a multimeter reading, 900..1100
   device_update: {body: {device_id: string, name: string}}
   device_remove: {body: {device_id: string, force: bool}}
   device_config_put: {body: {device_id: string, base_rev: int, config: object}, answer: {rev: int}}
@@ -92,8 +94,8 @@ api_events:                  # api -> hub
   - user_removed
 
 snapshots:                   # retained, republished on every change and on hub start
-  installation: {fields: [name, timezone, battery_low_mv, telegram_configured]}
-  devices: {item: [id, ieee, name, model, fw, board, status, safe_reason, last_seen_at, link_quality, voltage_mv, config_sync, desired_rev, reported_rev, desired_config, reported_config, config_error, latest_readings, diagnostics]}
+  installation: {fields: [name, timezone, battery_low_mv, battery_critical_mv, battery_chemistry, telegram_configured]}
+  devices: {item: [id, ieee, name, model, fw, board, status, safe_reason, last_seen_at, link_quality, voltage_mv, config_sync, desired_rev, reported_rev, desired_config, reported_config, config_error, latest_readings, diagnostics, battery]}   # battery: {mv, percent, state, present, calibrated, cal_permille}
   plants: {item: [id, name, notes, sensor, pump, latest_value, latest_ts, trend, archived]}
   rules: {item: [id, plant_id, enabled, threshold, water_s, cooldown_s, max_per_day, quiet_from, quiet_to, notify_channels, notify_on]}
   alerts_open: {item: [id, kind, subject, severity, opened_at, acked_by, acked_at, detail]}

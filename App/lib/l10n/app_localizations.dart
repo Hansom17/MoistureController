@@ -1001,7 +1001,7 @@ abstract class AppLocalizations {
   /// No description provided for @batteryThreshold.
   ///
   /// In en, this message translates to:
-  /// **'Low battery warning below'**
+  /// **'Battery low (mV)'**
   String get batteryThreshold;
 
   /// No description provided for @calDry.
@@ -2101,6 +2101,150 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'No readings in this period yet.'**
   String get noReadings;
+
+  /// No description provided for @batteryTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Battery'**
+  String get batteryTitle;
+
+  /// No description provided for @batteryStateOk.
+  ///
+  /// In en, this message translates to:
+  /// **'OK'**
+  String get batteryStateOk;
+
+  /// No description provided for @batteryStateLow.
+  ///
+  /// In en, this message translates to:
+  /// **'Low'**
+  String get batteryStateLow;
+
+  /// No description provided for @batteryStateCritical.
+  ///
+  /// In en, this message translates to:
+  /// **'Critical'**
+  String get batteryStateCritical;
+
+  /// No description provided for @batteryStateAbsent.
+  ///
+  /// In en, this message translates to:
+  /// **'No battery'**
+  String get batteryStateAbsent;
+
+  /// No description provided for @batteryPercent.
+  ///
+  /// In en, this message translates to:
+  /// **'about {percent} %'**
+  String batteryPercent(int percent);
+
+  /// No description provided for @batteryVolts.
+  ///
+  /// In en, this message translates to:
+  /// **'{volts} V'**
+  String batteryVolts(String volts);
+
+  /// No description provided for @batteryChargingHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Charging cannot be detected.'**
+  String get batteryChargingHint;
+
+  /// No description provided for @batteryCalibrated.
+  ///
+  /// In en, this message translates to:
+  /// **'Calibrated ({delta})'**
+  String batteryCalibrated(String delta);
+
+  /// No description provided for @calibrateBattery.
+  ///
+  /// In en, this message translates to:
+  /// **'Calibrate battery'**
+  String get calibrateBattery;
+
+  /// No description provided for @calibrateBatteryBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Measure the cell with a multimeter and enter the value. The module reports {volts} V now. Values more than 10 % off are refused.'**
+  String calibrateBatteryBody(String volts);
+
+  /// No description provided for @measuredVolts.
+  ///
+  /// In en, this message translates to:
+  /// **'Measured voltage'**
+  String get measuredVolts;
+
+  /// No description provided for @calibrate.
+  ///
+  /// In en, this message translates to:
+  /// **'Calibrate'**
+  String get calibrate;
+
+  /// No description provided for @batteryCalibrationSent.
+  ///
+  /// In en, this message translates to:
+  /// **'Calibration sent to the device.'**
+  String get batteryCalibrationSent;
+
+  /// No description provided for @batteryNoData.
+  ///
+  /// In en, this message translates to:
+  /// **'No battery readings yet.'**
+  String get batteryNoData;
+
+  /// No description provided for @batteryCriticalThreshold.
+  ///
+  /// In en, this message translates to:
+  /// **'Battery critical (mV)'**
+  String get batteryCriticalThreshold;
+
+  /// No description provided for @batteryThresholdsHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Applied to all devices as soon as they confirm it.'**
+  String get batteryThresholdsHint;
+
+  /// No description provided for @batteryThresholdsInvalid.
+  ///
+  /// In en, this message translates to:
+  /// **'Critical must be below low, both between 3000 and 4000 mV.'**
+  String get batteryThresholdsInvalid;
+
+  /// No description provided for @batteryCell.
+  ///
+  /// In en, this message translates to:
+  /// **'Li-ion / LiPo, one cell'**
+  String get batteryCell;
+
+  /// No description provided for @alertBatteryCritical.
+  ///
+  /// In en, this message translates to:
+  /// **'{subject}: battery critical'**
+  String alertBatteryCritical(String subject);
+
+  /// No description provided for @commandFailedBattery.
+  ///
+  /// In en, this message translates to:
+  /// **'Battery too low to water'**
+  String get commandFailedBattery;
+
+  /// No description provided for @waterBatteryHint.
+  ///
+  /// In en, this message translates to:
+  /// **'This module\'s battery is critical: it will refuse to water.'**
+  String get waterBatteryHint;
+
+  /// No description provided for @batteryVoltage.
+  ///
+  /// In en, this message translates to:
+  /// **'Voltage'**
+  String get batteryVoltage;
+
+  /// No description provided for @batteryLevel.
+  ///
+  /// In en, this message translates to:
+  /// **'Level (estimate)'**
+  String get batteryLevel;
 }
 
 class _AppLocalizationsDelegate

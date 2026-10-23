@@ -90,7 +90,8 @@ async def test_installation_set_and_token_is_write_only(rig):
                                                    "telegram": {"token": "123:abc", "chat_id": "42"}})
     assert r["ok"]
     inst = rig.api.state["state/installation"]
-    assert inst == {"name": "Home", "timezone": "Europe/Berlin", "battery_low_mv": 3500, "telegram_configured": True}
+    assert inst == {"name": "Home", "timezone": "Europe/Berlin", "battery_low_mv": 3600, "battery_critical_mv": 3400,
+                    "battery_chemistry": "li-ion-1s", "telegram_configured": True}
     assert "123:abc" not in json.dumps(rig.api.state)
     # updating the chat id without a token keeps the stored token
     await rig.api.request("installation_set", {"telegram": {"chat_id": "43"}})

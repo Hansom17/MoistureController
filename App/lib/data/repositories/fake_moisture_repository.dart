@@ -349,17 +349,31 @@ class FakeMoistureRepository implements MoistureRepository {
     String? name,
     String? timezone,
     int? batteryLowMv,
+    int? batteryCriticalMv,
     String? telegramToken,
     String? telegramChatId,
   }) => _delay(() {
     _require(Role.owner);
+    final low = batteryLowMv ?? _installation.batteryLowMv;
+    final critical = batteryCriticalMv ?? _installation.batteryCriticalMv;
+    if (!(3000 <= critical && critical < low && low <= 4000)) {
+      throw const ApiProblem(ApiProblem.validation, status: 422, detail: 'battery thresholds must satisfy 3000 <= critical < low <= 4000 mV');
+    }
     _installation = Installation(
       name: name ?? _installation.name,
       timezone: timezone ?? _installation.timezone,
-      batteryLowMv: batteryLowMv ?? _installation.batteryLowMv,
+      batteryLowMv: low,
+      batteryCriticalMv: critical,
       telegramConfigured:
           _installation.telegramConfigured || (telegramToken != null && telegramChatId != null),
     );
+    for (var i = 0; i < _devices.length; i++) { // the hub classifies the stored voltages again with the new thresholds
+      final b = _devices[i].battery;
+      if (b != null && b.present) {
+        _devices[i] = _copy(_devices[i], battery: fakeBattery(b.mv, cal: b.calPermille));
+        _emit(LiveEvent(LiveEventKind.device, entityId: _devices[i].id));
+      }
+    }
     _emit(const LiveEvent(LiveEventKind.installation));
     return _installation;
   });
@@ -653,6 +667,48 @@ class FakeMoistureRepository implements MoistureRepository {
     }
   }
 
+  /// A battery object the way the hub builds it from the reported voltage (the percentage curve is the hub's).
+  Battery fakeBattery(int mv, {int cal = 1000}) {
+    if (mv < 500) return const Battery(state: BatteryState.absent);
+    final state = mv <= _installation.batteryCriticalMv
+        ? BatteryState.critical
+        : mv <= _installation.batteryLowMv
+            ? BatteryState.low
+            : BatteryState.ok;
+    final percent = ((mv - 3300) * 100 / (4200 - 3300)).round().clamp(0, 100);
+    return Battery(state: state, mv: mv, percent: percent, calibrated: cal != 1000, calPermille: cal);
+  }
+
+  @override
+  Future<void> calibrateBattery(String deviceId, int measuredMv) => _delay(() {
+    _require(Role.admin);
+    final i = _devices.indexWhere((d) => d.id == deviceId);
+    final b = _devices[i].battery;
+    if (b == null || !b.present) {
+      throw const ApiProblem(ApiProblem.validation, status: 422, detail: 'the module reports no battery voltage');
+    }
+    final uncorrected = b.mv * 1000 / b.calPermille;
+    final cal = (measuredMv / uncorrected * 1000).round();
+    if (cal < 900 || cal > 1100) {
+      throw const ApiProblem(ApiProblem.validation, status: 422, detail: 'more than 10 % off: check the wiring before calibrating');
+    }
+    _devices[i] = _copy(_devices[i], battery: fakeBattery((uncorrected * cal / 1000).round(), cal: cal));
+    _emit(LiveEvent(LiveEventKind.device, entityId: deviceId));
+  });
+
+  @override
+  Future<List<BatteryPoint>> batteryHistory(String deviceId, ChartRange range) => _delay(() {
+    final b = _devices.firstWhere((d) => d.id == deviceId).battery;
+    if (b == null || !b.present) return <BatteryPoint>[];
+    final now = _clock();
+    final count = range.span.inMinutes ~/ range.bucket.inMinutes;
+    // a slowly falling cell with a small daily wobble that ends at the current voltage
+    return [
+      for (var i = count; i >= 0; i--)
+        BatteryPoint(now.subtract(range.bucket * i), b.mv + (i * 120 / count).round() + (i % 5) * 3),
+    ];
+  });
+
   Device _copy(
     Device d, {
     int? desiredRev,
@@ -662,6 +718,7 @@ class FakeMoistureRepository implements MoistureRepository {
     DeviceStatus? status,
     String? name,
     String? configError,
+    Battery? battery,
   }) => Device(
     id: d.id,
     name: name ?? d.name,
@@ -673,7 +730,8 @@ class FakeMoistureRepository implements MoistureRepository {
     safeReason: d.safeReason,
     lastSeen: d.lastSeen,
     linkQuality: d.linkQuality,
-    voltageMv: d.voltageMv,
+    voltageMv: battery?.mv ?? d.voltageMv,
+    battery: battery ?? d.battery,
     desiredRev: desiredRev ?? d.desiredRev,
     reportedRev: reportedRev ?? d.reportedRev,
     configError: configError ?? d.configError,
@@ -820,7 +878,7 @@ class FakeMoistureRepository implements MoistureRepository {
       String name,
       DeviceStatus status, {
       int? link = 150,
-      int? mv = 3900,
+      int mv = 3900,
       Duration seen = const Duration(minutes: 2),
       ConfigSync sync = ConfigSync.inSync,
       String? configError,
@@ -830,6 +888,7 @@ class FakeMoistureRepository implements MoistureRepository {
       return Device(
         id: id, name: name, status: status, configSync: sync, model: 'MC-PLANT', board: 'carrier-v1',
         firmware: '0.1.0', safeReason: safeReason, lastSeen: ago(seen), linkQuality: link, voltageMv: mv,
+        battery: fakeBattery(mv),
         desiredRev: sync == ConfigSync.inSync ? 7 : 8, reportedRev: 7, configError: configError, slots: slots,
         diagnostics: const {
           'uptime_s': 86400, 'boot_reason': 'power_on', 'reset_count': 0, 'rejoin_count': 1,
@@ -840,9 +899,9 @@ class FakeMoistureRepository implements MoistureRepository {
 
     _devices.addAll([
       device('d1', 'Kitchen window', DeviceStatus.online),
-      device('d2', 'Bathroom shelf', DeviceStatus.online, sync: ConfigSync.pending),
-      device('d3', 'Balcony', DeviceStatus.late, link: 60, seen: const Duration(minutes: 40)),
-      device('d4', 'Office', DeviceStatus.offline, link: null, seen: const Duration(days: 2),
+      device('d2', 'Bathroom shelf', DeviceStatus.online, sync: ConfigSync.pending, mv: 0),
+      device('d3', 'Balcony', DeviceStatus.late, link: 60, seen: const Duration(minutes: 40), mv: 3550),
+      device('d4', 'Office', DeviceStatus.offline, link: null, seen: const Duration(days: 2), mv: 3350,
           sync: ConfigSync.rejected, configError: 'rejected (port P3 cannot drive this module)'),
       device('d5', 'Greenhouse', DeviceStatus.safeMode, safeReason: 'crash_loop'),
     ]);
@@ -877,6 +936,8 @@ class FakeMoistureRepository implements MoistureRepository {
           createdAt: ago(const Duration(days: 2)), open: true),
       Alert(id: 'a2', kind: AlertKind.safeMode, kindName: 'device_safe_mode', subject: 'Greenhouse',
           createdAt: ago(const Duration(hours: 1)), open: true, critical: true),
+      Alert(id: 'a4', kind: AlertKind.batteryCritical, kindName: 'battery_critical', subject: 'Office',
+          createdAt: ago(const Duration(hours: 6)), open: true, critical: true),
       Alert(id: 'a3', kind: AlertKind.batteryLow, kindName: 'battery_low', subject: 'Balcony',
           createdAt: ago(const Duration(days: 4)), open: false, acknowledgedAt: ago(const Duration(days: 3)), acknowledgedBy: 'u-anna'),
     ]);

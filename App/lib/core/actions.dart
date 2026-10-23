@@ -127,10 +127,16 @@ class Actions {
     _ref.invalidate(tokensProvider);
   }
 
+  Future<void> calibrateBattery(String deviceId, int measuredMv) async {
+    await _ref.read(repositoryProvider).calibrateBattery(deviceId, measuredMv);
+    _ref.invalidate(devicesProvider);
+  }
+
   Future<void> updateInstallation({
     String? name,
     String? timezone,
     int? batteryLowMv,
+    int? batteryCriticalMv,
     String? telegramToken,
     String? telegramChatId,
   }) async {
@@ -138,6 +144,7 @@ class Actions {
       name: name,
       timezone: timezone,
       batteryLowMv: batteryLowMv,
+      batteryCriticalMv: batteryCriticalMv,
       telegramToken: telegramToken,
       telegramChatId: telegramChatId,
     );

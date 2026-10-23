@@ -150,6 +150,7 @@ void mc_core_attrs(const mc_core_t *c, mc_attrs_t *a)
     a->rejoin_count = c->diag.rejoin_count;
     a->last_error = c->diag.last_error;
     a->voltage_mv = c->voltage_mv;
+    a->batt_state = c->batt_state;
 }
 
 void mc_encode_slot_reading(const mc_reading_t *r, uint8_t out[8])
@@ -550,7 +551,7 @@ void mc_core_step(mc_core_t *c, const mc_event_t *ev, mc_actions_t *out)
         on_button(c, out, ev->kind);
         break;
     case MC_EV_BATT_SAMPLE:
-        mc_sense_on_battery(c, out, ev->u.mv);
+        mc_sense_on_battery(c, out, ev->u.batt.ok, ev->u.batt.mv);
         break;
     }
 }

@@ -18,6 +18,8 @@ class Telemetry:
     slots: list[SlotReading]
     voltage_mv: int | None
     linkquality: int | None
+    batt_mv: int | None = None        # millivolt resolution, 0 without a cell
+    batt_state: str | None = None     # absent | ok | low | critical
 
 
 @dataclass

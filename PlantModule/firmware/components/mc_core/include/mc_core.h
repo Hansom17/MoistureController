@@ -65,6 +65,7 @@ enum {
 #define MC_REJOIN_MAX_MS 300000u
 #define MC_TOMBSTONE_MS 600000u
 #define MC_CRASH_LOOP_COUNT 3
+/* The battery tunables (MC_BATT_*) come from the generated mc_interface.h. */
 
 #define MC_MAX_PENDING_MSGS 8
 #define MC_MAX_CMD_RECORDS 8
@@ -109,6 +110,7 @@ typedef enum {
     MC_TIMER_CFG_TXN,
     MC_TIMER_STABLE,
     MC_TIMER_IDENTIFY,
+    MC_TIMER_BATTERY,
 } mc_timer_t;
 
 typedef enum {
@@ -155,7 +157,7 @@ typedef struct {
         mc_cmd_t cmd;
         struct { mc_timer_t id; uint8_t arg; } timer; /* arg: slot of the per-slot timers */
         struct { uint8_t slot; bool ok; uint16_t raw; } adc;
-        uint16_t mv;                                  /* BATT_SAMPLE */
+        struct { uint16_t mv; bool ok; } batt;        /* BATT_SAMPLE: millivolts at the ADC pin */
     } u;
 } mc_event_t;
 
@@ -174,6 +176,7 @@ typedef enum {
     MC_ACT_DRIVE_PUMP,
     MC_ACT_ALL_OUTPUTS_OFF,
     MC_ACT_READ_SLOT,
+    MC_ACT_READ_BATTERY,    /* measure the pin of the battery divider, answer with BATT_SAMPLE */
     MC_ACT_PERSIST_CONFIG,  /* store core->cfg atomically */
     MC_ACT_PERSIST_DIAG,    /* store core->diag */
     MC_ACT_SET_LED,
@@ -239,7 +242,8 @@ typedef struct {
     uint16_t reset_count;
     uint16_t rejoin_count;
     uint16_t last_error;
-    uint16_t voltage_mv;
+    uint16_t voltage_mv; /* filtered cell voltage, 0 without a cell */
+    uint8_t batt_state;  /* mc_batt_state_t */
 } mc_attrs_t;
 
 typedef struct {
@@ -322,8 +326,14 @@ typedef struct mc_core {
     mc_sample_t sample[MC_NUM_SLOTS];
     uint8_t err_streak[MC_NUM_SLOTS];
     bool fault[MC_NUM_SLOTS];
-    uint16_t voltage_mv;
-    bool low_battery;
+    uint16_t voltage_mv;      /* filtered cell voltage in mV, 0 when absent */
+    uint8_t batt_state;       /* mc_batt_state_t */
+    uint16_t bat_hist[MC_BATT_FILTER_SAMPLES]; /* last calibrated samples */
+    uint8_t bat_n;            /* how many of them are valid */
+    uint8_t bat_bad_streak;   /* consecutive samples at or below the threshold of the next worse state */
+    bool bat_pending;         /* a READ_BATTERY is out and the sample waits for it */
+    bool have_pump_end;
+    uint32_t last_pump_end_ms;
 
     mc_pump_t pump[MC_NUM_SLOTS];
     mc_cmd_rec_t recs[MC_MAX_CMD_RECORDS];

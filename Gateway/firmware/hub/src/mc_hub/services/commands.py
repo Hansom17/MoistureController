@@ -94,6 +94,9 @@ async def create_pump_run(s: AsyncSession, fx: Effects, now: int, d: Device | No
                           source: str, created_by: str | None, request_id: str | None, plant_id: str | None = None,
                           rule_id: str | None = None, ttl_s: int | None = None) -> Command:
     d = _check_device(d)
+    if source == "rule" and d.batt_state == "critical":   # a manual run is left to the module, which refuses it itself
+        raise HubError("battery_critical", "Battery too low to water",
+                       "The module refuses pump runs while its battery is critical.")
     act = pump_config(d, slot)
     if act is None:
         raise HubError("slot_not_actuator", detail=f"slot {slot} is not a pump in the reported configuration")

@@ -153,12 +153,12 @@ export function encodeConfig(config) {
     if (bySlot.has(n)) throw new Error(`slot ${n} appears twice`);
     bySlot.set(n, s);
   }
-  const attrs = {
-    report_interval_s: intIn(config.report_interval_s ?? 300, 'report_interval_s', 10, 3600),
-    fast_report_interval_s: intIn(config.fast_report_interval_s ?? 30, 'fast_report_interval_s', 10, 300),
-    fast_report_hold_s: intIn(config.fast_report_hold_s ?? 120, 'fast_report_hold_s', 0, 1800),
-    batt_low_mv: intIn(config.batt_low_mv ?? 3500, 'batt_low_mv', 0, 65535),
-  };
+  // every device-level setting, with its range and default, comes from the interface file
+  const attrs = {};
+  for (const a of I.attributes.filter((x) => x.access.includes('rw') && x.range && x.default !== undefined)) {
+    attrs[a.name] = intIn(config[a.name] ?? a.default, a.name, a.range[0], a.range[1]);
+  }
+  if (attrs.batt_critical_mv >= attrs.batt_low_mv) throw new Error('batt_critical_mv must be below batt_low_mv');
   for (let n = 0; n < 6; n++) attrs[`slot_cfg_${n}`] = encodeSlotConfig(bySlot.get(n));
   return attrs;
 }

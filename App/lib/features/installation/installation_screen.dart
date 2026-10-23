@@ -44,6 +44,7 @@ class _FormState extends ConsumerState<_Form> {
   late final _name = TextEditingController(text: widget.installation.name);
   late final _timezone = TextEditingController(text: widget.installation.timezone);
   late final _battery = TextEditingController(text: '${widget.installation.batteryLowMv}');
+  late final _batteryCritical = TextEditingController(text: '${widget.installation.batteryCriticalMv}');
   final _token = TextEditingController();
   final _chat = TextEditingController();
   Object? _error;
@@ -51,7 +52,7 @@ class _FormState extends ConsumerState<_Form> {
 
   @override
   void dispose() {
-    for (final c in [_name, _timezone, _battery, _token, _chat]) {
+    for (final c in [_name, _timezone, _battery, _batteryCritical, _token, _chat]) {
       c.dispose();
     }
     super.dispose();
@@ -68,6 +69,7 @@ class _FormState extends ConsumerState<_Form> {
         name: _name.text.trim(),
         timezone: _timezone.text.trim(),
         batteryLowMv: int.tryParse(_battery.text),
+        batteryCriticalMv: int.tryParse(_batteryCritical.text),
         telegramToken: _token.text.isEmpty ? null : _token.text.trim(),
         telegramChatId: _chat.text.isEmpty ? null : _chat.text.trim(),
       );
@@ -99,6 +101,17 @@ class _FormState extends ConsumerState<_Form> {
                 controller: _battery,
                 keyboardType: TextInputType.number,
                 decoration: InputDecoration(labelText: l.batteryThreshold, suffixText: 'mV'),
+              ),
+              const SizedBox(height: Spacing.md),
+              TextField(
+                controller: _batteryCritical,
+                keyboardType: TextInputType.number,
+                decoration: InputDecoration(
+                  labelText: l.batteryCriticalThreshold,
+                  suffixText: 'mV',
+                  helperText: '${l.batteryThresholdsHint} ${l.batteryCell}',
+                  helperMaxLines: 2,
+                ),
               ),
             ],
           ),

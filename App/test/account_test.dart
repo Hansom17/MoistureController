@@ -97,10 +97,10 @@ void main() {
     await pumpApp(tester);
     await openTab(tester, 'Alerts');
     expect(find.textContaining('Office'), findsWidgets);
-    expect(find.text('Acknowledge'), findsNWidgets(2));
+    expect(find.text('Acknowledge'), findsNWidgets(3)); // device offline, safe mode, critical battery
     await tester.tap(find.text('Acknowledge').first);
     await tester.pumpAndSettle();
-    expect(find.text('Acknowledge'), findsOneWidget);
+    expect(find.text('Acknowledge'), findsNWidgets(2));
   });
 
   testWidgets('a viewer cannot acknowledge', (tester) async {

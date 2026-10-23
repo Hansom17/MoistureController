@@ -12,8 +12,6 @@
 
 static const char *TAG = "mc_app";
 
-#define BATTERY_PERIOD_MS 30000u
-
 static QueueHandle_t queue;
 static mc_core_t core;
 static mc_factory_t factory_copy;
@@ -34,6 +32,13 @@ static void read_slot(uint8_t slot, uint8_t port)
     uint16_t raw = 0;
     ev.u.adc.ok = mc_hal_adc_read_port(port, core.cfg.slots[slot].samples, &raw);
     ev.u.adc.raw = raw;
+    mc_app_post(&ev);
+}
+
+static void read_battery(void)
+{
+    mc_event_t ev = {.kind = MC_EV_BATT_SAMPLE};
+    ev.u.batt.ok = mc_hal_battery_pin_mv(&ev.u.batt.mv);
     mc_app_post(&ev);
 }
 
@@ -85,6 +90,9 @@ static void execute(const mc_action_t *a)
     case MC_ACT_READ_SLOT:
         read_slot(a->u.read.slot, a->u.read.port);
         break;
+    case MC_ACT_READ_BATTERY:
+        read_battery();
+        break;
     case MC_ACT_PERSIST_CONFIG:
         if (!mc_hal_config_store(&core.cfg)) {
             ESP_LOGE(TAG, "configuration not stored");
@@ -124,14 +132,6 @@ static void step(mc_event_t *ev)
     }
 }
 
-static void battery_tick(void *arg)
-{
-    (void)arg;
-    mc_event_t ev = {.kind = MC_EV_BATT_SAMPLE};
-    ev.u.mv = mc_hal_battery_mv();
-    mc_app_post(&ev);
-}
-
 static void app_task(void *arg)
 {
     (void)arg;
@@ -142,14 +142,9 @@ static void app_task(void *arg)
              ev.u.boot.first_boot, ev.u.boot.config_valid ? "ok" : "INVALID");
     step(&ev);
 
-    TickType_t last_battery = 0;
     for (;;) {
-        if (xQueueReceive(queue, &ev, pdMS_TO_TICKS(1000)) == pdTRUE) {
+        if (xQueueReceive(queue, &ev, portMAX_DELAY) == pdTRUE) {
             step(&ev);
-        }
-        if (xTaskGetTickCount() - last_battery >= pdMS_TO_TICKS(BATTERY_PERIOD_MS)) {
-            last_battery = xTaskGetTickCount();
-            battery_tick(NULL);
         }
     }
 }

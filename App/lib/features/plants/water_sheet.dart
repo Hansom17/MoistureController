@@ -13,12 +13,13 @@ Future<void> showWaterSheet(
   WidgetRef ref,
   Plant plant, {
   bool deviceOffline = false,
+  bool batteryCritical = false,
 }) async {
   final seconds = await showModalBottomSheet<int>(
     context: context,
     showDragHandle: true,
     isScrollControlled: true,
-    builder: (context) => _WaterSheet(plant: plant),
+    builder: (context) => _WaterSheet(plant: plant, batteryCritical: batteryCritical),
   );
   if (seconds == null || !context.mounted) return;
 
@@ -33,9 +34,12 @@ Future<void> showWaterSheet(
 }
 
 class _WaterSheet extends StatefulWidget {
-  const _WaterSheet({required this.plant});
+  const _WaterSheet({required this.plant, this.batteryCritical = false});
 
   final Plant plant;
+
+  /// The module's battery is critical: it will refuse the run (the button stays enabled, the module decides).
+  final bool batteryCritical;
 
   @override
   State<_WaterSheet> createState() => _WaterSheetState();
@@ -76,6 +80,10 @@ class _WaterSheetState extends State<_WaterSheet> {
                 color: theme.colorScheme.onSurfaceVariant,
               ),
             ),
+            if (widget.batteryCritical) ...[
+              const SizedBox(height: Spacing.sm),
+              Text(l.waterBatteryHint, style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.error)),
+            ],
             const SizedBox(height: Spacing.xl),
             Center(
               child: Text(

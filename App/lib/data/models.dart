@@ -63,13 +63,15 @@ class Installation {
   const Installation({
     required this.name,
     required this.timezone,
-    this.batteryLowMv = 3500,
+    this.batteryLowMv = 3600,
+    this.batteryCriticalMv = 3400,
     this.telegramConfigured = false,
   });
 
   final String name;
   final String timezone;
   final int batteryLowMv;
+  final int batteryCriticalMv;
   final bool telegramConfigured;
 }
 
@@ -234,6 +236,38 @@ class Board {
   final List<BoardPort> ports;
 }
 
+/// Battery state of a module (PlantModule/specs.md 6.1): `absent` means no cell is connected (USB only).
+enum BatteryState { absent, ok, low, critical }
+
+/// What the hub says about the cell of a device (`battery` in the device snapshot). The percentage is an estimate
+/// and null when the last report is old.
+class Battery {
+  const Battery({
+    required this.state,
+    this.mv = 0,
+    this.percent,
+    this.calibrated = false,
+    this.calPermille = 1000,
+  });
+
+  final BatteryState state;
+  final int mv;
+  final int? percent;
+  final bool calibrated;
+  final int calPermille;
+
+  bool get present => state != BatteryState.absent && mv > 0;
+  double get volts => mv / 1000;
+}
+
+/// One stored battery report for the chart.
+class BatteryPoint {
+  const BatteryPoint(this.at, this.mv);
+
+  final DateTime at;
+  final int mv;
+}
+
 class Device {
   const Device({
     required this.id,
@@ -247,6 +281,7 @@ class Device {
     this.lastSeen,
     this.linkQuality,
     this.voltageMv,
+    this.battery,
     this.desiredRev = 0,
     this.reportedRev,
     this.configError,
@@ -267,6 +302,9 @@ class Device {
   /// Zigbee link quality 0..255.
   final int? linkQuality;
   final int? voltageMv;
+
+  /// Null for a device the hub sends no battery object for.
+  final Battery? battery;
   final int desiredRev;
   final int? reportedRev;
   final String? configError;
@@ -300,6 +338,7 @@ class Device {
         lastSeen: lastSeen ?? this.lastSeen,
         linkQuality: linkQuality,
         voltageMv: voltageMv,
+        battery: battery,
         desiredRev: desiredRev,
         reportedRev: reportedRev,
         configError: configError,
@@ -560,6 +599,7 @@ class RuleExecution {
 enum AlertKind {
   deviceOffline,
   batteryLow,
+  batteryCritical,
   sensorSuspect,
   commandFailed,
   safeMode,

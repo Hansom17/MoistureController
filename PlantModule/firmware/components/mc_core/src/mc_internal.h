@@ -29,7 +29,7 @@ void mc_sense_rearm(mc_core_t *c, mc_actions_t *out);
 void mc_sense_on_timer(mc_core_t *c, mc_actions_t *out, mc_timer_t id, uint8_t arg);
 void mc_sense_on_adc(mc_core_t *c, mc_actions_t *out, uint8_t slot, bool ok, uint16_t raw);
 void mc_sense_on_report_result(mc_core_t *c, mc_actions_t *out);
-void mc_sense_on_battery(mc_core_t *c, mc_actions_t *out, uint16_t mv);
+void mc_sense_on_battery(mc_core_t *c, mc_actions_t *out, bool ok, uint16_t pin_mv);
 void mc_readings_refresh_outputs(mc_core_t *c);
 void mc_fast_enter(mc_core_t *c, mc_actions_t *out);
 void mc_fast_maybe_leave(mc_core_t *c, mc_actions_t *out);

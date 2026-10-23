@@ -10,6 +10,7 @@ import '../../core/permissions.dart';
 import '../../data/models.dart';
 import '../../ui/app_scope.dart';
 import '../../ui/common.dart';
+import '../../ui/battery_chip.dart';
 import '../../ui/status_chip.dart';
 
 class DevicesScreen extends StatelessWidget {
@@ -92,6 +93,7 @@ class _DeviceTile extends StatelessWidget {
                 children: [
                   StatusChip.device(context, device, withLastSeen: true),
                   if (!device.isNew) configSyncChip(context, device),
+                  BatteryChip(device: device),
                 ],
               ),
               const SizedBox(height: Spacing.sm),

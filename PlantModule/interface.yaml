@@ -10,7 +10,7 @@
 interface:
   name: moisturecontroller-plant
   version: {major: 1, minor: 0}      # interface_version attribute = (major << 8) | minor
-  config_schema: 1
+  config_schema: 2
 
 identity:
   manufacturer: MoistureController
@@ -55,6 +55,8 @@ custom_cluster:
     - {id: 0x0135, name: free_heap,       type: uint32, access: [r, report], mqtt: free_heap}
     - {id: 0x0136, name: interface_version, type: uint16, access: [r],       mqtt: interface}
     - {id: 0x0137, name: config_schema,   type: uint8,  access: [r],         mqtt: config_schema}
+    - {id: 0x0138, name: batt_mv,         type: uint16, access: [r, report], mqtt: batt_mv,    note: "filtered cell voltage in mV, 0 when no cell is connected (PlantModule/specs.md 6.1)"}
+    - {id: 0x0139, name: batt_state,      type: enum8,  access: [r, report], mqtt: batt_state, enum: batt_state}
     - {id: 0x0140, name: board,           type: char16, access: [r],         mqtt: board}
 
     # --- configuration state (device -> gateway) ---
@@ -66,7 +68,9 @@ custom_cluster:
     - {id: 0x0001, name: report_interval_s,      type: uint16, access: [rw], range: [10, 3600], default: 300}
     - {id: 0x0002, name: fast_report_interval_s, type: uint16, access: [rw], range: [10, 300],   default: 30}
     - {id: 0x0003, name: fast_report_hold_s,     type: uint16, access: [rw], range: [0, 1800],   default: 120}
-    - {id: 0x0004, name: batt_low_mv,            type: uint16, access: [rw], default: 3500}
+    - {id: 0x0004, name: batt_low_mv,            type: uint16, access: [rw], range: [3000, 4000], default: 3600}
+    - {id: 0x0005, name: batt_critical_mv,       type: uint16, access: [rw], range: [3000, 4000], default: 3400}
+    - {id: 0x0006, name: batt_cal_permille,      type: uint16, access: [rw], range: [900, 1100],  default: 1000}
     - {id: 0x0010, name: slot_cfg_0, type: octet24, access: [rw], layout: slot_config}
     - {id: 0x0011, name: slot_cfg_1, type: octet24, access: [rw], layout: slot_config}
     - {id: 0x0012, name: slot_cfg_2, type: octet24, access: [rw], layout: slot_config}
@@ -144,17 +148,40 @@ enums:
   boot_reason:  {0: power_on, 1: software, 2: panic, 3: watchdog, 4: brownout, 5: other}
   cfg_result:   {0: ok, 1: rejected}
   ack_state:    {0: running, 1: done, 2: failed, 3: rejected, 4: cancelled}
-  reason:       {0: none, 1: expired, 2: busy, 3: limit, 4: min_pause, 5: slot_not_actuator, 6: slot_not_sensor, 7: hw_error}
+  reason:       {0: none, 1: expired, 2: busy, 3: limit, 4: min_pause, 5: slot_not_actuator, 6: slot_not_sensor, 7: hw_error, 8: battery_low}
   device_action: {1: identify, 2: reboot, 3: clear_safe_mode}
-  event_code:   {1: boot, 2: low_battery, 3: sensor_fault, 4: sensor_ok, 5: safety_stop, 6: safe_mode, 7: config_rejected}
+  event_code:   {1: boot, 2: low_battery, 3: sensor_fault, 4: sensor_ok, 5: safety_stop, 6: safe_mode, 7: config_rejected, 8: battery_critical}
+  batt_state:   {0: absent, 1: ok, 2: low, 3: critical}
   cfg_error:    {1: port_invalid, 2: port_conflict, 3: out_of_range, 4: busy, 5: stale_rev, 6: schema_unknown, 7: role_unsupported}
 
 reporting:                             # set by Zigbee2MQTT during configure. The slot_n attributes (octet strings) are NOT
                                        # listed: the stack refuses a reporting configuration for them, so the module sends
                                        # them itself after every sample (and on every change of the outputs).
   - {attributes: [power_config.batteryVoltage],                     min_s: 60, max_s: 600, change: "50 mV"}
-  - {attributes: [status, fast_mode, safe_reason, cfg_rev, cfg_result, cfg_error], min_s: 1, max_s: 600, change: any}
+  - {attributes: [batt_mv],                                         min_s: 60, max_s: 600, change: "20 mV", change_value: 20}
+  - {attributes: [status, fast_mode, safe_reason, batt_state, cfg_rev, cfg_result, cfg_error], min_s: 1, max_s: 600, change: any}
   - {attributes: [uptime_s, boot_reason, reset_count, rejoin_count, last_error, free_heap],  min_s: 10, max_s: 600, change: any}
+
+# --- battery detection: every tunable of PlantModule/specs.md 6.1 in one place ------------------------------------
+# The thresholds and the calibration factor are configuration attributes above (batt_low_mv, batt_critical_mv,
+# batt_cal_permille, with range and default). Everything below is generated into the firmware header
+# (PlantModule/scripts/gen_interface_h.py) and into the hub (Gateway/scripts/gen_hub_params.py).
+battery:
+  chemistry: li-ion-1s                 # the curve below that the hub uses; the app shows it read-only
+  measure:                             # firmware: how a sample is taken
+    adc_conversions: 8                 # conversions averaged per sample (median of the cell voltage is taken afterwards)
+    filter_samples: 3                  # the reported value is the median of the last N samples
+    quiet_after_pump_ms: 5000          # no sample while a pump runs and this long after it stopped
+    read_timeout_ms: 500               # a read that does not answer is skipped, the previous value stays
+  classify:                            # firmware: state machine absent / ok / low / critical
+    present_min_mv: 500                # below this no cell is connected (state absent, no alerts)
+    hysteresis_mv: 100                 # recovery needs the threshold plus this
+    debounce_samples: 3                # consecutive samples at or below a threshold before the state worsens
+  hub:                                 # hub: how the level is estimated and shown
+    history_reports: 5                 # percentage = median of the last N reports
+    stale_factor: 2                    # no percentage when the last report is older than N report intervals
+    percent_curves:                    # rest voltage in mV -> percent, descending; a starting point until a measured discharge
+      li-ion-1s: [[3900, 100], [3840, 90], [3780, 80], [3720, 70], [3660, 60], [3600, 50], [3540, 40], [3480, 30], [3420, 20], [3380, 10], [3320, 5], [3300, 0]]
 
 mqtt:                                  # shapes: Gateway/specs.md "Message paths"
   state_topic: "zigbee2mqtt/{dev-id}"

@@ -5,7 +5,9 @@
       "report_interval_s": 300,
       "fast_report_interval_s": 30,
       "fast_report_hold_s": 120,
-      "batt_low_mv": 3500,
+      "batt_low_mv": 3600,
+      "batt_critical_mv": 3400,
+      "batt_cal_permille": 1000,
       "slots": [
         {
           "slot": 0,

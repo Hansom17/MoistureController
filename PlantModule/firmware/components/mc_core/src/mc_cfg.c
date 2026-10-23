@@ -48,7 +48,8 @@ void mc_cfg_on_write(mc_core_t *c, mc_actions_t *out, uint16_t attr, const uint8
         return;
     }
     bool scalar = attr == MC_ATTR_REPORT_INTERVAL_S || attr == MC_ATTR_FAST_REPORT_INTERVAL_S ||
-                  attr == MC_ATTR_FAST_REPORT_HOLD_S || attr == MC_ATTR_BATT_LOW_MV;
+                  attr == MC_ATTR_FAST_REPORT_HOLD_S || attr == MC_ATTR_BATT_LOW_MV ||
+                  attr == MC_ATTR_BATT_CRITICAL_MV || attr == MC_ATTR_BATT_CAL_PERMILLE;
     bool slot = attr >= MC_ATTR_SLOT_CFG_0 && attr <= MC_ATTR_SLOT_CFG_5;
     if (!scalar && !slot) {
         return;
@@ -71,8 +72,14 @@ void mc_cfg_on_write(mc_core_t *c, mc_actions_t *out, uint16_t attr, const uint8
         case MC_ATTR_FAST_REPORT_HOLD_S:
             c->stage.cfg.fast_report_hold_s = v;
             break;
-        default:
+        case MC_ATTR_BATT_LOW_MV:
             c->stage.cfg.batt_low_mv = v;
+            break;
+        case MC_ATTR_BATT_CRITICAL_MV:
+            c->stage.cfg.batt_critical_mv = v;
+            break;
+        default:
+            c->stage.cfg.batt_cal_permille = v;
             break;
         }
         return;

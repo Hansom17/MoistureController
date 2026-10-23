@@ -121,6 +121,16 @@ static void exec(sim_t *s, const mc_action_t *a)
             pending_add(s, s->now + s->adc_delay_ms, &ev);
         }
         break;
+    case MC_ACT_READ_BATTERY:
+        s->read_battery_calls++;
+        if (!s->batt_silent) {
+            mc_event_t ev = {.kind = MC_EV_BATT_SAMPLE};
+            ev.u.batt.mv = s->batt_pin_mv;
+            ev.u.batt.ok = s->batt_ok;
+            ev.now_ms = s->now + s->adc_delay_ms;
+            pending_add(s, s->now + s->adc_delay_ms, &ev);
+        }
+        break;
     case MC_ACT_PERSIST_CONFIG:
         s->persist_config_calls++;
         s->persisted_config = s->core.cfg;
@@ -194,6 +204,8 @@ void sim_init(sim_t *s, const char *board_name)
     memset(s, 0, sizeof *s);
     s->now = 1000;
     mc_core_init(&s->core, board_name ? mc_board_find(board_name) : NULL, 4095);
+    s->batt_pin_mv = 1950; /* 3.9 V through the 2.0 divider of carrier-v1 */
+    s->batt_ok = true;
     for (int i = 0; i < MC_NUM_SLOTS; i++) {
         s->adc_ok[i] = true;
         s->adc_raw[i] = 2100;
@@ -356,7 +368,8 @@ mc_event_t ev_timer(mc_timer_t id, uint8_t arg)
 mc_event_t ev_battery(uint16_t mv)
 {
     mc_event_t e = {.kind = MC_EV_BATT_SAMPLE};
-    e.u.mv = mv;
+    e.u.batt.mv = mv;
+    e.u.batt.ok = true;
     return e;
 }
 

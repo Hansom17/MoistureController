@@ -79,15 +79,16 @@ bool mc_hal_adc_read_port(uint8_t port, uint8_t samples, uint16_t *raw)
     return true;
 }
 
-uint16_t mc_hal_battery_mv(void)
+bool mc_hal_battery_pin_mv(uint16_t *out)
 {
     int raw;
-    if (board == NULL || board->battery_gpio < 0 || !average(board->battery_gpio, 8, &raw)) {
-        return 0;
+    if (board == NULL || board->battery_gpio < 0 || !average(board->battery_gpio, MC_BATT_ADC_CONVERSIONS, &raw)) {
+        return false;
     }
     int mv = raw * 3300 / 4095; /* without calibration: a rough linear estimate */
     if (cali != NULL) {
         adc_cali_raw_to_voltage(cali, raw, &mv);
     }
-    return (uint16_t)(mv * board->battery_divider_x100 / 100);
+    *out = (uint16_t)mv;
+    return true;
 }

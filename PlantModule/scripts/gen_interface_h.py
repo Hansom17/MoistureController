@@ -49,6 +49,15 @@ def render() -> str:
             out.append(f'#define MC_CFG_{up(a["name"])}_MAX {hi}')
         if "rw" in a["access"] and "default" in a:
             out.append(f'#define MC_CFG_{up(a["name"])}_DEFAULT {a["default"]}')
+    b = d["battery"]
+    out += ["", "/* battery detection tunables (interface.yaml, section battery) */",
+            f'#define MC_BATT_ADC_CONVERSIONS {b["measure"]["adc_conversions"]}',
+            f'#define MC_BATT_FILTER_SAMPLES {b["measure"]["filter_samples"]}',
+            f'#define MC_BATT_QUIET_MS {b["measure"]["quiet_after_pump_ms"]}u',
+            f'#define MC_BATT_READ_TIMEOUT_MS {b["measure"]["read_timeout_ms"]}u',
+            f'#define MC_BATT_PRESENT_MV {b["classify"]["present_min_mv"]}u',
+            f'#define MC_BATT_HYSTERESIS_MV {b["classify"]["hysteresis_mv"]}u',
+            f'#define MC_BATT_DEBOUNCE {b["classify"]["debounce_samples"]}']
     out += ["", "/* cluster commands, coordinator to module */"]
     for x in c["commands_in"]:
         out.append(f'#define MC_CMD_IN_{up(x["name"])} 0x{x["id"]:02X}')

@@ -21,7 +21,8 @@ def normalize(p: dict) -> list:
             for i, d in sorted(slots.items()) if d.get("type") not in (None, "empty")
         ]
         out.append(Telemetry(seq=int(p["seq"]), boot_id=p.get("boot_id"), slots=readings,
-                             voltage_mv=p.get("voltage_mv"), linkquality=p.get("linkquality")))
+                             voltage_mv=p.get("voltage_mv"), linkquality=p.get("linkquality"),
+                             batt_mv=p.get("batt_mv"), batt_state=p.get("batt_state")))
     elif "linkquality" in p and len(p) <= 2:
         out.append(Telemetry(seq=-1, boot_id=None, slots=[], voltage_mv=p.get("voltage_mv"),
                              linkquality=p.get("linkquality")))

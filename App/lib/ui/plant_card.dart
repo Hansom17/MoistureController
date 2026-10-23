@@ -5,6 +5,7 @@ import '../app/theme/tokens.dart';
 import '../core/format.dart';
 import '../data/models.dart';
 import 'moisture_gauge.dart';
+import 'battery_chip.dart';
 import 'status_chip.dart';
 
 /// Dashboard card for one plant (App/specs.md Part A §4, dashboard).
@@ -78,6 +79,7 @@ class PlantCard extends StatelessWidget {
                       crossAxisAlignment: WrapCrossAlignment.center,
                       children: [
                         if (device != null) StatusChip.device(context, device!),
+                        if (device != null) BatteryChip(device: device!),
                         if (hasPendingCommand)
                           StatusChip(
                             kind: StatusKind.pending,

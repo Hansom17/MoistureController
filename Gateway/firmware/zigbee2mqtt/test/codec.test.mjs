@@ -102,15 +102,25 @@ test('slot config tables', () => {
   for (let n = 0; n < 6; n++) assert.ok(codec.encodeSlotConfig({slot: n, module: 'moisture', port: 'P1'}).length <= 24);
 });
 
+test('battery thresholds: critical must be below low, calibration within 10 %', () => {
+  assert.throws(() => codec.encodeConfig({rev: 1, batt_low_mv: 3500, batt_critical_mv: 3500}), /below/);
+  assert.throws(() => codec.encodeConfig({rev: 1, batt_cal_permille: 1200}), /batt_cal_permille/);
+  assert.throws(() => codec.encodeConfig({rev: 1, batt_low_mv: 2900}), /batt_low_mv/);
+  const a = codec.encodeConfig({rev: 1});
+  assert.deepEqual([a.batt_low_mv, a.batt_critical_mv, a.batt_cal_permille], [3600, 3400, 1000], 'defaults');
+});
+
 test('whole configuration: intervals and six slot tables, absent slots emptied', () => {
   const a = codec.encodeConfig({
-    rev: 9, report_interval_s: 120, fast_report_interval_s: 20, fast_report_hold_s: 60, batt_low_mv: 3400,
+    rev: 9, report_interval_s: 120, fast_report_interval_s: 20, fast_report_hold_s: 60, batt_low_mv: 3700, batt_critical_mv: 3450, batt_cal_permille: 1012,
     slots: [{slot: 0, module: 'moisture', port: 'P1'}, {slot: 2, module: 'pump', port: 'P3'}],
   });
   assert.equal(a.report_interval_s, 120);
   assert.equal(a.fast_report_interval_s, 20);
   assert.equal(a.fast_report_hold_s, 60);
-  assert.equal(a.batt_low_mv, 3400);
+  assert.equal(a.batt_low_mv, 3700);
+  assert.equal(a.batt_critical_mv, 3450);
+  assert.equal(a.batt_cal_permille, 1012);
   assert.deepEqual(Object.keys(a).filter((k) => k.startsWith('slot_cfg_')), ['slot_cfg_0', 'slot_cfg_1', 'slot_cfg_2', 'slot_cfg_3', 'slot_cfg_4', 'slot_cfg_5']);
   assert.equal(a.slot_cfg_0[0], 1);
   assert.deepEqual([...a.slot_cfg_1], [0, 0, 0]);

@@ -320,7 +320,8 @@ class ApiMoistureRepository implements MoistureRepository {
   Installation _installation(Map i) => Installation(
     name: (i['name'] ?? '') as String,
     timezone: (i['timezone'] ?? 'UTC') as String,
-    batteryLowMv: (i['battery_low_mv'] as int?) ?? 3500,
+    batteryLowMv: (i['battery_low_mv'] as int?) ?? 3600,
+    batteryCriticalMv: (i['battery_critical_mv'] as int?) ?? 3400,
     telegramConfigured: (i['telegram_configured'] as bool?) ?? false,
   );
 
@@ -333,6 +334,7 @@ class ApiMoistureRepository implements MoistureRepository {
     String? name,
     String? timezone,
     int? batteryLowMv,
+    int? batteryCriticalMv,
     String? telegramToken,
     String? telegramChatId,
   }) async {
@@ -340,6 +342,7 @@ class ApiMoistureRepository implements MoistureRepository {
       'name': ?name,
       'timezone': ?timezone,
       'battery_low_mv': ?batteryLowMv,
+      'battery_critical_mv': ?batteryCriticalMv,
       if (telegramToken != null || telegramChatId != null)
         'telegram': {'token': ?telegramToken, 'chat_id': ?telegramChatId},
     });
@@ -500,6 +503,36 @@ class ApiMoistureRepository implements MoistureRepository {
     return out;
   }
 
+  @override
+  Future<void> calibrateBattery(String deviceId, int measuredMv) =>
+      _send('POST', '/devices/$deviceId/battery/calibrate', {'measured_mv': measuredMv});
+
+  @override
+  Future<List<BatteryPoint>> batteryHistory(String deviceId, ChartRange range) async {
+    final end = _now().toUtc();
+    final out = <BatteryPoint>[];
+    String? cursor;
+    for (var page = 0; page < 5; page++) {
+      final r = _map(
+        await _get('/devices/$deviceId/health', {
+          'from': end.subtract(range.span).toIso8601String(),
+          'to': end.toIso8601String(),
+          'limit': 1000,
+          'cursor': ?cursor,
+        }),
+      );
+      for (final i in _list(r['items']).cast<Map>()) {
+        final mv = i['voltage_mv'] as int?;
+        final at = _dt(i['ts']);
+        if (mv != null && mv > 500 && at != null) out.add(BatteryPoint(at, mv));
+      }
+      cursor = r['next_cursor'] as String?;
+      if (cursor == null) break;
+    }
+    out.sort((a, b) => a.at.compareTo(b.at));
+    return out;
+  }
+
   // ---- commands ----------------------------------------------------------------------------------
 
   Command _command(Map c) {
@@ -657,6 +690,24 @@ class ApiMoistureRepository implements MoistureRepository {
     return raw == null ? 'rejected' : 'rejected: $raw';
   }
 
+  static const _batteryStates = {
+    'absent': BatteryState.absent,
+    'ok': BatteryState.ok,
+    'low': BatteryState.low,
+    'critical': BatteryState.critical,
+  };
+
+  Battery? _battery(Object? b) {
+    if (b is! Map) return null;
+    return Battery(
+      state: _batteryStates[b['state']] ?? BatteryState.absent,
+      mv: (b['mv'] as int?) ?? 0,
+      percent: b['percent'] as int?,
+      calibrated: (b['calibrated'] as bool?) ?? false,
+      calPermille: (b['cal_permille'] as int?) ?? 1000,
+    );
+  }
+
   Device _device(Map d) {
     final reported = _body(d['reported_config']);
     return Device(
@@ -671,6 +722,7 @@ class ApiMoistureRepository implements MoistureRepository {
       lastSeen: _dt(d['last_seen_at']),
       linkQuality: d['link_quality'] as int?,
       voltageMv: d['voltage_mv'] as int?,
+      battery: _battery(d['battery']),
       desiredRev: (d['desired_rev'] as int?) ?? 0,
       reportedRev: d['reported_rev'] as int?,
       configError: _configError(d['config_error']),
@@ -801,6 +853,7 @@ class ApiMoistureRepository implements MoistureRepository {
   static const _alertKinds = {
     'device_offline': AlertKind.deviceOffline,
     'battery_low': AlertKind.batteryLow,
+    'battery_critical': AlertKind.batteryCritical,
     'sensor_error': AlertKind.sensorSuspect,
     'command_failed': AlertKind.commandFailed,
     'device_safe_mode': AlertKind.safeMode,

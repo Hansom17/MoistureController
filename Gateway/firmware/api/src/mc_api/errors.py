@@ -2,7 +2,7 @@
 
 STATUS = {
     "validation": 422, "not_found": 404, "conflict": 409, "busy": 409, "device_not_ready": 409,
-    "device_safe_mode": 409, "slot_not_actuator": 422, "safety_limit": 422, "unknown_kind": 400,
+    "device_safe_mode": 409, "battery_critical": 409, "slot_not_actuator": 422, "safety_limit": 422, "unknown_kind": 400,
     "unauthorized": 401, "invalid_credentials": 401, "reauth_required": 401, "forbidden": 403,
     "rate_limited": 429, "hub_unavailable": 503, "hub_timeout": 504, "incompatible_hub": 503,
     "setup_required": 409, "already_set_up": 409, "invalid_setup_code": 403, "invalid_invite": 404,

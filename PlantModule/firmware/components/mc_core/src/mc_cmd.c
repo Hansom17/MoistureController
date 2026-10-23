@@ -77,6 +77,8 @@ static void pump_finish(mc_core_t *c, mc_actions_t *out, uint8_t slot, uint8_t a
     } else {
         p->state = MC_PUMP_OFF;
     }
+    c->have_pump_end = true;
+    c->last_pump_end_ms = c->now_ms;
     mc_fast_maybe_leave(c, out);
     mc_readings_refresh_outputs(c);
     mc_act(out, MC_ACT_UPDATE_ATTRS);
@@ -90,6 +92,8 @@ void mc_pumps_force_off(mc_core_t *c, mc_actions_t *out)
     for (uint8_t i = 0; i < MC_NUM_SLOTS; i++) {
         mc_pump_t *p = &c->pump[i];
         if (p->state == MC_PUMP_ON) {
+            c->have_pump_end = true;
+            c->last_pump_end_ms = c->now_ms;
             drive(c, out, i, false);
             mc_cancel(out, MC_TIMER_PUMP_END, i);
             c->recs[p->rec].running = false;
@@ -182,6 +186,8 @@ static void pump_run(mc_core_t *c, mc_actions_t *out, const mc_cmd_t *cmd)
         reason = MC_REASON_EXPIRED;
     } else if (slot >= MC_NUM_SLOTS || c->cfg.slots[slot].module != MC_MODULE_PUMP) {
         reason = MC_REASON_SLOT_NOT_ACTUATOR;
+    } else if (c->batt_state == MC_BATT_STATE_CRITICAL) {
+        reason = MC_REASON_BATTERY_LOW; /* a pump start on a nearly flat cell can brown the module out */
     } else {
         uint16_t max = c->cfg.slots[slot].max_run_s;
         if (max > MC_PUMP_HARD_MAX_S) {

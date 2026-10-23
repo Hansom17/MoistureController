@@ -47,6 +47,7 @@ class InstallationIn(BaseModel):
     name: str | None = Field(default=None, min_length=1, max_length=80)
     timezone: str | None = None
     battery_low_mv: int | None = None
+    battery_critical_mv: int | None = None
     telegram: TelegramIn | None = None
 
 
@@ -186,6 +187,19 @@ async def device_events(device_id: str, request: Request, p: Principal = Depends
 
 class ActionIn(BaseModel):
     action: str
+
+
+class CalibrateIn(BaseModel):
+    measured_mv: int = Field(ge=1000, le=6000)
+
+
+@router.post("/devices/{device_id}/battery/calibrate")
+async def calibrate_battery(device_id: str, body: CalibrateIn, request: Request,
+                            p: Principal = Depends(require("admin"))):
+    r = await hub(request, p, "device_battery_calibrate", {"device_id": device_id, "measured_mv": body.measured_mv})
+    await audit(app_of(request), p.user_id, "battery_calibrated", {"device": device_id, "measured_mv": body.measured_mv,
+                                                                    "cal_permille": r["cal_permille"]}, request)
+    return r
 
 
 @router.post("/devices/{device_id}/actions", status_code=202)

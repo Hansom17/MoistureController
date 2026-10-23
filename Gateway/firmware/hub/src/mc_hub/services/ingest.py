@@ -8,12 +8,12 @@ from ulid import ULID
 
 from mc_hub.bus.transport import Transport
 from mc_hub.clock import Clock
-from mc_hub.db.models import Device, DeviceEvent, HealthReport, Plant, Reading
+from mc_hub.db.models import Device, DeviceEvent, HealthReport, Plant, Reading, Setting
 from mc_hub.zigbee import adapter
 from mc_hub.zigbee.messages import CmdAck, ConfigState, Event, Status, Telemetry
 from mc_hub.zigbee.topics import Z2MTopics
 
-from . import alerts, commands, config_sync, devices as devs, rules
+from . import alerts, battery, commands, config_sync, devices as devs, rules
 from .join import Join
 from .effects import Effects
 from .views import alert_view, device_view
@@ -60,7 +60,8 @@ class Ingest:
                         fx.emit("join", dict(self.join.state)); fx.touch("join")
                     if supported:
                         await s.flush()
-                        config_sync.initial(d, now, s)
+                        low, critical = await self.battery_thresholds(s)
+                        config_sync.initial(d, now, s, low, critical)
                 elif d.deleted_at is None and d.status in ("joining", "join_failed", "unsupported"):
                     new = self._join_status(model_id == MODEL, state)
                     if new != d.status:
@@ -163,14 +164,22 @@ class Ingest:
     async def _telemetry(self, s: AsyncSession, fx: Effects, d: Device, m: Telemetry, now: int) -> None:
         if m.linkquality is not None:
             d.link_quality = m.linkquality
-        if m.voltage_mv is not None:
-            d.voltage_mv = m.voltage_mv
+        mv = m.batt_mv if m.batt_mv is not None else m.voltage_mv
+        if mv is not None:
+            d.voltage_mv = mv
+            low, critical = await self.battery_thresholds(s)
+            d.batt_state = m.batt_state or battery.state_from(mv, low, critical)
+            if m.seq >= 0 and d.batt_state == "absent":
+                d.batt_hist = []
+            await self._battery_alerts(s, fx, now, d)
         if m.seq < 0:
             return                                        # link-quality-only update
         same_boot = m.boot_id is None or m.boot_id == d.boot_id
         if same_boot and not adapter.is_newer_u16(m.seq, d.last_seq):
             return                                        # repeat of a reading we have
         d.last_seq, d.boot_id = m.seq, (m.boot_id if m.boot_id is not None else d.boot_id)
+        if mv and d.batt_state != "absent":
+            d.batt_hist = battery.push(d.batt_hist, mv)   # one point per new sample
         s.add(HealthReport(device_id=d.id, ts=now, voltage_mv=d.voltage_mv, link_quality=d.link_quality,
                            diagnostics=d.diagnostics))
         latest = dict(d.slots or {})
@@ -220,12 +229,31 @@ class Ingest:
         name = d.name or d.id
         if m.code == "low_battery":
             await self._raise(s, fx, now, "battery_low", "device", d.id, name)
+        elif m.code == "battery_critical":
+            await self._raise(s, fx, now, "battery_critical", "device", d.id, name, {"mv": m.arg}, "critical")
         elif m.code == "sensor_fault":
             await self._raise(s, fx, now, "sensor_error", "device", d.id, name, {"slot": m.slot})
         elif m.code == "sensor_ok":
             await self._resolve(s, fx, now, "sensor_error", d)
         elif m.code == "safety_stop":
             await self._raise(s, fx, now, "safety_stop", "device", d.id, name, {"slot": m.slot}, "critical")
+
+    async def battery_thresholds(self, s: AsyncSession) -> tuple[int, int]:
+        low = await s.get(Setting, "battery_low_mv")
+        critical = await s.get(Setting, "battery_critical_mv")
+        return (low.value if low else battery.DEFAULT_LOW_MV, critical.value if critical else battery.DEFAULT_CRITICAL_MV)
+
+    async def _battery_alerts(self, s, fx: Effects, now: int, d: Device) -> None:
+        state = d.batt_state
+        if state in ("low", "critical"):
+            await self._raise(s, fx, now, "battery_low", "device", d.id, d.name or d.id, {"mv": d.voltage_mv})
+        if state == "critical":
+            await self._raise(s, fx, now, "battery_critical", "device", d.id, d.name or d.id, {"mv": d.voltage_mv},
+                              "critical")
+        if state in ("ok", "absent"):
+            await self._resolve(s, fx, now, "battery_low", d)
+        if state != "critical":
+            await self._resolve(s, fx, now, "battery_critical", d)
 
     async def _raise(self, s, fx: Effects, now, kind, st, sid, name, detail=None, severity="warning") -> None:
         a, new = await alerts.open_alert(s, now, kind, st, sid, name, severity, detail)

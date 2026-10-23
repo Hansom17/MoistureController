@@ -4,6 +4,7 @@ STATUS = {
     "validation": 422, "not_found": 404, "conflict": 409, "busy": 409,
     "device_not_ready": 409, "device_safe_mode": 409, "slot_not_actuator": 422,
     "safety_limit": 422, "unknown_kind": 400, "expired": 408, "unsupported_version": 400,
+    "battery_critical": 409,
 }
 
 

@@ -351,7 +351,7 @@
   "backupDone": "Backup written on the gateway.",
   "bannerHubDown": "The watering service is not reachable. You see the last known data; changes are not possible.",
   "bannerZigbeeDown": "Zigbee is not running. Data and commands are paused.",
-  "batteryThreshold": "Low battery warning below",
+  "batteryThreshold": "Battery low (mV)",
   "calDry": "Dry value (raw)",
   "calWet": "Wet value (raw)",
   "changePassword": "Change password",
@@ -663,5 +663,64 @@
   },
   "usersTitle": "Users",
   "waterQueuedDeviceOffline": "Watering queued. The device is offline and gets it when it is back.",
-  "noReadings": "No readings in this period yet."
+  "noReadings": "No readings in this period yet.",
+  "batteryTitle": "Battery",
+  "batteryStateOk": "OK",
+  "batteryStateLow": "Low",
+  "batteryStateCritical": "Critical",
+  "batteryStateAbsent": "No battery",
+  "batteryPercent": "about {percent} %",
+  "@batteryPercent": {
+    "placeholders": {
+      "percent": {
+        "type": "int"
+      }
+    }
+  },
+  "batteryVolts": "{volts} V",
+  "@batteryVolts": {
+    "placeholders": {
+      "volts": {
+        "type": "String"
+      }
+    }
+  },
+  "batteryChargingHint": "Charging cannot be detected.",
+  "batteryCalibrated": "Calibrated ({delta})",
+  "@batteryCalibrated": {
+    "placeholders": {
+      "delta": {
+        "type": "String"
+      }
+    }
+  },
+  "calibrateBattery": "Calibrate battery",
+  "calibrateBatteryBody": "Measure the cell with a multimeter and enter the value. The module reports {volts} V now. Values more than 10 % off are refused.",
+  "@calibrateBatteryBody": {
+    "placeholders": {
+      "volts": {
+        "type": "String"
+      }
+    }
+  },
+  "measuredVolts": "Measured voltage",
+  "calibrate": "Calibrate",
+  "batteryCalibrationSent": "Calibration sent to the device.",
+  "batteryNoData": "No battery readings yet.",
+  "batteryCriticalThreshold": "Battery critical (mV)",
+  "batteryThresholdsHint": "Applied to all devices as soon as they confirm it.",
+  "batteryThresholdsInvalid": "Critical must be below low, both between 3000 and 4000 mV.",
+  "batteryCell": "Li-ion / LiPo, one cell",
+  "alertBatteryCritical": "{subject}: battery critical",
+  "@alertBatteryCritical": {
+    "placeholders": {
+      "subject": {
+        "type": "String"
+      }
+    }
+  },
+  "commandFailedBattery": "Battery too low to water",
+  "waterBatteryHint": "This module's battery is critical: it will refuse to water.",
+  "batteryVoltage": "Voltage",
+  "batteryLevel": "Level (estimate)"
 }

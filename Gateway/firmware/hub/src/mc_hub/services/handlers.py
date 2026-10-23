@@ -51,6 +51,15 @@ def register(h: RequestHandler, hub) -> None:
         ctx.emit("device", device_view(d))
         return {"rev": rev}
 
+    @h.register("device_battery_calibrate")
+    async def device_battery_calibrate(ctx: Ctx, b: dict):
+        _need(b, "device_id", "measured_mv")
+        d = await ctx.session.get(Device, b["device_id"])
+        permille = await config_sync.calibrate(ctx.session, ctx.fx, ctx.now, d, int(b["measured_mv"]),
+                                               ctx.actor.user_id)
+        ctx.emit("device", device_view(d))
+        return {"cal_permille": permille, "rev": d.desired_rev}
+
     # ---- join window and removal (Gateway/specs.md 7.3, 7.4) --------------------------------
 
     @h.register("device_join_open")

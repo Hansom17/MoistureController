@@ -6,6 +6,7 @@ from mc_hub import __version__
 from mc_hub.bus.publisher import Publisher
 from mc_hub.db.models import Alert, Device, Plant, Reading, Rule, Setting
 
+from . import battery
 from .views import alert_view, device_view, plant_view, rule_view
 
 NAMES = ("installation", "devices", "plants", "rules", "alerts_open", "join", "status", "boards")
@@ -26,11 +27,14 @@ class Snapshots:
             tg = await self.get_setting(s, "telegram") or {}
             return {"name": await self.get_setting(s, "name", ""),
                     "timezone": await self.get_setting(s, "timezone", "UTC"),
-                    "battery_low_mv": await self.get_setting(s, "battery_low_mv", 3500),
+                    "battery_low_mv": await self.get_setting(s, "battery_low_mv", battery.DEFAULT_LOW_MV),
+                    "battery_critical_mv": await self.get_setting(s, "battery_critical_mv", battery.DEFAULT_CRITICAL_MV),
+                    "battery_chemistry": battery.CHEMISTRY,
                     "telegram_configured": bool(tg.get("token") and tg.get("chat_id"))}
         if name == "devices":
             rows = (await s.execute(select(Device).where(Device.deleted_at.is_(None)).order_by(Device.created_at))).scalars()
-            return [device_view(d) for d in rows]
+            now = int(self.pub.clock.now())
+            return [device_view(d, now) for d in rows]
         if name == "plants":
             out = []
             for p in (await s.execute(select(Plant).where(Plant.archived_at.is_(None)).order_by(Plant.created_at))).scalars():

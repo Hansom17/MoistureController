@@ -152,3 +152,55 @@ async def test_export_and_backup(stack: Stack):
     assert json.loads(z.read("installation.json"))["name"] == "Home"
     b = await stack.post("/backup", owner)
     assert b.status_code == 200 and b.json()["hub"]["file"].startswith("hub-") and b.json()["api"]["file"].startswith("api-")
+
+
+async def test_battery_flow_calibration_thresholds_and_the_refused_run(stack: Stack):
+    owner = await stack.setup_owner()
+    member, _ = await stack.user(owner, "member")
+    admin, _ = await stack.user(owner, "admin")
+    dev = await join_device(stack, admin)
+    module = next(iter(stack.sim.modules.values()))
+    assert (await stack.put(f"/devices/{dev}/config", admin, {"base_rev": 1, "config": CFG})).status_code == 200
+    await stack.until(lambda: stack.mc.hub.state["devices"][0]["reported_rev"] == 2)
+    await stack.sim.report(module)
+    await stack.settle()
+    d = (await stack.get(f"/devices/{dev}", member)).json()
+    assert d["battery"]["state"] == "ok" and d["battery"]["mv"] == 3900 and d["battery"]["present"] is True
+    assert 0 < d["battery"]["percent"] <= 100
+
+    # installation thresholds: validated, owner only, pushed to the device configuration
+    assert (await stack.patch("/installation", member, {"battery_low_mv": 3700})).status_code == 403
+    bad = await stack.patch("/installation", owner, {"battery_low_mv": 3400, "battery_critical_mv": 3500})
+    assert bad.status_code == 422
+    ok = await stack.patch("/installation", owner, {"battery_low_mv": 3700, "battery_critical_mv": 3450})
+    assert ok.status_code == 200 and ok.json()["battery_critical_mv"] == 3450
+    await stack.until(lambda: stack.mc.hub.state["devices"][0]["reported_rev"] == 3)
+    assert module.config["batt_low_mv"] == 3700 and module.config["batt_critical_mv"] == 3450
+
+    # calibration: admin only, the module applies the new factor, far-off values are refused
+    assert (await stack.post(f"/devices/{dev}/battery/calibrate", member, {"measured_mv": 3990})).status_code == 403
+    r = await stack.post(f"/devices/{dev}/battery/calibrate", admin, {"measured_mv": 3990})
+    assert r.status_code == 200 and r.json()["cal_permille"] == 1023
+    await stack.until(lambda: stack.mc.hub.state["devices"][0]["reported_rev"] == 4)
+    await stack.sim.report(module)
+    await stack.settle()
+    d = (await stack.get(f"/devices/{dev}", member)).json()
+    assert d["battery"]["mv"] == 3990 and d["battery"]["calibrated"] is True
+    far = await stack.post(f"/devices/{dev}/battery/calibrate", admin, {"measured_mv": 5000})
+    assert far.status_code == 422
+
+    # a critical cell: alert, and the module refuses the run (the hub shows the reason)
+    module.cell_mv = 3300
+    await stack.sim.report(module)
+    await stack.settle()
+    alerts = (await stack.get("/alerts", member)).json()
+    assert {a["kind"] for a in alerts} == {"battery_low", "battery_critical"}
+    plant = (await stack.post("/plants", member, {"name": "Ficus", "sensor": {"device_id": dev, "slot": 0},
+                                                  "pump": {"device_id": dev, "slot": 2}})).json()
+    cmd = (await stack.post(f"/plants/{plant['id']}/water", member, {"seconds": 1})).json()
+    for _ in range(100):
+        c = (await stack.get(f"/commands/{cmd['id']}", member)).json()
+        if c["status"] == "failed":
+            break
+        await stack.settle(2)
+    assert c["status"] == "failed" and c["reason"] == "battery_low"

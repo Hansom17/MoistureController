@@ -32,11 +32,26 @@ class Module:
         self.boot_id = random.randint(1, 60000)
         self.n_ack = self.n_event = 0
         self.moisture = {0: 35.0}
+        self.cell_mv: int | None = 3900           # the true cell voltage; None = no cell connected
         self.runs: dict[int, asyncio.Task] = {}   # cmd_id -> task
         self.done: dict[int, int] = {}            # cmd_id -> n of its final ack (idempotency)
         self.state: dict = {}
         self.status = "operational"
         self.interview = "SUCCESSFUL"
+
+    def batt_mv(self) -> int:
+        """What the module reports: the cell voltage times the calibration factor, 0 without a cell."""
+        if self.cell_mv is None:
+            return 0
+        return round(self.cell_mv * self.config.get("batt_cal_permille", 1000) / 1000)
+
+    def batt_state(self) -> str:
+        mv = self.batt_mv()
+        if mv < 500:
+            return "absent"
+        if mv <= self.config.get("batt_critical_mv", 3400):
+            return "critical"
+        return "low" if mv <= self.config.get("batt_low_mv", 3600) else "ok"
 
     def entry(self) -> dict:
         return {"ieee_address": self.ieee, "friendly_name": self.name, "type": "EndDevice", "supported": True,
@@ -106,8 +121,9 @@ class Sim:
         st = m.state
         st.update(seq=m.seq, boot_id=m.boot_id, status=m.status, fast_mode=bool(m.runs), safe_reason="none",
                   cfg_rev=m.cfg_rev, cfg_result=st.get("cfg_result", "ok"), board=m.board, interface="1.0",
-                  config_schema=1, linkquality=random.randint(80, 200), voltage_mv=0, uptime_s=m.seq * 5,
+                  config_schema=2, linkquality=random.randint(80, 200), uptime_s=m.seq * 5,
                   boot_reason="power_on", reset_count=0, rejoin_count=0, last_error=0, free_heap=143000)
+        st.update(batt_mv=m.batt_mv(), batt_state=m.batt_state(), voltage_mv=m.batt_mv() // 100 * 100)
         for sl in m.config.get("slots", []):
             n = sl["slot"]
             if sl["module"] == "moisture":
@@ -235,6 +251,8 @@ class Sim:
         pump = next((s for s in m.config.get("slots", []) if s["slot"] == slot and s["module"] == "pump"), None)
         if pump is None:
             return await self._ack(m, cmd_id, "rejected", "slot_not_actuator")
+        if m.batt_state() == "critical":
+            return await self._ack(m, cmd_id, "rejected", "battery_low")
         if seconds > pump.get("max_run_s", 60):
             return await self._ack(m, cmd_id, "rejected", "limit")
         if m.runs:

@@ -7,8 +7,9 @@ from ulid import ULID
 from mc_hub.bus.requests import Ctx, RequestHandler
 from mc_hub.db.models import Device, Plant, Rule, Setting
 from mc_hub.errors import HubError
+from mc_hub.params import CONFIG
 
-from . import alerts
+from . import alerts, battery, config_sync
 from .views import alert_view, device_view, plant_view, rule_view
 
 HHMM = re.compile(r"^([01]\d|2[0-3]):[0-5]\d$")
@@ -50,10 +51,17 @@ def register(h: RequestHandler) -> None:
             await _set(s, "name", str(b["name"]))
         if "timezone" in b:
             await _set(s, "timezone", str(b["timezone"]))
-        if "battery_low_mv" in b:
-            if not 2500 <= int(b["battery_low_mv"]) <= 5000:
-                raise HubError("validation", detail="battery_low_mv out of range")
-            await _set(s, "battery_low_mv", int(b["battery_low_mv"]))
+        if "battery_low_mv" in b or "battery_critical_mv" in b:
+            cur_low = await s.get(Setting, "battery_low_mv")
+            cur_crit = await s.get(Setting, "battery_critical_mv")
+            low = int(b.get("battery_low_mv", cur_low.value if cur_low else battery.DEFAULT_LOW_MV))
+            crit = int(b.get("battery_critical_mv", cur_crit.value if cur_crit else battery.DEFAULT_CRITICAL_MV))
+            lo_mv, hi_mv = CONFIG["batt_critical_mv"]["min"], CONFIG["batt_low_mv"]["max"]
+            if not lo_mv <= crit < low <= hi_mv:
+                raise HubError("validation", detail=f"battery thresholds must satisfy {lo_mv} <= critical < low <= {hi_mv} mV")
+            await _set(s, "battery_low_mv", low)
+            await _set(s, "battery_critical_mv", crit)
+            await config_sync.push_battery(s, ctx.fx, ctx.now, low, crit, ctx.actor.user_id)
         if "telegram" in b:
             cur = (await s.get(Setting, "telegram"))
             old = dict(cur.value) if cur and cur.value else {}

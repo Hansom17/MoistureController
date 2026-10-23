@@ -21,6 +21,12 @@ final readingsProvider = FutureProvider.family<List<Reading>, ReadingsKey>(
   (ref, key) => ref.watch(repositoryProvider).readings(key.plantId, key.range),
 );
 
+typedef BatteryKey = ({String deviceId, ChartRange range});
+
+final batteryHistoryProvider = FutureProvider.family<List<BatteryPoint>, BatteryKey>(
+  (ref, key) => ref.watch(repositoryProvider).batteryHistory(key.deviceId, key.range),
+);
+
 final commandsProvider = FutureProvider.family<List<Command>, String>(
   (ref, plantId) => ref.watch(repositoryProvider).commands(plantId),
 );

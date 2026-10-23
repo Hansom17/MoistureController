@@ -69,6 +69,7 @@ abstract interface class MoistureRepository {
     String? name,
     String? timezone,
     int? batteryLowMv,
+    int? batteryCriticalMv,
     String? telegramToken,
     String? telegramChatId,
   });
@@ -121,6 +122,12 @@ abstract interface class MoistureRepository {
   /// Needs [reauth]. A device that cannot be reached is removed with [force].
   Future<void> deleteDevice(String deviceId, {bool force = false});
   Future<void> deviceAction(String deviceId, DeviceAction action);
+
+  /// Admin: sets the battery correction from a multimeter reading in millivolts (the hub refuses more than 10 % off).
+  Future<void> calibrateBattery(String deviceId, int measuredMv);
+
+  /// Stored battery reports of a device for the chart.
+  Future<List<BatteryPoint>> batteryHistory(String deviceId, ChartRange range);
   Future<List<Map<String, Object?>>> deviceEvents(String deviceId);
 
   Future<JoinState> joinState();

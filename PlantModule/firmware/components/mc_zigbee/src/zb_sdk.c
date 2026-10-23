@@ -47,6 +47,9 @@ static struct {
     uint8_t cfg_result;
     uint16_t cfg_error;
     uint16_t report_interval_s, fast_report_interval_s, fast_report_hold_s, batt_low_mv;
+    uint16_t batt_critical_mv, batt_cal_permille;
+    uint16_t batt_mv;
+    uint8_t batt_state;
     uint8_t slot_cfg[MC_NUM_SLOTS][25]; /* octet string: length byte + up to 24 */
     uint8_t batt_100mv;
 } store;
@@ -94,6 +97,8 @@ static esp_zb_attribute_list_t *custom_cluster(void)
     ADD(MC_ATTR_FREE_HEAP, ESP_ZB_ZCL_ATTR_TYPE_U32, REP, &store.free_heap);
     ADD(MC_ATTR_INTERFACE_VERSION, ESP_ZB_ZCL_ATTR_TYPE_U16, R, &store.interface_version);
     ADD(MC_ATTR_CONFIG_SCHEMA, ESP_ZB_ZCL_ATTR_TYPE_U8, R, &store.config_schema);
+    ADD(MC_ATTR_BATT_MV, ESP_ZB_ZCL_ATTR_TYPE_U16, REP, &store.batt_mv);
+    ADD(MC_ATTR_BATT_STATE, ESP_ZB_ZCL_ATTR_TYPE_8BIT_ENUM, REP, &store.batt_state);
     ADD(MC_ATTR_BOARD, ESP_ZB_ZCL_ATTR_TYPE_CHAR_STRING, R, store.board);
     ADD(MC_ATTR_CFG_REV, ESP_ZB_ZCL_ATTR_TYPE_U16, REP, &store.cfg_rev);
     ADD(MC_ATTR_CFG_RESULT, ESP_ZB_ZCL_ATTR_TYPE_8BIT_ENUM, REP, &store.cfg_result);
@@ -102,6 +107,8 @@ static esp_zb_attribute_list_t *custom_cluster(void)
     ADD(MC_ATTR_FAST_REPORT_INTERVAL_S, ESP_ZB_ZCL_ATTR_TYPE_U16, RW, &store.fast_report_interval_s);
     ADD(MC_ATTR_FAST_REPORT_HOLD_S, ESP_ZB_ZCL_ATTR_TYPE_U16, RW, &store.fast_report_hold_s);
     ADD(MC_ATTR_BATT_LOW_MV, ESP_ZB_ZCL_ATTR_TYPE_U16, RW, &store.batt_low_mv);
+    ADD(MC_ATTR_BATT_CRITICAL_MV, ESP_ZB_ZCL_ATTR_TYPE_U16, RW, &store.batt_critical_mv);
+    ADD(MC_ATTR_BATT_CAL_PERMILLE, ESP_ZB_ZCL_ATTR_TYPE_U16, RW, &store.batt_cal_permille);
     for (int i = 0; i < MC_NUM_SLOTS; i++) {
         ADD(MC_ATTR_SLOT_CFG_0 + i, ESP_ZB_ZCL_ATTR_TYPE_OCTET_STRING, RW, store.slot_cfg[i]);
     }
@@ -127,6 +134,8 @@ static void register_endpoint(void)
     store.fast_report_interval_s = MC_CFG_FAST_REPORT_INTERVAL_S_DEFAULT;
     store.fast_report_hold_s = MC_CFG_FAST_REPORT_HOLD_S_DEFAULT;
     store.batt_low_mv = MC_CFG_BATT_LOW_MV_DEFAULT;
+    store.batt_critical_mv = MC_CFG_BATT_CRITICAL_MV_DEFAULT;
+    store.batt_cal_permille = MC_CFG_BATT_CAL_PERMILLE_DEFAULT;
     for (int i = 0; i < MC_NUM_SLOTS; i++) {
         store.slot[i][0] = 8;
         store.slot_cfg[i][0] = 0;
@@ -475,6 +484,8 @@ void mc_zb_update_attrs(const mc_attrs_t *a)
     store.cfg_result = a->cfg_result;
     store.cfg_error = a->cfg_error;
     store.batt_100mv = (uint8_t)(a->voltage_mv / 100);
+    store.batt_mv = a->voltage_mv;
+    store.batt_state = a->batt_state;
 
     if (!esp_zb_lock_acquire(pdMS_TO_TICKS(1000))) {
         return;
@@ -496,6 +507,8 @@ void mc_zb_update_attrs(const mc_attrs_t *a)
     set_attr(MC_ATTR_CFG_REV, &store.cfg_rev);
     set_attr(MC_ATTR_CFG_RESULT, &store.cfg_result);
     set_attr(MC_ATTR_CFG_ERROR, &store.cfg_error);
+    set_attr(MC_ATTR_BATT_MV, &store.batt_mv);
+    set_attr(MC_ATTR_BATT_STATE, &store.batt_state);
     esp_zb_zcl_set_attribute_val(EP, ESP_ZB_ZCL_CLUSTER_ID_POWER_CONFIG, SRV, ESP_ZB_ZCL_ATTR_POWER_CONFIG_BATTERY_VOLTAGE_ID,
                                  &store.batt_100mv, false);
     esp_zb_lock_release();
@@ -526,7 +539,8 @@ void mc_zb_report_now(void)
      * reading": `seq` goes last, so the state that carries it already holds the new slots and status. */
     static const uint16_t attrs[] = {MC_ATTR_SLOT_0,  MC_ATTR_SLOT_1,   MC_ATTR_SLOT_2,     MC_ATTR_SLOT_3,
                                      MC_ATTR_SLOT_4,  MC_ATTR_SLOT_5,   MC_ATTR_STATUS,     MC_ATTR_FAST_MODE,
-                                     MC_ATTR_CFG_REV, MC_ATTR_CFG_RESULT, MC_ATTR_CFG_ERROR, MC_ATTR_SEQ};
+                                     MC_ATTR_BATT_MV, MC_ATTR_BATT_STATE, MC_ATTR_CFG_REV, MC_ATTR_CFG_RESULT,
+                                     MC_ATTR_CFG_ERROR, MC_ATTR_SEQ};
     bool ok = true;
     for (size_t i = 0; i < sizeof attrs / sizeof attrs[0]; i++) {
         ok &= report_attr(MC_CLUSTER_ID, attrs[i], MANUF) == ESP_OK;

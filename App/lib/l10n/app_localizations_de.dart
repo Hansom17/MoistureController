@@ -523,7 +523,7 @@ class AppLocalizationsDe extends AppLocalizations {
       'Zigbee läuft nicht. Daten und Befehle sind pausiert.';
 
   @override
-  String get batteryThreshold => 'Batteriewarnung unter';
+  String get batteryThreshold => 'Akku schwach (mV)';
 
   @override
   String get calDry => 'Trockenwert (roh)';
@@ -1132,4 +1132,89 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get noReadings => 'In diesem Zeitraum gibt es noch keine Messwerte.';
+
+  @override
+  String get batteryTitle => 'Akku';
+
+  @override
+  String get batteryStateOk => 'OK';
+
+  @override
+  String get batteryStateLow => 'Schwach';
+
+  @override
+  String get batteryStateCritical => 'Kritisch';
+
+  @override
+  String get batteryStateAbsent => 'Kein Akku';
+
+  @override
+  String batteryPercent(int percent) {
+    return 'ca. $percent %';
+  }
+
+  @override
+  String batteryVolts(String volts) {
+    return '$volts V';
+  }
+
+  @override
+  String get batteryChargingHint => 'Laden kann nicht erkannt werden.';
+
+  @override
+  String batteryCalibrated(String delta) {
+    return 'Kalibriert ($delta)';
+  }
+
+  @override
+  String get calibrateBattery => 'Akku kalibrieren';
+
+  @override
+  String calibrateBatteryBody(String volts) {
+    return 'Miss die Zelle mit einem Multimeter und gib den Wert ein. Das Modul meldet jetzt $volts V. Werte mit mehr als 10 % Abweichung werden abgelehnt.';
+  }
+
+  @override
+  String get measuredVolts => 'Gemessene Spannung';
+
+  @override
+  String get calibrate => 'Kalibrieren';
+
+  @override
+  String get batteryCalibrationSent => 'Kalibrierung an das Gerät gesendet.';
+
+  @override
+  String get batteryNoData => 'Noch keine Akkuwerte.';
+
+  @override
+  String get batteryCriticalThreshold => 'Akku kritisch (mV)';
+
+  @override
+  String get batteryThresholdsHint =>
+      'Gilt für alle Geräte, sobald sie es bestätigen.';
+
+  @override
+  String get batteryThresholdsInvalid =>
+      'Kritisch muss unter schwach liegen, beide zwischen 3000 und 4000 mV.';
+
+  @override
+  String get batteryCell => 'Li-Ion / LiPo, eine Zelle';
+
+  @override
+  String alertBatteryCritical(String subject) {
+    return '$subject: Akku kritisch';
+  }
+
+  @override
+  String get commandFailedBattery => 'Akku zu schwach zum Gießen';
+
+  @override
+  String get waterBatteryHint =>
+      'Der Akku dieses Moduls ist kritisch: Es verweigert das Gießen.';
+
+  @override
+  String get batteryVoltage => 'Spannung';
+
+  @override
+  String get batteryLevel => 'Stand (geschätzt)';
 }

@@ -70,6 +70,9 @@ typedef struct {
     bool adc_ok[MC_NUM_SLOTS];
     bool adc_silent[MC_NUM_SLOTS];
     uint32_t adc_delay_ms;
+    uint16_t batt_pin_mv; /* what the battery divider pin reads */
+    bool batt_ok, batt_silent;
+    int read_battery_calls;
 
     /* all action kinds in order, for ordering assertions */
     mc_act_kind_t kinds[SIM_MAX_LOG * 4];
@@ -111,7 +114,7 @@ mc_event_t ev_write_u16(uint16_t attr, uint16_t v);
 mc_event_t ev_write_bytes(uint16_t attr, const uint8_t *b, uint8_t n);
 mc_event_t ev_write_slot(uint8_t idx, const mc_slot_cfg_t *cfg);
 mc_event_t ev_timer(mc_timer_t id, uint8_t arg);
-mc_event_t ev_battery(uint16_t mv);
+mc_event_t ev_battery(uint16_t pin_mv); /* a BATT_SAMPLE with this pin voltage */
 
 /* ---- inspection ---- */
 const sim_ack_t *sim_last_ack(const sim_t *s);

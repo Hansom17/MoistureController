@@ -12,6 +12,7 @@ import '../../ui/app_scope.dart';
 import '../../ui/common.dart';
 import '../../ui/reauth.dart';
 import '../../ui/status_chip.dart';
+import 'battery_card.dart';
 import 'devices_screen.dart';
 
 class DeviceDetailScreen extends StatelessWidget {
@@ -112,6 +113,10 @@ class _DeviceBody extends ConsumerWidget {
             ],
           ),
         ),
+        if (!device.isNew && device.battery != null) ...[
+          const SizedBox(height: Spacing.md),
+          BatteryCard(device: device, canCalibrate: canManage),
+        ],
         const SizedBox(height: Spacing.md),
         SectionCard(
           title: l.diagnostics,

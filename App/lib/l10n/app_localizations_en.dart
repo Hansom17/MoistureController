@@ -521,7 +521,7 @@ class AppLocalizationsEn extends AppLocalizations {
       'Zigbee is not running. Data and commands are paused.';
 
   @override
-  String get batteryThreshold => 'Low battery warning below';
+  String get batteryThreshold => 'Battery low (mV)';
 
   @override
   String get calDry => 'Dry value (raw)';
@@ -1126,4 +1126,89 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get noReadings => 'No readings in this period yet.';
+
+  @override
+  String get batteryTitle => 'Battery';
+
+  @override
+  String get batteryStateOk => 'OK';
+
+  @override
+  String get batteryStateLow => 'Low';
+
+  @override
+  String get batteryStateCritical => 'Critical';
+
+  @override
+  String get batteryStateAbsent => 'No battery';
+
+  @override
+  String batteryPercent(int percent) {
+    return 'about $percent %';
+  }
+
+  @override
+  String batteryVolts(String volts) {
+    return '$volts V';
+  }
+
+  @override
+  String get batteryChargingHint => 'Charging cannot be detected.';
+
+  @override
+  String batteryCalibrated(String delta) {
+    return 'Calibrated ($delta)';
+  }
+
+  @override
+  String get calibrateBattery => 'Calibrate battery';
+
+  @override
+  String calibrateBatteryBody(String volts) {
+    return 'Measure the cell with a multimeter and enter the value. The module reports $volts V now. Values more than 10 % off are refused.';
+  }
+
+  @override
+  String get measuredVolts => 'Measured voltage';
+
+  @override
+  String get calibrate => 'Calibrate';
+
+  @override
+  String get batteryCalibrationSent => 'Calibration sent to the device.';
+
+  @override
+  String get batteryNoData => 'No battery readings yet.';
+
+  @override
+  String get batteryCriticalThreshold => 'Battery critical (mV)';
+
+  @override
+  String get batteryThresholdsHint =>
+      'Applied to all devices as soon as they confirm it.';
+
+  @override
+  String get batteryThresholdsInvalid =>
+      'Critical must be below low, both between 3000 and 4000 mV.';
+
+  @override
+  String get batteryCell => 'Li-ion / LiPo, one cell';
+
+  @override
+  String alertBatteryCritical(String subject) {
+    return '$subject: battery critical';
+  }
+
+  @override
+  String get commandFailedBattery => 'Battery too low to water';
+
+  @override
+  String get waterBatteryHint =>
+      'This module\'s battery is critical: it will refuse to water.';
+
+  @override
+  String get batteryVoltage => 'Voltage';
+
+  @override
+  String get batteryLevel => 'Level (estimate)';
 }

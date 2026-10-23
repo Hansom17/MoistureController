@@ -46,6 +46,8 @@ class Device(Base):
     sensor_error_streak: Mapped[dict | None] = mapped_column(JSON, nullable=True)
     slots: Mapped[dict | None] = mapped_column(JSON, nullable=True)  # latest reading per slot
     diagnostics: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    batt_state: Mapped[str | None] = mapped_column(String, nullable=True)   # absent | ok | low | critical
+    batt_hist: Mapped[list | None] = mapped_column(JSON, nullable=True)     # last reported millivolts
     created_at: Mapped[int] = mapped_column(Integer)
     updated_at: Mapped[int] = mapped_column(Integer)
     deleted_at: Mapped[int | None] = mapped_column(Integer, nullable=True)

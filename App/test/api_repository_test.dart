@@ -99,6 +99,26 @@ class CannedApi implements HttpClientAdapter {
           'id': 'r1', 'plant_id': 'p1', 'enabled': true, 'threshold': 25, 'water_s': 10, 'cooldown_s': 21600,
           'max_per_day': 2, 'quiet_from': null, 'quiet_to': null, 'notify_channels': ['app'], 'notify_on': ['failed'],
         };
+      case 'GET /devices/dev-abc/health':
+        return {
+          'items': [
+            {'ts': '2026-10-09T10:00:00Z', 'voltage_mv': 3900, 'link_quality': 150, 'diagnostics': {}},
+            {'ts': '2026-10-09T09:00:00Z', 'voltage_mv': 3920, 'link_quality': 150, 'diagnostics': {}},
+            {'ts': '2026-10-09T08:00:00Z', 'voltage_mv': 0, 'link_quality': 150, 'diagnostics': {}},
+          ],
+          'next_cursor': null,
+        };
+      case 'POST /devices/dev-abc/battery/calibrate':
+        return {'cal_permille': 1050, 'rev': 9};
+      case 'GET /installation':
+        return {'name': 'Home', 'timezone': 'Europe/Berlin', 'battery_low_mv': 3700, 'battery_critical_mv': 3450,
+          'battery_chemistry': 'li-ion-1s', 'telegram_configured': false};
+      case 'PATCH /installation':
+        return {'name': 'Home', 'timezone': 'Europe/Berlin', 'battery_low_mv': 3700, 'battery_critical_mv': 3450};
+      case 'GET /alerts':
+        return [
+          {'id': 'a1', 'kind': 'battery_critical', 'subject': {'kind': 'device', 'name': 'Kitchen'}, 'severity': 'critical', 'opened_at': '2026-10-09T19:00:00Z'},
+        ];
       case 'GET /devices/join':
         return {'open': true, 'ends_at': '2026-10-09T20:02:00Z', 'devices': ['dev-new'], 'error': null};
       case 'POST /auth/reauth':
@@ -337,5 +357,57 @@ void main() {
   test('delete a device with force', () async {
     await repo.deleteDevice('dev-abc', force: true);
     expect(last('DELETE', '/devices/dev-abc').queryParameters['force'], true);
+  });
+
+  group('battery', () {
+    test('the battery object of a device is parsed, without one the device has none', () async {
+      api.respond = (o) => o.path == '/devices'
+          ? [
+              {
+                ...CannedApi.device,
+                'battery': {'mv': 3900, 'percent': 62, 'state': 'ok', 'present': true, 'calibrated': true, 'cal_permille': 1030},
+              },
+              {
+                ...CannedApi.device,
+                'id': 'dev-2',
+                'battery': {'mv': 0, 'percent': null, 'state': 'absent', 'present': false, 'calibrated': false, 'cal_permille': 1000},
+              },
+              {...CannedApi.device, 'id': 'dev-3'},
+            ]
+          : null;
+      final d = await repo.devices();
+      expect(d[0].battery!.state, BatteryState.ok);
+      expect(d[0].battery!.mv, 3900);
+      expect(d[0].battery!.percent, 62);
+      expect(d[0].battery!.calibrated, isTrue);
+      expect(d[0].battery!.calPermille, 1030);
+      expect(d[0].battery!.present, isTrue);
+      expect(d[1].battery!.present, isFalse);
+      expect(d[1].battery!.percent, isNull);
+      expect(d[2].battery, isNull);
+    });
+
+    test('installation thresholds are read and written', () async {
+      final i = await repo.installation();
+      expect((i.batteryLowMv, i.batteryCriticalMv), (3700, 3450));
+      await repo.updateInstallation(batteryLowMv: 3700, batteryCriticalMv: 3450);
+      expect(api.bodies['PATCH /installation'], {'battery_low_mv': 3700, 'battery_critical_mv': 3450});
+    });
+
+    test('calibration posts the measured millivolts', () async {
+      await repo.calibrateBattery('dev-abc', 3990);
+      expect(api.bodies['POST /devices/dev-abc/battery/calibrate'], {'measured_mv': 3990});
+    });
+
+    test('history: stored reports in time order, reports without a cell are left out', () async {
+      final points = await repo.batteryHistory('dev-abc', ChartRange.day);
+      expect(points.map((p) => p.mv), [3920, 3900]);
+      expect(points.first.at.isBefore(points.last.at), isTrue);
+    });
+
+    test('a critical battery alert has its own kind', () async {
+      final alerts = await repo.alerts();
+      expect(alerts.single.kind, AlertKind.batteryCritical);
+    });
   });
 }

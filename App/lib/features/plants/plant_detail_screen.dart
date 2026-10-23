@@ -161,6 +161,7 @@ class _Overview extends ConsumerWidget {
                                 ref,
                                 plant,
                                 deviceOffline: device != null && !device.reachable,
+                                batteryCritical: device?.battery?.state == BatteryState.critical,
                               )
                             : null,
                       ),

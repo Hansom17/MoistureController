@@ -63,7 +63,11 @@ class CommandStateTile extends StatelessWidget {
           runSpacing: 4,
           crossAxisAlignment: WrapCrossAlignment.center,
           children: [
-            StatusChip(kind: kind, label: label, detail: c.failureReason),
+            StatusChip(
+              kind: kind,
+              label: label,
+              detail: c.failureReason == 'battery_low' ? l.commandFailedBattery : c.failureReason,
+            ),
             Text('$origin · ${formatAgo(l, c.createdAt)}'),
           ],
         ),

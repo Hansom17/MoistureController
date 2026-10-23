@@ -96,6 +96,11 @@ class _AlertTile extends ConsumerWidget {
         l.alertBatteryLow(alert.subject),
         status.warning,
       ),
+      AlertKind.batteryCritical => (
+        Icons.battery_alert,
+        l.alertBatteryCritical(alert.subject),
+        status.error,
+      ),
       AlertKind.sensorSuspect => (
         Icons.sensors_off,
         l.alertSensorSuspect(alert.subject),

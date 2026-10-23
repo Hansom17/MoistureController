@@ -1,12 +1,14 @@
 """Row -> JSON shapes shared by events and snapshots (Gateway/mqtt-contract.yaml)."""
 from mc_hub.db.models import Alert, Device, Plant, Rule
 
+from . import battery
 
-def device_view(d: Device) -> dict:
+
+def device_view(d: Device, now: int | None = None) -> dict:
     return {
         "id": d.id, "ieee": d.ieee, "name": d.name, "model": d.model, "fw": d.fw, "board": d.board,
         "status": d.status, "safe_reason": d.safe_reason, "last_seen_at": d.last_seen_at,
-        "link_quality": d.link_quality, "voltage_mv": d.voltage_mv,
+        "link_quality": d.link_quality, "voltage_mv": d.voltage_mv, "battery": battery.view(d, now),
         "config_sync": config_sync(d), "desired_rev": d.desired_rev, "reported_rev": d.reported_rev,
         "latest_readings": d.slots or {}, "diagnostics": d.diagnostics or {},
         "desired_config": d.desired_config, "reported_config": d.reported_config, "config_error": d.config_error,

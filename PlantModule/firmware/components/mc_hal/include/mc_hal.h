@@ -51,8 +51,9 @@ void mc_hal_adc_init(const mc_board_t *board);
 /* Average of `samples` readings of the port, 12 bit. False when the port has no ADC channel. */
 bool mc_hal_adc_read_port(uint8_t port, uint8_t samples, uint16_t *raw);
 
-/* Battery voltage in mV through the board's divider; 0 when the board has none. */
-uint16_t mc_hal_battery_mv(void);
+/* Voltage at the battery divider pin in mV (calibrated ADC, 8 conversions averaged). The core applies the divider
+ * ratio, the per-device calibration and the filter. False when the board has no battery input or the read failed. */
+bool mc_hal_battery_pin_mv(uint16_t *mv);
 
 /* ---- timers (hal_timers.c) -------------------------------------------------------------------------------- */
 

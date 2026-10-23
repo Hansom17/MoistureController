@@ -2,8 +2,6 @@
 #include "mc_internal.h"
 
 #define SENSOR_FAULT_AFTER 3 /* consecutive bad samples before a sensor_fault event */
-#define LOW_BATTERY_PRESENT_MV 500u /* below this no cell is connected (the divider reads ~0) */
-#define LOW_BATTERY_HYSTERESIS_MV 100u
 
 static uint32_t interval_ms(const mc_core_t *c)
 {
@@ -38,6 +36,8 @@ void mc_sense_stop(mc_core_t *c, mc_actions_t *out)
     mc_cancel(out, MC_TIMER_SAMPLE_WINDOW, 0);
     mc_cancel(out, MC_TIMER_REPORT, 0);
     mc_cancel(out, MC_TIMER_FAST_HOLD, 0);
+    mc_cancel(out, MC_TIMER_BATTERY, 0);
+    c->bat_pending = false;
 }
 
 /* A changed interval or fast mode takes effect from now on. */
@@ -84,8 +84,81 @@ void mc_readings_refresh_outputs(mc_core_t *c)
     }
 }
 
+/* ---- battery (PlantModule/specs.md 6.1) ------------------------------------------------------------------ */
+
+/* A battery sample is taken with every sensor sample, but never while a pump loads the cell. */
+static bool battery_due(const mc_core_t *c)
+{
+    if (c->board == NULL || c->board->battery_gpio < 0) {
+        return false;
+    }
+    if (mc_core_pump_running(c)) {
+        return false;
+    }
+    return !c->have_pump_end || (int32_t)(c->now_ms - c->last_pump_end_ms) >= (int32_t)MC_BATT_QUIET_MS;
+}
+
+/* Median of the n samples in the history (the mean of the two middle ones for an even count). */
+static uint16_t median_of(const uint16_t *h, uint8_t n)
+{
+    uint16_t v[MC_BATT_FILTER_SAMPLES];
+    for (uint8_t i = 0; i < n; i++) {
+        uint16_t x = h[i];
+        uint8_t j = i;
+        while (j > 0 && v[j - 1] > x) {
+            v[j] = v[j - 1];
+            j--;
+        }
+        v[j] = x;
+    }
+    return n % 2 ? v[n / 2] : (uint16_t)(((uint32_t)v[n / 2 - 1] + v[n / 2]) / 2);
+}
+
+static void battery_evaluate(mc_core_t *c, mc_actions_t *out)
+{
+    uint16_t mv = c->voltage_mv;
+    uint16_t low = c->cfg.batt_low_mv, crit = c->cfg.batt_critical_mv;
+    uint8_t st = c->batt_state;
+    if (st == MC_BATT_STATE_ABSENT) {
+        st = MC_BATT_STATE_OK; /* a cell appeared: start from ok, the debounce below worsens it */
+        c->bat_bad_streak = 0;
+    }
+    /* recovery is immediate, with hysteresis */
+    if (st == MC_BATT_STATE_CRITICAL && mv > crit + MC_BATT_HYSTERESIS_MV) {
+        st = MC_BATT_STATE_LOW;
+        c->bat_bad_streak = 0;
+    }
+    if (st == MC_BATT_STATE_LOW && mv > low + MC_BATT_HYSTERESIS_MV) {
+        st = MC_BATT_STATE_OK;
+        c->bat_bad_streak = 0;
+    }
+    /* worsening needs MC_BATT_DEBOUNCE consecutive samples at or below the next threshold */
+    uint8_t next = st;
+    if (mv <= crit) {
+        next = MC_BATT_STATE_CRITICAL;
+    } else if (mv <= low && st == MC_BATT_STATE_OK) {
+        next = MC_BATT_STATE_LOW;
+    }
+    if (next > st) {
+        if (++c->bat_bad_streak >= MC_BATT_DEBOUNCE) {
+            st = next;
+            c->bat_bad_streak = 0;
+            if (st == MC_BATT_STATE_CRITICAL) {
+                mc_msg_event(c, out, MC_EVENT_CODE_BATTERY_CRITICAL, MC_SLOT_NONE, mv);
+            } else {
+                mc_msg_event(c, out, MC_EVENT_CODE_LOW_BATTERY, MC_SLOT_NONE, mv);
+            }
+        }
+    } else {
+        c->bat_bad_streak = 0;
+    }
+    c->batt_state = st;
+}
+
 static void finish_sample(mc_core_t *c, mc_actions_t *out)
 {
+    c->bat_pending = false;
+    mc_cancel(out, MC_TIMER_BATTERY, 0);
     mc_cancel(out, MC_TIMER_SAMPLE_WINDOW, 0);
     mc_cancel(out, MC_TIMER_SLOT, 0);
     c->seq++;
@@ -143,6 +216,12 @@ static void read_next(mc_core_t *c, mc_actions_t *out)
         c->sn_next++;
     }
     if (c->sn_next >= MC_NUM_SLOTS) {
+        if (battery_due(c)) {
+            c->bat_pending = true;
+            mc_act(out, MC_ACT_READ_BATTERY);
+            mc_arm(out, MC_TIMER_BATTERY, 0, MC_BATT_READ_TIMEOUT_MS);
+            return;
+        }
         finish_sample(c, out);
         return;
     }
@@ -203,6 +282,11 @@ void mc_sense_on_timer(mc_core_t *c, mc_actions_t *out, mc_timer_t id, uint8_t a
             finish_sample(c, out);
         }
         break;
+    case MC_TIMER_BATTERY:
+        if (c->bat_pending) {
+            mc_sense_on_battery(c, out, false, 0); /* no answer: the value stays, the sample goes on */
+        }
+        break;
     case MC_TIMER_REPORT:
         if (c->sn == MC_SN_REPORTING) {
             c->sn = MC_SN_IDLE;
@@ -225,17 +309,38 @@ void mc_sense_on_report_result(mc_core_t *c, mc_actions_t *out)
     }
 }
 
-void mc_sense_on_battery(mc_core_t *c, mc_actions_t *out, uint16_t mv)
+void mc_sense_on_battery(mc_core_t *c, mc_actions_t *out, bool ok, uint16_t pin_mv)
 {
-    c->voltage_mv = mv;
-    if (mv < LOW_BATTERY_PRESENT_MV) {
-        c->low_battery = false;
-        return;
+    bool waiting = c->bat_pending;
+    if (waiting) {
+        c->bat_pending = false;
+        mc_cancel(out, MC_TIMER_BATTERY, 0);
     }
-    if (!c->low_battery && mv < c->cfg.batt_low_mv) {
-        c->low_battery = true;
-        mc_msg_event(c, out, MC_EVENT_CODE_LOW_BATTERY, MC_SLOT_NONE, mv);
-    } else if (c->low_battery && mv >= c->cfg.batt_low_mv + LOW_BATTERY_HYSTERESIS_MV) {
-        c->low_battery = false;
+    if (ok && c->board != NULL && c->board->battery_gpio >= 0) {
+        uint32_t cell = (uint32_t)pin_mv * c->board->battery_divider_x100 / 100u;
+        if (cell < MC_BATT_PRESENT_MV) { /* no cell: the divider reads about 0 */
+            c->batt_state = MC_BATT_STATE_ABSENT;
+            c->voltage_mv = 0;
+            c->bat_n = 0;
+            c->bat_bad_streak = 0;
+        } else {
+            cell = cell * c->cfg.batt_cal_permille / 1000u;
+            if (cell > 65535u) {
+                cell = 65535u;
+            }
+            if (c->bat_n < MC_BATT_FILTER_SAMPLES) {
+                c->bat_hist[c->bat_n++] = (uint16_t)cell;
+            } else {
+                memmove(c->bat_hist, c->bat_hist + 1, (MC_BATT_FILTER_SAMPLES - 1) * sizeof c->bat_hist[0]);
+                c->bat_hist[MC_BATT_FILTER_SAMPLES - 1] = (uint16_t)cell;
+            }
+            c->voltage_mv = median_of(c->bat_hist, c->bat_n);
+            battery_evaluate(c, out);
+        }
+    }
+    if (waiting && c->sn == MC_SN_SAMPLING) {
+        finish_sample(c, out); /* the battery was the last step of the sample */
+    } else {
+        mc_act(out, MC_ACT_UPDATE_ATTRS);
     }
 }

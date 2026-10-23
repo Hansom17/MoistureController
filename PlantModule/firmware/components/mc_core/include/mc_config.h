@@ -32,6 +32,8 @@ typedef struct {
     uint16_t fast_report_interval_s;
     uint16_t fast_report_hold_s;
     uint16_t batt_low_mv;
+    uint16_t batt_critical_mv;
+    uint16_t batt_cal_permille;
     mc_slot_cfg_t slots[MC_NUM_SLOTS];
 } mc_config_t;
 
@@ -62,7 +64,8 @@ static inline uint16_t mc_cfg_err_wire(mc_cfg_err_t e)
 
 /* Stored form of a configuration (NVS blob): schema byte, fields little endian, CRC32 last. Independent of the
  * struct layout so that a firmware update can read what an older one wrote. */
-#define MC_CONFIG_BLOB_SIZE 87
+#define MC_CONFIG_BLOB_SIZE 91    /* schema 2; a schema 1 blob (87 bytes) is migrated on decode */
+#define MC_CONFIG_BLOB_SIZE_V1 87
 
 size_t mc_config_encode(const mc_config_t *c, uint8_t out[MC_CONFIG_BLOB_SIZE]);
 

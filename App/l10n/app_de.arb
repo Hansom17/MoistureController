@@ -164,7 +164,7 @@
   "backupDone": "Sicherung auf dem Gateway angelegt.",
   "bannerHubDown": "Der Gießdienst ist nicht erreichbar. Du siehst die letzten bekannten Daten; Änderungen sind nicht möglich.",
   "bannerZigbeeDown": "Zigbee läuft nicht. Daten und Befehle sind pausiert.",
-  "batteryThreshold": "Batteriewarnung unter",
+  "batteryThreshold": "Akku schwach (mV)",
   "calDry": "Trockenwert (roh)",
   "calWet": "Nasswert (roh)",
   "changePassword": "Passwort ändern",
@@ -476,5 +476,64 @@
   },
   "usersTitle": "Benutzer",
   "waterQueuedDeviceOffline": "Gießen eingeplant. Das Gerät ist offline und bekommt es, sobald es zurück ist.",
-  "noReadings": "In diesem Zeitraum gibt es noch keine Messwerte."
+  "noReadings": "In diesem Zeitraum gibt es noch keine Messwerte.",
+  "batteryTitle": "Akku",
+  "batteryStateOk": "OK",
+  "batteryStateLow": "Schwach",
+  "batteryStateCritical": "Kritisch",
+  "batteryStateAbsent": "Kein Akku",
+  "batteryPercent": "ca. {percent} %",
+  "@batteryPercent": {
+    "placeholders": {
+      "percent": {
+        "type": "int"
+      }
+    }
+  },
+  "batteryVolts": "{volts} V",
+  "@batteryVolts": {
+    "placeholders": {
+      "volts": {
+        "type": "String"
+      }
+    }
+  },
+  "batteryChargingHint": "Laden kann nicht erkannt werden.",
+  "batteryCalibrated": "Kalibriert ({delta})",
+  "@batteryCalibrated": {
+    "placeholders": {
+      "delta": {
+        "type": "String"
+      }
+    }
+  },
+  "calibrateBattery": "Akku kalibrieren",
+  "calibrateBatteryBody": "Miss die Zelle mit einem Multimeter und gib den Wert ein. Das Modul meldet jetzt {volts} V. Werte mit mehr als 10 % Abweichung werden abgelehnt.",
+  "@calibrateBatteryBody": {
+    "placeholders": {
+      "volts": {
+        "type": "String"
+      }
+    }
+  },
+  "measuredVolts": "Gemessene Spannung",
+  "calibrate": "Kalibrieren",
+  "batteryCalibrationSent": "Kalibrierung an das Gerät gesendet.",
+  "batteryNoData": "Noch keine Akkuwerte.",
+  "batteryCriticalThreshold": "Akku kritisch (mV)",
+  "batteryThresholdsHint": "Gilt für alle Geräte, sobald sie es bestätigen.",
+  "batteryThresholdsInvalid": "Kritisch muss unter schwach liegen, beide zwischen 3000 und 4000 mV.",
+  "batteryCell": "Li-Ion / LiPo, eine Zelle",
+  "alertBatteryCritical": "{subject}: Akku kritisch",
+  "@alertBatteryCritical": {
+    "placeholders": {
+      "subject": {
+        "type": "String"
+      }
+    }
+  },
+  "commandFailedBattery": "Akku zu schwach zum Gießen",
+  "waterBatteryHint": "Der Akku dieses Moduls ist kritisch: Es verweigert das Gießen.",
+  "batteryVoltage": "Spannung",
+  "batteryLevel": "Stand (geschätzt)"
 }

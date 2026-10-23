@@ -188,9 +188,9 @@ Component library and palette: Part B.
 - Device-level fields: `report_interval_s` (10–3600 s, default 300), `fast_report_interval_s` (10–300 s, default 30, used while watering) and `fast_report_hold_s` (0–1800 s, default 120). The editor shows that a change is applied as soon as the device confirms it ("pending until the device reports the new revision").
 - Save = `PUT …/config` with `base_rev`; validation errors (422) show on the affected slot.
 - **Planned:** the calibration wizard (capture *dry* and *wet* with `sensor_sample`, review, save as a new revision). It needs the firmware command and a hub endpoint.
-### 10.1 Battery display and calibration (plan)
+### 10.1 Battery display and calibration
 
-**Status: plan only.** Source of the data and the rules: `Gateway/specs.md` §13.1, module side `PlantModule/specs.md` §6.1 (one Li-ion/LiPo cell). The app shows what the snapshot says and never computes a level itself.
+**Status: built** (118 widget and unit tests, seen in the browser against the bench hub). Source of the data and the rules: `Gateway/specs.md` §13.1, module side `PlantModule/specs.md` §6.1 (one Li-ion/LiPo cell). The app shows what the snapshot says and never computes a level itself.
 
 - **What is shown where**
   - **Plant card and device list:** a battery chip next to the status chip, only when the device has a cell (`present`): icon + **"about 72 %"** and the colour of the state (`ok` neutral, `low` `warning`, `critical` `error`). Without a cell (`absent`, USB only) **no chip at all**, not "0 %". A percentage that is `null` (stale report) shows the icon with "—".
@@ -286,7 +286,7 @@ App/
 
 ## 17. Open points
 
-- Battery display and calibration (§10.1) are planned, not built; the percentage is an estimate from the hub.
+- Battery display and calibration (§10.1) are built; the percentage is an estimate from the hub and the curve is a starting point until a real discharge is measured.
 
 - The build and serve setup of Flutter web without a CDN (**verify** flags; also check `go_router` URL strategy when served from the hub root).
 - Generated API client from the hub's OpenAPI.

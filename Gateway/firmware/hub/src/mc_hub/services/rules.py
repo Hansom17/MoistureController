@@ -9,9 +9,9 @@ from . import commands
 from .effects import Effects
 from .rules_engine import RuleContext, RuleSpec, evaluate, start_of_day
 
-SKIP_PROBLEMS = ("sensor_error", "no_pump", "clock_not_synced")
+SKIP_PROBLEMS = ("sensor_error", "no_pump", "clock_not_synced", "battery_critical")
 BLOCK_TO_SKIP = {"busy": "pending_command", "slot_not_actuator": "no_pump", "device_not_ready": "no_pump",
-                 "device_safe_mode": "no_pump", "safety_limit": "daily_limit"}
+                 "device_safe_mode": "no_pump", "safety_limit": "daily_limit", "battery_critical": "battery_critical"}
 
 
 async def evaluate_reading(s: AsyncSession, fx: Effects, now: int, reading: Reading, clock_synced: bool = True) -> None:

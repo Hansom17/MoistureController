@@ -37,8 +37,8 @@ void mc_zb_leave(void)
 
 void mc_zb_update_attrs(const mc_attrs_t *a)
 {
-    ESP_LOGI(TAG, "attrs seq=%u status=%u fast=%d cfg_rev=%u vbat=%u mV", a->seq, a->status, a->fast_mode,
-             a->cfg_rev, a->voltage_mv);
+    ESP_LOGI(TAG, "attrs seq=%u status=%u fast=%d cfg_rev=%u vbat=%u mV (state %u)", a->seq, a->status, a->fast_mode,
+             a->cfg_rev, a->voltage_mv, a->batt_state);
     for (int i = 0; i < MC_NUM_SLOTS; i++) {
         if (a->readings[i].type != MC_MODULE_EMPTY) {
             ESP_LOGI(TAG, "  slot %d type=%u err=%u value=%d raw=%u", i, a->readings[i].type, a->readings[i].error,
