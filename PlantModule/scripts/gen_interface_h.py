@@ -58,6 +58,20 @@ def render() -> str:
             f'#define MC_BATT_PRESENT_MV {b["classify"]["present_min_mv"]}u',
             f'#define MC_BATT_HYSTERESIS_MV {b["classify"]["hysteresis_mv"]}u',
             f'#define MC_BATT_DEBOUNCE {b["classify"]["debounce_samples"]}']
+    ids = {a["name"]: a["id"] for a in c["attributes"]}
+    out += ["", "/* reporting the module sets up itself when its attribute set changed (the stack keeps the records of the old",
+            " * set otherwise): X(attribute id, min s, max s, reportable change). Zigbee2MQTT configures the same values. */",
+            "#define MC_REPORTING_LIST(X) \\"]
+    rows = []
+    for r in d["reporting"]:
+        for name in r["attributes"]:
+            if not name.startswith("power_config."):
+                rows.append(f'    X(0x{ids[name]:04X}, {r["min_s"]}, {r["max_s"]}, {r.get("change_value", 0)})')
+    out.append(" \\\n".join(rows))
+    for r in d["reporting"]:
+        if "power_config.batteryVoltage" in r["attributes"]:
+            out += [f'#define MC_REPORTING_POWER_MIN_S {r["min_s"]}', f'#define MC_REPORTING_POWER_MAX_S {r["max_s"]}',
+                    "#define MC_REPORTING_POWER_CHANGE 1 /* 100 mV steps, as Zigbee2MQTT configures it */"]
     out += ["", "/* cluster commands, coordinator to module */"]
     for x in c["commands_in"]:
         out.append(f'#define MC_CMD_IN_{up(x["name"])} 0x{x["id"]:02X}')

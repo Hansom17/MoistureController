@@ -118,16 +118,18 @@ idf.py -p /dev/cu.usbmodem1101 monitor     # Ctrl+] leaves
 2. A module that has never joined starts looking for a network by itself (fast LED blink, about three minutes). One that belonged to another network: **hold the button for 10 seconds** (factory reset), it restarts and looks for a network. A short press only identifies it (LED blinks); a 3 s hold starts a search when it is not joined.
 3. The module appears in the app (joined, interview, configure, ready); set its slots in **Edit configuration**.
 
-### When the Zigbee storage must be erased
+### Changing the attribute set
 
-A firmware that **changes the Zigbee attribute set** (new, removed or re-ordered attributes in `interface.yaml`) aborts at boot (`zb_assert`) with the Zigbee data of the old firmware. Erase it (and the settings, so the module searches for a network by itself) and let the module join again:
+Adding, removing or re-ordering attributes in `interface.yaml` (or editing its `reporting` table) needs **no erase and no new join**. The Zigbee stack keeps its reporting records in `zb_storage` and with records left over from a different attribute set it aborts at the first report (`zb_assert`). So the firmware hashes what it registers and remembers the hash in NVS (`mc_zb/attr_hash`). On the first start after a change it throws the stored records away and sets up its own from the `reporting` table (log line `attribute set changed: reporting records rebuilt`); the network, the bindings and the settings stay. A module without a network just stores the new hash. Flash the app only (`write-flash 0x20000 build/plantmodule.bin`) and the module comes back on its own.
+
+The Zigbee storage still has to be erased for a module whose network is gone (new coordinator) or to start from scratch:
 
 ```bash
 python -m esptool --port /dev/cu.usbmodem1101 erase-region 0x9000 0x6000     # NVS: settings, counters, "has booted" flag
 python -m esptool --port /dev/cu.usbmodem1101 erase-region 0x13000 0x5000    # Zigbee storage and its factory-test partition
 ```
 
-Then open the join window, wait for the module, and the gateway's configure step runs again. The same erase also helps a module whose network is gone (new coordinator).
+Then open the join window, wait for the module, and the gateway's configure step runs again.
 
 ### Changing a value of the interface
 

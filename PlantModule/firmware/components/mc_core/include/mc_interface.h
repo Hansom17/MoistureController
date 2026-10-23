@@ -79,6 +79,27 @@
 #define MC_BATT_HYSTERESIS_MV 100u
 #define MC_BATT_DEBOUNCE 3
 
+/* reporting the module sets up itself when its attribute set changed (the stack keeps the records of the old
+ * set otherwise): X(attribute id, min s, max s, reportable change). Zigbee2MQTT configures the same values. */
+#define MC_REPORTING_LIST(X) \
+    X(0x0138, 60, 600, 20) \
+    X(0x0120, 1, 600, 0) \
+    X(0x0121, 1, 600, 0) \
+    X(0x0122, 1, 600, 0) \
+    X(0x0139, 1, 600, 0) \
+    X(0x0030, 1, 600, 0) \
+    X(0x0031, 1, 600, 0) \
+    X(0x0032, 1, 600, 0) \
+    X(0x0130, 10, 600, 0) \
+    X(0x0131, 10, 600, 0) \
+    X(0x0132, 10, 600, 0) \
+    X(0x0133, 10, 600, 0) \
+    X(0x0134, 10, 600, 0) \
+    X(0x0135, 10, 600, 0)
+#define MC_REPORTING_POWER_MIN_S 60
+#define MC_REPORTING_POWER_MAX_S 600
+#define MC_REPORTING_POWER_CHANGE 1 /* 100 mV steps, as Zigbee2MQTT configures it */
+
 /* cluster commands, coordinator to module */
 #define MC_CMD_IN_COMMIT_CONFIG 0x00
 #define MC_CMD_IN_PUMP_RUN 0x01

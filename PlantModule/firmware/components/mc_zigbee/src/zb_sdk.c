@@ -11,6 +11,7 @@
 #include "esp_log.h"
 #include "esp_timer.h"
 #include "esp_zigbee_core.h"
+#include "nvs.h"
 #include "ha/esp_zigbee_ha_standard.h"
 #include "zcl/esp_zigbee_zcl_power_config.h"
 #include "mc_hal.h"
@@ -28,7 +29,10 @@ static mc_factory_t factory_copy;
 static bool have_factory;
 static bool rejoining;
 static bool join_seen_configured;
+static bool reporting_stale; /* the registered attribute set differs from the one the stored records belong to */
+static volatile bool stack_up; /* the endpoint is registered and the stack runs: attributes can be set and reported */
 static uint16_t configure_polls;
+static uint32_t attr_set_hash; /* of everything registered below: when it changes the stack's stored records are stale */
 
 /* ---- attribute storage (the stack keeps pointers to these) --------------------------------------------- */
 
@@ -74,12 +78,31 @@ static void post_bool(mc_ev_kind_t kind, bool v)
 
 /* ---- endpoint ----------------------------------------------------------------------------------------- */
 
+static uint16_t rep_ids[48];
+static size_t rep_count;
+
+static void mix(uint32_t v)
+{
+    attr_set_hash = (attr_set_hash ^ v) * 16777619u; /* FNV-1a over 32-bit words */
+}
+
+/* every attribute of the custom cluster goes through here: the hash covers id, type, access and position */
+static void note_attr(uint16_t id, uint8_t type, uint8_t access)
+{
+    mix(((uint32_t)id << 16) | ((uint32_t)type << 8) | access);
+    if ((access & ESP_ZB_ZCL_ATTR_ACCESS_REPORTING) && rep_count < sizeof rep_ids / sizeof rep_ids[0]) {
+        rep_ids[rep_count++] = id;
+    }
+}
+
 static esp_zb_attribute_list_t *custom_cluster(void)
 {
+    attr_set_hash = 2166136261u;
     esp_zb_attribute_list_t *c = esp_zb_zcl_attr_list_create(MC_CLUSTER_ID);
     const uint8_t R = ESP_ZB_ZCL_ATTR_ACCESS_READ_ONLY, REP = ESP_ZB_ZCL_ATTR_ACCESS_READ_ONLY | ESP_ZB_ZCL_ATTR_ACCESS_REPORTING;
     const uint8_t RW = ESP_ZB_ZCL_ATTR_ACCESS_READ_WRITE;
 #define ADD(id, type, acc, ptr) \
+    note_attr((id), (type), (acc)); \
     ESP_ERROR_CHECK(esp_zb_cluster_add_manufacturer_attr(c, MC_CLUSTER_ID, (id), MANUF, (type), (acc), (ptr)))
     ADD(MC_ATTR_SEQ, ESP_ZB_ZCL_ATTR_TYPE_U16, REP, &store.seq);
     ADD(MC_ATTR_BOOT_ID, ESP_ZB_ZCL_ATTR_TYPE_U16, REP, &store.boot_id);
@@ -113,6 +136,9 @@ static esp_zb_attribute_list_t *custom_cluster(void)
         ADD(MC_ATTR_SLOT_CFG_0 + i, ESP_ZB_ZCL_ATTR_TYPE_OCTET_STRING, RW, store.slot_cfg[i]);
     }
 #undef ADD
+#define X(id, min_s, max_s, change) mix(((uint32_t)(id) << 16) ^ ((uint32_t)(min_s) << 8) ^ (uint32_t)(max_s) ^ ((uint32_t)(change) << 24));
+    MC_REPORTING_LIST(X)
+#undef X
     return c;
 }
 
@@ -318,6 +344,101 @@ static void start_commissioning(uint8_t mode)
     }
 }
 
+/* ---- reporting records after a change of the attribute set -------------------------------------------------- */
+
+/* The stack keeps its reporting records in `zb_storage`, matched to the attributes by position. A firmware that adds,
+ * removes or re-orders attributes (or changes the reporting table) then aborts at the first report. So the module
+ * remembers a hash of what it registered; when it differs, it throws the stored records away and sets up its own
+ * from interface.yaml. The network, the bindings and the settings stay. */
+#define NVS_NS "mc_zb"
+#define NVS_KEY_HASH "attr_hash"
+
+static bool attr_set_changed(void)
+{
+    nvs_handle_t h;
+    uint32_t stored = 0;
+    if (nvs_open(NVS_NS, NVS_READONLY, &h) != ESP_OK) {
+        return true; /* never stored: a firmware from before this check, or a fresh module */
+    }
+    bool same = nvs_get_u32(h, NVS_KEY_HASH, &stored) == ESP_OK && stored == attr_set_hash;
+    nvs_close(h);
+    return !same;
+}
+
+static void remember_attr_set(void)
+{
+    nvs_handle_t h;
+    if (nvs_open(NVS_NS, NVS_READWRITE, &h) == ESP_OK) {
+        nvs_set_u32(h, NVS_KEY_HASH, attr_set_hash);
+        nvs_commit(h);
+        nvs_close(h);
+    }
+}
+
+static void table_values(uint16_t id, uint16_t *min_s, uint16_t *max_s, uint16_t *change)
+{
+    *min_s = 0;
+    *max_s = 0xFFFF; /* the module sends these itself (octet strings cannot be configured, seq and boot_id are explicit) */
+    *change = 0;
+#define X(aid, mn, mx, ch) \
+    if (id == (aid)) { \
+        *min_s = (mn); \
+        *max_s = (mx); \
+        *change = (ch); \
+    }
+    MC_REPORTING_LIST(X)
+#undef X
+}
+
+static void rebuild_reporting(void)
+{
+    esp_zb_zcl_reset_all_reporting_info();
+    for (size_t i = 0; i < rep_count; i++) {
+        esp_zb_zcl_reporting_info_t info = {0};
+        uint16_t change;
+        info.direction = ESP_ZB_ZCL_REPORT_DIRECTION_SEND;
+        info.ep = EP;
+        info.cluster_id = MC_CLUSTER_ID;
+        info.cluster_role = SRV;
+        info.attr_id = rep_ids[i];
+        info.manuf_code = MANUF;
+        table_values(rep_ids[i], &info.u.send_info.min_interval, &info.u.send_info.max_interval, &change);
+        info.u.send_info.def_min_interval = info.u.send_info.min_interval;
+        info.u.send_info.def_max_interval = info.u.send_info.max_interval;
+        info.u.send_info.delta.u16 = change;
+        info.dst.profile_id = ESP_ZB_AF_HA_PROFILE_ID;
+        esp_err_t e = esp_zb_zcl_update_reporting_info(&info);
+        if (e != ESP_OK) {
+            ESP_LOGW(TAG, "reporting record for 0x%04x: %s", rep_ids[i], esp_err_to_name(e));
+        }
+    }
+    esp_zb_zcl_reporting_info_t power = {0};
+    power.direction = ESP_ZB_ZCL_REPORT_DIRECTION_SEND;
+    power.ep = EP;
+    power.cluster_id = ESP_ZB_ZCL_CLUSTER_ID_POWER_CONFIG;
+    power.cluster_role = SRV;
+    power.attr_id = ESP_ZB_ZCL_ATTR_POWER_CONFIG_BATTERY_VOLTAGE_ID;
+    power.u.send_info.min_interval = power.u.send_info.def_min_interval = MC_REPORTING_POWER_MIN_S;
+    power.u.send_info.max_interval = power.u.send_info.def_max_interval = MC_REPORTING_POWER_MAX_S;
+    power.u.send_info.delta.u8 = MC_REPORTING_POWER_CHANGE;
+    power.dst.profile_id = ESP_ZB_AF_HA_PROFILE_ID;
+    esp_zb_zcl_update_reporting_info(&power);
+    ESP_LOGW(TAG, "attribute set changed: reporting records rebuilt (hash 0x%08x)", (unsigned)attr_set_hash);
+}
+
+/* The network state is known: bring the reporting records in line with the attribute set, then let the app use the stack. */
+static void stack_started(bool joined)
+{
+    if (reporting_stale) {
+        if (joined) {
+            rebuild_reporting();
+        }
+        remember_attr_set(); /* a module without a network has no records to be stale */
+        reporting_stale = false;
+    }
+    stack_up = true;
+}
+
 void esp_zb_app_signal_handler(esp_zb_app_signal_t *signal_struct)
 {
     uint32_t *p = signal_struct->p_app_signal;
@@ -326,6 +447,7 @@ void esp_zb_app_signal_handler(esp_zb_app_signal_t *signal_struct)
     ESP_LOGI(TAG, "signal %s (0x%x): %s", esp_zb_zdo_signal_to_string(type), (unsigned)type, esp_err_to_name(status));
     switch (type) {
     case ESP_ZB_ZDO_SIGNAL_SKIP_STARTUP:
+        reporting_stale = attr_set_changed();
         start_commissioning(ESP_ZB_BDB_MODE_INITIALIZATION);
         break;
     case ESP_ZB_BDB_SIGNAL_DEVICE_FIRST_START:
@@ -333,6 +455,7 @@ void esp_zb_app_signal_handler(esp_zb_app_signal_t *signal_struct)
         if (status == ESP_OK) {
             bool joined = !esp_zb_bdb_is_factory_new();
             ESP_LOGI(TAG, "stack ready, %s", joined ? "joined" : "factory new");
+            stack_started(joined);
             mc_event_t ev = {.kind = MC_EV_ZB_STACK_READY};
             ev.u.joined = joined;
             post(&ev);
@@ -340,6 +463,7 @@ void esp_zb_app_signal_handler(esp_zb_app_signal_t *signal_struct)
             /* The network was restored from flash but the parent did not answer (coordinator off or away): the
              * module is joined without a link, which is the rejoin back-off of the core, not a start failure. */
             ESP_LOGW(TAG, "network restored, parent not reachable");
+            stack_started(true);
             mc_event_t ev = {.kind = MC_EV_ZB_STACK_READY};
             ev.u.joined = true;
             post(&ev);
@@ -487,7 +611,7 @@ void mc_zb_update_attrs(const mc_attrs_t *a)
     store.batt_mv = a->voltage_mv;
     store.batt_state = a->batt_state;
 
-    if (!esp_zb_lock_acquire(pdMS_TO_TICKS(1000))) {
+    if (!stack_up || !esp_zb_lock_acquire(pdMS_TO_TICKS(1000))) { /* the stack reads `store` itself once it is up */
         return;
     }
     set_attr(MC_ATTR_SEQ, &store.seq);
@@ -531,7 +655,7 @@ static esp_err_t report_attr(uint16_t cluster, uint16_t attr, uint16_t manuf)
 
 void mc_zb_report_now(void)
 {
-    if (!esp_zb_lock_acquire(pdMS_TO_TICKS(1000))) {
+    if (!stack_up || !esp_zb_lock_acquire(pdMS_TO_TICKS(1000))) {
         post_bool(MC_EV_ZB_REPORT_RESULT, false);
         return;
     }
