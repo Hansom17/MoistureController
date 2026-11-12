@@ -5,6 +5,7 @@ on:
   pull_request:
   push:
     branches: [main]
+    tags: ["v*"]
 
 concurrency:
   group: ci-${{ github.ref }}
@@ -106,6 +107,16 @@ jobs:
           . "$IDF_PATH/export.sh"
           idf.py set-target esp32c6
           idf.py build
+      - uses: actions/upload-artifact@v4
+        with:
+          name: moisture-firmware
+          path: |
+            PlantModule/firmware/build/*.bin
+            PlantModule/firmware/build/bootloader/bootloader.bin
+            PlantModule/firmware/build/partition_table/partition-table.bin
+            PlantModule/firmware/build/flasher_args.json
+          retention-days: 30
+          if-no-files-found: error
 
   web-build:
     name: Web build (downloadable for the gateway)
@@ -126,3 +137,30 @@ jobs:
           path: App/build/web
           retention-days: 30
           if-no-files-found: error
+
+  release:
+    name: GitHub release with build outputs
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [firmware-host, gateway, converter, web-build, firmware-build]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write   # needed to create the release and attach files
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: moisture-web
+          path: moisture-web
+      - uses: actions/download-artifact@v4
+        with:
+          name: moisture-firmware
+          path: moisture-firmware
+      - name: pack
+        run: |
+          mkdir dist
+          (cd moisture-web && zip -r ../dist/moisture-web.zip .)
+          tar -czf dist/moisture-web.tar.gz -C moisture-web .
+          (cd moisture-firmware && zip -r ../dist/moisture-firmware.zip .)
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: dist/*
+          generate_release_notes: true
