@@ -11,6 +11,7 @@
   ],
   "i2c": {"sda": 18, "scl": 19, "switchable_pullups": false},
   "battery": {"gpio": 5, "divider": 2.0},
+  "low_power": {"modes": ["light_sleep", "deep_sleep"]},
   "led": {"gpio": 20, "active_high": true},
   "button": {"gpio": 21, "active_low": true}
 }

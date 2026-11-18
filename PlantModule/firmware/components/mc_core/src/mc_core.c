@@ -109,8 +109,8 @@ static mc_led_t base_led(const mc_core_t *c)
     case MC_LC_STEERING:
     case MC_LC_INTERVIEWING:
         return MC_LED_FAST_BLINK;
-    case MC_LC_OPERATIONAL:
-        return MC_LED_SOLID;
+    case MC_LC_OPERATIONAL: /* a module that sleeps does not burn a LED all day */
+        return c->cfg.power_mode == MC_POWER_MODE_ALWAYS_ON ? MC_LED_SOLID : MC_LED_OFF;
     case MC_LC_REJOINING:
         return MC_LED_DOUBLE_BLINK;
     case MC_LC_SAFE_MODE:
@@ -151,6 +151,11 @@ void mc_core_attrs(const mc_core_t *c, mc_attrs_t *a)
     a->last_error = c->diag.last_error;
     a->voltage_mv = c->voltage_mv;
     a->batt_state = c->batt_state;
+    a->wake_reason = c->wake_reason;
+    a->awake_ms = c->last_awake_ms;
+    a->wake_count = c->wake_count;
+    a->sleep_total_s = c->sleep_total_s;
+    a->next_wake_s = c->cfg.power_mode == MC_POWER_MODE_DEEP_SLEEP ? (uint16_t)(mc_core_deep_sleep_ms(c) / 1000u) : 0;
 }
 
 void mc_encode_slot_reading(const mc_reading_t *r, uint8_t out[8])
@@ -261,7 +266,7 @@ static void enter_operational(mc_core_t *c, mc_actions_t *out)
     c->rejoin_attempt = 0;
     link_up(c, out);
     mc_sense_start(c, out);
-    mc_attrs_changed(out, true);
+    mc_attrs_changed(out, !c->deep_boot); /* a deep-sleep wake samples and reports within 50 ms: no frame twice */
     mc_led_update(c, out);
 }
 
@@ -326,7 +331,17 @@ static void on_boot(mc_core_t *c, mc_actions_t *out, const mc_boot_t *b)
     c->boot_reason = b->reset_reason;
     c->first_boot = b->first_boot;
     c->boot_id = b->boot_id;
-    c->diag.reset_count = (uint16_t)(b->reset_count_stored + 1);
+    c->deep_boot = b->deep_sleep_wake;
+    c->wake_reason = b->wake_reason;
+    c->wake_count = b->rtc_wake_count;
+    c->sleep_total_s = b->rtc_sleep_total_s;
+    c->last_awake_ms = b->rtc_last_awake_ms;
+    if (c->deep_boot) { /* not a restart: the counters, the sequence and the boot id go on */
+        c->seq = b->rtc_seq;
+    } else {
+        c->grace_active = true;
+    }
+    c->diag.reset_count = (uint16_t)(b->reset_count_stored + (c->deep_boot ? 0 : 1));
     c->diag.rejoin_count = b->rejoin_count_stored;
     c->diag.last_error = b->last_error_stored;
 
@@ -339,9 +354,14 @@ static void on_boot(mc_core_t *c, mc_actions_t *out, const mc_boot_t *b)
     } else {
         c->diag.crash_count = b->crash_count_stored;
     }
-    persist_diag(out);
+    if (!c->deep_boot) { /* a deep-sleep wake changes nothing worth a flash write */
+        persist_diag(out);
+    }
 
     mc_act(out, MC_ACT_ALL_OUTPUTS_OFF); /* outputs come up off after any reset */
+    if (c->grace_active) {
+        mc_arm(out, MC_TIMER_GRACE, 0, MC_GRACE_MS);
+    }
     if (b->config_valid) {
         c->cfg = b->config;
     } else {
@@ -349,7 +369,9 @@ static void on_boot(mc_core_t *c, mc_actions_t *out, const mc_boot_t *b)
         mc_set_error(c, MC_ERR_CONFIG_STORED_INVALID);
         mc_msg_event(c, out, MC_EVENT_CODE_CONFIG_REJECTED, MC_SLOT_NONE, MC_CFG_ERROR_SCHEMA_UNKNOWN);
     }
-    mc_msg_event(c, out, MC_EVENT_CODE_BOOT, MC_SLOT_NONE, b->reset_reason);
+    if (!c->deep_boot) {
+        mc_msg_event(c, out, MC_EVENT_CODE_BOOT, MC_SLOT_NONE, b->reset_reason);
+    }
 
     if (!b->factory_valid) {
         mc_act(out, MC_ACT_START_ZIGBEE);
@@ -425,6 +447,10 @@ static void on_timer(mc_core_t *c, mc_actions_t *out, mc_timer_t id, uint8_t arg
         break;
     case MC_TIMER_CFG_TXN:
         mc_cfg_on_timeout(c, out);
+        break;
+    case MC_TIMER_AWAKE:
+    case MC_TIMER_GRACE:
+        mc_power_on_timer(c, id);
         break;
     case MC_TIMER_PUMP_END:
     case MC_TIMER_PUMP_PAUSE:
@@ -530,9 +556,11 @@ void mc_core_step(mc_core_t *c, const mc_event_t *ev, mc_actions_t *out)
         }
         break;
     case MC_EV_ZB_ATTR_WRITE:
+        mc_power_traffic(c, out);
         mc_cfg_on_write(c, out, ev->u.write.attr, ev->u.write.data, ev->u.write.len);
         break;
     case MC_EV_ZB_CMD:
+        mc_power_traffic(c, out);
         mc_cmd_on_zb(c, out, &ev->u.cmd);
         break;
     case MC_EV_ZB_REPORT_RESULT:
@@ -554,6 +582,7 @@ void mc_core_step(mc_core_t *c, const mc_event_t *ev, mc_actions_t *out)
         mc_sense_on_battery(c, out, ev->u.batt.ok, ev->u.batt.mv);
         break;
     }
+    mc_power_after_step(c, out);
 }
 
 /* Used by the command machine: device_action clear_safe_mode and reboot. */

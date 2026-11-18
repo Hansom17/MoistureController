@@ -74,6 +74,10 @@ typedef struct {
     bool batt_ok, batt_silent;
     int read_battery_calls;
 
+    /* parent poll (MC_ACT_POLL) */
+    uint16_t poll_ms, poll_fast_ms;
+    int poll_actions;
+
     /* switched sensor supply */
     bool rail_on;
     uint32_t rail_on_since;
@@ -97,6 +101,11 @@ typedef struct {
     bool config_invalid;
     const mc_config_t *config;
     uint16_t boot_id;
+    bool deep_sleep_wake;     /* the boot is a wake from deep sleep: the RTC values below come along */
+    uint16_t rtc_seq, rtc_wake_count;
+    uint32_t rtc_sleep_total_s;
+    uint16_t rtc_last_awake_ms;
+    uint8_t wake_reason;
 } sim_boot_opts_t;
 
 /* ---- setup ---- */

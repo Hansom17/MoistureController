@@ -8,7 +8,7 @@
 #define MC_ENDPOINT 1
 #define MC_CLUSTER_ID 0xFC11
 #define MC_MANUFACTURER_CODE 0x131B
-#define MC_INTERFACE_VERSION 0x0101
+#define MC_INTERFACE_VERSION 0x0102
 #define MC_CONFIG_SCHEMA 3
 
 /* attribute ids of the custom cluster */
@@ -38,6 +38,9 @@
 #define MC_ATTR_AWAKE_MS 0x0142
 #define MC_ATTR_POLL_FAIL_COUNT 0x0143
 #define MC_ATTR_NEXT_WAKE_S 0x0144
+#define MC_ATTR_WAKE_COUNT 0x0145
+#define MC_ATTR_RADIO_MODE 0x0146
+#define MC_ATTR_SLEEP_TOTAL_S 0x0147
 #define MC_ATTR_CFG_REV 0x0030
 #define MC_ATTR_CFG_RESULT 0x0031
 #define MC_ATTR_CFG_ERROR 0x0032
@@ -115,7 +118,10 @@
     X(0x0141, 10, 600, 0) \
     X(0x0142, 10, 600, 0) \
     X(0x0143, 10, 600, 0) \
-    X(0x0144, 10, 600, 0)
+    X(0x0144, 10, 600, 0) \
+    X(0x0145, 10, 600, 0) \
+    X(0x0146, 10, 600, 0) \
+    X(0x0147, 10, 600, 0)
 #define MC_REPORTING_POWER_MIN_S 60
 #define MC_REPORTING_POWER_MAX_S 600
 #define MC_REPORTING_POWER_CHANGE 1 /* 100 mV steps, as Zigbee2MQTT configures it */
@@ -183,6 +189,11 @@ typedef enum {
     MC_WAKE_REASON_PUMP_END = 3,
     MC_WAKE_REASON_RADIO = 4,
 } mc_wake_reason_t;
+
+typedef enum {
+    MC_RADIO_MODE_RECEIVER_ON_LEGACY = 0,
+    MC_RADIO_MODE_SLEEPY = 1,
+} mc_radio_mode_t;
 
 typedef enum {
     MC_CFG_RESULT_OK = 0,

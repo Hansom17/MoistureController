@@ -28,4 +28,12 @@ void mc_zb_report_now(void);
 void mc_zb_send_ack(uint16_t n, uint32_t cmd_id, uint8_t state, uint8_t reason, uint16_t ends_in_s);
 void mc_zb_send_event(uint16_t n, uint8_t code, uint8_t slot, uint16_t arg);
 
+/* Power (PlantModule/specs.md 18). The parent poll interval and a fast window after traffic; whether the stack may
+ * put the chip to sleep when it says it can; and wake-up alarms mirroring the core's timers, so that a sleep never
+ * overshoots one. */
+void mc_zb_set_poll(uint16_t ms, uint16_t fast_ms);
+void mc_zb_set_sleep_ok(bool ok);
+void mc_zb_wake_at(uint8_t key, uint32_t ms);
+void mc_zb_wake_cancel(uint8_t key);
+
 #endif

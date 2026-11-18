@@ -13,6 +13,7 @@
 #define MC_SAMPLES_MAX 64
 #define MC_PORT_RAW_FLAG 0x80u /* port byte 0x80 + n = raw GPIO n, only on boards that allow it */
 #define MC_SLOT_NONE 0xFFu     /* "the device as a whole" in an error */
+#define MC_DEEP_MIN_INTERVAL_S 30 /* shortest report interval in deep sleep; it must also exceed awake_s + 10 */
 
 /* One entry of the slot table (attribute slot_cfg_n, PlantModule/interface.yaml layout slot_config). */
 typedef struct {

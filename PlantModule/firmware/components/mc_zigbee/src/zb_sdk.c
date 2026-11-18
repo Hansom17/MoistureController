@@ -11,6 +11,7 @@
 #include "esp_log.h"
 #include "esp_timer.h"
 #include "esp_zigbee_core.h"
+#include "zboss_api.h"
 #include "nvs.h"
 #include "ha/esp_zigbee_ha_standard.h"
 #include "zcl/esp_zigbee_zcl_power_config.h"
@@ -30,6 +31,8 @@ static bool have_factory;
 static bool rejoining;
 static bool join_seen_configured;
 static bool reporting_stale; /* the registered attribute set differs from the one the stored records belong to */
+static volatile uint16_t want_poll_ms = MC_ALWAYS_ON_POLL_MS; /* what the core asked for, applied once the stack runs */
+static volatile bool sleep_ok; /* the core allows the stack to put the chip to sleep */
 static volatile bool stack_up; /* the endpoint is registered and the stack runs: attributes can be set and reported */
 static uint16_t configure_polls;
 static uint32_t attr_set_hash; /* of everything registered below: when it changes the stack's stored records are stale */
@@ -54,8 +57,11 @@ static struct {
     uint16_t batt_critical_mv, batt_cal_permille;
     uint8_t power_mode, awake_s;
     uint16_t poll_interval_ms;
-    uint8_t wake_reason;               /* owned by the sleep layer: stays 0 in always_on */
+    uint8_t wake_reason;               /* what the core says (deep-sleep wakes) */
     uint16_t awake_ms, poll_fail_count, next_wake_s;
+    uint16_t wake_count;
+    uint8_t radio_mode;                /* 0 joined with the receiver on (legacy), 1 sleepy */
+    uint32_t sleep_total_s;
     uint16_t batt_mv;
     uint8_t batt_state;
     uint8_t slot_cfg[MC_NUM_SLOTS][25]; /* octet string: length byte + up to 24 */
@@ -131,6 +137,9 @@ static esp_zb_attribute_list_t *custom_cluster(void)
     ADD(MC_ATTR_AWAKE_MS, ESP_ZB_ZCL_ATTR_TYPE_U16, REP, &store.awake_ms);
     ADD(MC_ATTR_POLL_FAIL_COUNT, ESP_ZB_ZCL_ATTR_TYPE_U16, REP, &store.poll_fail_count);
     ADD(MC_ATTR_NEXT_WAKE_S, ESP_ZB_ZCL_ATTR_TYPE_U16, REP, &store.next_wake_s);
+    ADD(MC_ATTR_WAKE_COUNT, ESP_ZB_ZCL_ATTR_TYPE_U16, REP, &store.wake_count);
+    ADD(MC_ATTR_RADIO_MODE, ESP_ZB_ZCL_ATTR_TYPE_8BIT_ENUM, REP, &store.radio_mode);
+    ADD(MC_ATTR_SLEEP_TOTAL_S, ESP_ZB_ZCL_ATTR_TYPE_U32, REP, &store.sleep_total_s);
     ADD(MC_ATTR_CFG_REV, ESP_ZB_ZCL_ATTR_TYPE_U16, REP, &store.cfg_rev);
     ADD(MC_ATTR_CFG_RESULT, ESP_ZB_ZCL_ATTR_TYPE_8BIT_ENUM, REP, &store.cfg_result);
     ADD(MC_ATTR_CFG_ERROR, ESP_ZB_ZCL_ATTR_TYPE_U16, REP, &store.cfg_error);
@@ -189,7 +198,7 @@ static void register_endpoint(void)
 
     esp_zb_cluster_list_t *list = esp_zb_zcl_cluster_list_create();
     esp_zb_basic_cluster_cfg_t basic_cfg = {.zcl_version = ESP_ZB_ZCL_BASIC_ZCL_VERSION_DEFAULT_VALUE,
-                                            .power_source = 0x01 /* mains */};
+                                            .power_source = 0x03 /* battery: the module is a sleepy end device in every power mode, so Zigbee2MQTT must not ping it */};
     esp_zb_attribute_list_t *basic = esp_zb_basic_cluster_create(&basic_cfg);
     ESP_ERROR_CHECK(esp_zb_basic_cluster_add_attr(basic, ESP_ZB_ZCL_ATTR_BASIC_MANUFACTURER_NAME_ID, manufacturer));
     ESP_ERROR_CHECK(esp_zb_basic_cluster_add_attr(basic, ESP_ZB_ZCL_ATTR_BASIC_MODEL_IDENTIFIER_ID, model));
@@ -450,7 +459,15 @@ static void stack_started(bool joined)
         remember_attr_set(); /* a module without a network has no records to be stale */
         reporting_stale = false;
     }
+    /* The receiver mode is stored with the join: a module that joined with the old firmware (receiver on) keeps it,
+     * the parent sends to it directly and a sleeping module would miss everything. It has to be erased and joined once. */
+    bool rx_on = esp_zb_get_rx_on_when_idle();
+    store.radio_mode = rx_on ? 0 : 1;
+    if (joined && rx_on) {
+        ESP_LOGW(TAG, "joined with the receiver on (old firmware): sleep modes will not work until the module is erased and joined again");
+    }
     stack_up = true;
+    zb_zdo_pim_set_long_poll_interval(want_poll_ms); /* we are in the stack's own context here */
 }
 
 void esp_zb_app_signal_handler(esp_zb_app_signal_t *signal_struct)
@@ -507,7 +524,13 @@ void esp_zb_app_signal_handler(esp_zb_app_signal_t *signal_struct)
             }
         }
         break;
+    case ESP_ZB_COMMON_SIGNAL_CAN_SLEEP:
+        if (sleep_ok) {
+            esp_zb_sleep_now(); /* the stack knows its next alarm: the core's timers are mirrored as alarms (mc_zb_wake_at) */
+        }
+        break;
     case ESP_ZB_NWK_SIGNAL_NO_ACTIVE_LINKS_LEFT:
+        store.poll_fail_count++;
         ESP_LOGW(TAG, "parent lost");
         post_simple(MC_EV_ZB_PARENT_LOST);
         break;
@@ -530,10 +553,16 @@ static void zb_task(void *arg)
     esp_zb_cfg_t cfg = {
         .esp_zb_role = ESP_ZB_DEVICE_TYPE_ED,
         .install_code_policy = have_factory && factory_copy.install_code_required && !params.dev_join,
-        .nwk_cfg.zed_cfg = {.ed_timeout = ESP_ZB_ED_AGING_TIMEOUT_64MIN, .keep_alive = 3000},
+        /* the parent keeps the module as a child for 1024 minutes without a poll: a deep-sleep cycle of up to an hour fits */
+        .nwk_cfg.zed_cfg = {.ed_timeout = ESP_ZB_ED_AGING_TIMEOUT_1024MIN, .keep_alive = MC_ALWAYS_ON_POLL_MS},
     };
     esp_zb_init(&cfg);
-    esp_zb_set_rx_on_when_idle(true); /* the receiver stays on: PlantModule/specs.md 8 */
+    /* A sleepy end device in every power mode (PlantModule/specs.md 18): the receiver is off when idle and the parent
+     * is polled; the mode only decides how often and whether the CPU sleeps. This has to be set before the stack starts
+     * and it is stored with the join, so a module that joined with the receiver on stays "legacy" until it is erased. */
+    esp_zb_set_rx_on_when_idle(false);
+    esp_zb_sleep_set_threshold(50);
+    esp_zb_sleep_enable(true);
     if (have_factory && factory_copy.has_install_code) {
         uint8_t ic[18];
         memcpy(ic, factory_copy.install_code, 16);
@@ -585,6 +614,50 @@ void mc_zb_rejoin(void)
     }
 }
 
+/* ---- power ------------------------------------------------------------------------------------------------------- */
+
+void mc_zb_set_sleep_ok(bool ok)
+{
+    sleep_ok = ok;
+}
+
+void mc_zb_set_poll(uint16_t ms, uint16_t fast_ms)
+{
+    want_poll_ms = ms;
+    if (!stack_up || !esp_zb_lock_acquire(pdMS_TO_TICKS(200))) {
+        return;
+    }
+    zb_zdo_pim_set_long_poll_interval(ms);
+    if (fast_ms != 0) {
+        zb_zdo_pim_start_turbo_poll_continuous(fast_ms); /* poll fast for a moment: more frames are on their way */
+    }
+    esp_zb_lock_release();
+}
+
+static void wake_cb(uint8_t key)
+{
+    (void)key; /* the alarm only exists so that the stack's sleep ends here */
+}
+
+void mc_zb_wake_at(uint8_t key, uint32_t ms)
+{
+    if (!stack_up || !esp_zb_lock_acquire(pdMS_TO_TICKS(100))) {
+        return;
+    }
+    esp_zb_scheduler_alarm_cancel(wake_cb, key);
+    esp_zb_scheduler_alarm(wake_cb, key, ms > 600000u ? 600000u : ms);
+    esp_zb_lock_release();
+}
+
+void mc_zb_wake_cancel(uint8_t key)
+{
+    if (!stack_up || !esp_zb_lock_acquire(pdMS_TO_TICKS(100))) {
+        return;
+    }
+    esp_zb_scheduler_alarm_cancel(wake_cb, key);
+    esp_zb_lock_release();
+}
+
 void mc_zb_leave(void)
 {
     if (esp_zb_lock_acquire(pdMS_TO_TICKS(1000))) {
@@ -624,6 +697,11 @@ void mc_zb_update_attrs(const mc_attrs_t *a)
     store.batt_100mv = (uint8_t)(a->voltage_mv / 100);
     store.batt_mv = a->voltage_mv;
     store.batt_state = a->batt_state;
+    store.wake_reason = a->wake_reason;
+    store.awake_ms = a->awake_ms;
+    store.next_wake_s = a->next_wake_s;
+    store.wake_count = a->wake_count;
+    store.sleep_total_s = a->sleep_total_s;
 
     if (!stack_up || !esp_zb_lock_acquire(pdMS_TO_TICKS(1000))) { /* the stack reads `store` itself once it is up */
         return;
@@ -650,6 +728,9 @@ void mc_zb_update_attrs(const mc_attrs_t *a)
     set_attr(MC_ATTR_AWAKE_MS, &store.awake_ms);
     set_attr(MC_ATTR_POLL_FAIL_COUNT, &store.poll_fail_count);
     set_attr(MC_ATTR_NEXT_WAKE_S, &store.next_wake_s);
+    set_attr(MC_ATTR_WAKE_COUNT, &store.wake_count);
+    set_attr(MC_ATTR_RADIO_MODE, &store.radio_mode);
+    set_attr(MC_ATTR_SLEEP_TOTAL_S, &store.sleep_total_s);
     set_attr(MC_ATTR_BATT_STATE, &store.batt_state);
     esp_zb_zcl_set_attribute_val(EP, ESP_ZB_ZCL_CLUSTER_ID_POWER_CONFIG, SRV, ESP_ZB_ZCL_ATTR_POWER_CONFIG_BATTERY_VOLTAGE_ID,
                                  &store.batt_100mv, false);
@@ -682,7 +763,9 @@ void mc_zb_report_now(void)
     static const uint16_t attrs[] = {MC_ATTR_SLOT_0,  MC_ATTR_SLOT_1,   MC_ATTR_SLOT_2,     MC_ATTR_SLOT_3,
                                      MC_ATTR_SLOT_4,  MC_ATTR_SLOT_5,   MC_ATTR_STATUS,     MC_ATTR_FAST_MODE,
                                      MC_ATTR_BATT_MV, MC_ATTR_BATT_STATE, MC_ATTR_CFG_REV, MC_ATTR_CFG_RESULT,
-                                     MC_ATTR_CFG_ERROR, MC_ATTR_BOOT_ID, MC_ATTR_SEQ}; /* boot_id too: a restarted module counts seq from 1 again */
+                                     MC_ATTR_CFG_ERROR, MC_ATTR_WAKE_REASON, MC_ATTR_AWAKE_MS,
+                                     MC_ATTR_NEXT_WAKE_S, MC_ATTR_WAKE_COUNT, MC_ATTR_RADIO_MODE, MC_ATTR_SLEEP_TOTAL_S,
+                                     MC_ATTR_BOOT_ID, MC_ATTR_SEQ}; /* boot_id too: a restarted module counts seq from 1 again */
     bool ok = true;
     for (size_t i = 0; i < sizeof attrs / sizeof attrs[0]; i++) {
         ok &= report_attr(MC_CLUSTER_ID, attrs[i], MANUF) == ESP_OK;

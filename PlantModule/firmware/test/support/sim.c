@@ -110,6 +110,11 @@ static void exec(sim_t *s, const mc_action_t *a)
             set_pump(s, i, false);
         }
         break;
+    case MC_ACT_POLL:
+        s->poll_ms = a->u.poll.ms;
+        s->poll_fast_ms = a->u.poll.fast_ms;
+        s->poll_actions++;
+        break;
     case MC_ACT_SENSOR_POWER:
         if (a->u.sensor_power.on) {
             s->rail_on_calls++;
@@ -258,6 +263,12 @@ void sim_boot(sim_t *s, const sim_boot_opts_t *o)
     b->crash_count_stored = o->crash_count_stored;
     b->boot_id = o->boot_id ? o->boot_id : 7;
     b->config_valid = !o->config_invalid;
+    b->deep_sleep_wake = o->deep_sleep_wake;
+    b->wake_reason = o->wake_reason;
+    b->rtc_seq = o->rtc_seq;
+    b->rtc_wake_count = o->rtc_wake_count;
+    b->rtc_sleep_total_s = o->rtc_sleep_total_s;
+    b->rtc_last_awake_ms = o->rtc_last_awake_ms;
     if (o->config) {
         b->config = *o->config;
     } else {

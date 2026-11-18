@@ -13,6 +13,20 @@
 /* The application's event queue entry point, implemented by main/mc_app.c; safe from any task. */
 void mc_app_post(const mc_event_t *ev);
 
+/* ---- sleeping (hal_sleep.c) ----------------------------------------------------------------------------------- */
+
+/* True when this boot is the wake-up from a deep sleep (and the RTC memory is valid). */
+bool mc_hal_sleep_is_deep_wake(void);
+
+/* Adds the deep-sleep wake information (RTC counters, wake reason) to the boot event. */
+void mc_hal_sleep_boot(mc_boot_t *b);
+
+/* Light sleep on or off, following mc_core_sleep_allowed() (automatic power management). */
+void mc_hal_sleep_apply(mc_sleep_t allowed);
+
+/* Deep sleep for `ms`; the pump and sensor-supply pads are held. Does not return. */
+void mc_hal_deep_sleep(uint32_t ms, uint16_t seq, const mc_config_t *cfg);
+
 /* ---- storage (hal_store.c) ---------------------------------------------------------------------------- */
 
 /* Initialises NVS. Returns false when it had to be erased and the stored state is gone. */
@@ -41,6 +55,9 @@ void mc_hal_pump_set(uint8_t port, bool active_high, bool on);
 
 void mc_hal_led_set(mc_led_t pattern);
 
+/* Hold or release the pump pads and the sensor supply pad through deep sleep. */
+void mc_hal_outputs_hold(const mc_config_t *cfg, bool hold);
+
 /* Switches the sensor supply; a no-op on boards without a switched rail. */
 void mc_hal_sensor_power(bool on);
 
@@ -59,6 +76,9 @@ bool mc_hal_adc_read_port(uint8_t port, uint8_t samples, uint16_t *raw);
 bool mc_hal_battery_pin_mv(uint16_t *mv);
 
 /* ---- timers (hal_timers.c) -------------------------------------------------------------------------------- */
+
+/* The Zigbee layer mirrors every armed timer into its scheduler so that its sleep never overshoots one. */
+void mc_hal_set_wake_hooks(void (*at)(uint8_t key, uint32_t ms), void (*cancel)(uint8_t key));
 
 void mc_hal_timers_init(void);
 void mc_hal_timer_arm(mc_timer_t id, uint8_t arg, uint32_t delay_ms);

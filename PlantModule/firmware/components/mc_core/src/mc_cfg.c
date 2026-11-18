@@ -164,6 +164,7 @@ void mc_cfg_commit(mc_core_t *c, mc_actions_t *out, uint16_t rev)
             c->fault[i] = false;
         }
     }
+    uint8_t old_mode = c->cfg.power_mode;
     c->cfg = c->stage.cfg;
     c->cfg_result = MC_CFG_RESULT_OK;
     c->cfg_error = 0;
@@ -172,5 +173,6 @@ void mc_cfg_commit(mc_core_t *c, mc_actions_t *out, uint16_t rev)
     if (intervals_changed) {
         mc_sense_rearm(c, out);
     }
+    mc_power_config_applied(c, out, old_mode);
     mc_attrs_changed(out, true);
 }

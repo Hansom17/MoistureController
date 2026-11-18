@@ -3,7 +3,7 @@
 export default {
   "interfaceVersion": [
     1,
-    1
+    2
   ],
   "configSchema": 3,
   "identity": {
@@ -372,6 +372,48 @@ export default {
         "report"
       ],
       "mqtt": "next_wake_s",
+      "layout": null,
+      "enum": null,
+      "range": null,
+      "default": null
+    },
+    {
+      "id": 325,
+      "name": "wake_count",
+      "type": "uint16",
+      "access": [
+        "r",
+        "report"
+      ],
+      "mqtt": "wake_count",
+      "layout": null,
+      "enum": null,
+      "range": null,
+      "default": null
+    },
+    {
+      "id": 326,
+      "name": "radio_mode",
+      "type": "enum8",
+      "access": [
+        "r",
+        "report"
+      ],
+      "mqtt": "radio_mode",
+      "layout": null,
+      "enum": "radio_mode",
+      "range": null,
+      "default": null
+    },
+    {
+      "id": 327,
+      "name": "sleep_total_s",
+      "type": "uint32",
+      "access": [
+        "r",
+        "report"
+      ],
+      "mqtt": "sleep_total_s",
       "layout": null,
       "enum": null,
       "range": null,
@@ -836,6 +878,10 @@ export default {
       "3": "pump_end",
       "4": "radio"
     },
+    "radio_mode": {
+      "0": "receiver_on_legacy",
+      "1": "sleepy"
+    },
     "cfg_result": {
       "0": "ok",
       "1": "rejected"
@@ -940,7 +986,10 @@ export default {
         "wake_reason",
         "awake_ms",
         "poll_fail_count",
-        "next_wake_s"
+        "next_wake_s",
+        "wake_count",
+        "radio_mode",
+        "sleep_total_s"
       ],
       "min_s": 10,
       "max_s": 600,

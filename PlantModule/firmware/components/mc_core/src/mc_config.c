@@ -96,6 +96,10 @@ bool mc_config_validate(const mc_config_t *c, const mc_board_t *board, mc_cfg_er
     if (!mc_board_supports_power_mode(board, c->power_mode)) { /* a mode this board cannot run (PlantModule/specs.md 18.5) */
         return fail(err, MC_CFG_ERROR_ROLE_UNSUPPORTED, MC_SLOT_NONE);
     }
+    if (c->power_mode == MC_POWER_MODE_DEEP_SLEEP &&
+        (c->report_interval_s < MC_DEEP_MIN_INTERVAL_S || c->report_interval_s <= c->awake_s + 10u)) {
+        return fail(err, MC_CFG_ERROR_OUT_OF_RANGE, MC_SLOT_NONE); /* a cycle shorter than its own awake window */
+    }
     bool used[MC_MAX_PORTS + 1] = {false};
     bool raw_used[256] = {false};
     for (uint8_t i = 0; i < MC_NUM_SLOTS; i++) {

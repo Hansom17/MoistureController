@@ -31,6 +31,7 @@ static void operational_on(const mc_board_t *board, uint8_t mode)
     cfg.report_interval_s = 10;
     sim_init_board(&S, board);
     sim_to_operational(&S, &cfg);
+    sim_send(&S, ev_timer(MC_TIMER_GRACE, 0)); /* the 60 s after a normal boot are not what these tests are about */
 }
 
 static void operational_v1(void)
@@ -123,16 +124,55 @@ static void test_the_power_settings_are_range_checked(void)
     TEST_ASSERT_TRUE(mc_config_validate(&c, &b, &e));
 }
 
+static mc_board_t plain_board(void)
+{
+    mc_board_t b = *mc_board_find("carrier-v1");
+    b.name = "test-plain";
+    b.power_modes = 0; /* a board that cannot sleep */
+    return b;
+}
+
 static void test_a_mode_the_board_cannot_run_is_refused_as_role_unsupported(void)
 {
+    mc_board_t b = plain_board();
     mc_config_t c;
     mc_cfg_err_t e;
     sim_cfg_default(&c);
     c.power_mode = MC_POWER_MODE_LIGHT_SLEEP;
-    TEST_ASSERT_FALSE(mc_config_validate(&c, mc_board_find("carrier-v1"), &e));
+    TEST_ASSERT_FALSE(mc_config_validate(&c, &b, &e));
     TEST_ASSERT_EQUAL_UINT8(MC_CFG_ERROR_ROLE_UNSUPPORTED, e.code);
     TEST_ASSERT_EQUAL_UINT8(MC_SLOT_NONE, e.slot);
     c.power_mode = MC_POWER_MODE_ALWAYS_ON;
+    TEST_ASSERT_TRUE(mc_config_validate(&c, &b, &e));
+}
+
+static void test_carrier_v1_runs_all_three_modes(void)
+{
+    mc_config_t c;
+    sim_cfg_default(&c);
+    for (uint8_t m = 0; m <= 2; m++) {
+        c.power_mode = m;
+        c.report_interval_s = 300;
+        TEST_ASSERT_TRUE(mc_config_validate(&c, mc_board_find("carrier-v1"), NULL));
+    }
+}
+
+static void test_deep_sleep_needs_an_interval_longer_than_its_awake_window(void)
+{
+    mc_config_t c;
+    mc_cfg_err_t e;
+    sim_cfg_default(&c);
+    c.power_mode = MC_POWER_MODE_DEEP_SLEEP;
+    c.awake_s = 20;
+    c.report_interval_s = 30; /* 30 <= 20 + 10 */
+    TEST_ASSERT_FALSE(mc_config_validate(&c, mc_board_find("carrier-v1"), &e));
+    TEST_ASSERT_EQUAL_UINT8(MC_CFG_ERROR_OUT_OF_RANGE, e.code);
+    c.report_interval_s = 31;
+    TEST_ASSERT_TRUE(mc_config_validate(&c, mc_board_find("carrier-v1"), &e));
+    c.awake_s = 2;
+    c.report_interval_s = 20; /* below the 30 s minimum */
+    TEST_ASSERT_FALSE(mc_config_validate(&c, mc_board_find("carrier-v1"), &e));
+    c.power_mode = MC_POWER_MODE_LIGHT_SLEEP; /* the rule is for deep sleep only */
     TEST_ASSERT_TRUE(mc_config_validate(&c, mc_board_find("carrier-v1"), &e));
 }
 
@@ -155,7 +195,8 @@ static void test_writes_stage_the_power_settings_and_the_commit_applies_them(voi
 
 static void test_the_commit_of_an_unsupported_mode_is_rejected_and_nothing_changes(void)
 {
-    operational_v1();
+    mc_board_t b = plain_board();
+    operational_on(&b, MC_POWER_MODE_ALWAYS_ON);
     uint8_t mode = MC_POWER_MODE_DEEP_SLEEP;
     uint16_t rev = S.core.cfg.rev;
     sim_send(&S, ev_write_bytes(MC_ATTR_POWER_MODE, &mode, 1));
@@ -301,25 +342,22 @@ static void test_a_report_in_flight_keeps_the_module_awake_until_it_is_answered_
     TEST_ASSERT_EQUAL_INT(MC_SLEEP_LIGHT, mc_core_sleep_allowed(&S.core));
 }
 
-static void test_deep_sleep_is_only_light_while_a_pump_runs_and_after_it_in_fast_mode(void)
+static void test_a_running_pump_keeps_every_sleep_mode_awake_and_polling_fast(void)
 {
-    mc_board_t b = sleepy_board();
-    operational_on(&b, MC_POWER_MODE_DEEP_SLEEP);
-    sim_send(&S, ev_bool(MC_EV_ZB_REPORT_RESULT, true));
-    idle();
-    sim_send(&S, ev_bool(MC_EV_ZB_REPORT_RESULT, true));
-    TEST_ASSERT_EQUAL_INT(MC_SLEEP_DEEP, mc_core_sleep_allowed(&S.core));
-    sim_send(&S, ev_pump_run(500, 2, 20, 60));
-    TEST_ASSERT_TRUE(mc_core_pump_running(&S.core));
-    TEST_ASSERT_EQUAL_INT_MESSAGE(MC_SLEEP_LIGHT, mc_core_sleep_allowed(&S.core), "L7: never deep during a run");
-    sim_advance(&S, 21000);
-    TEST_ASSERT_FALSE(mc_core_pump_running(&S.core));
-    TEST_ASSERT_TRUE(S.core.fast);
-    sim_send(&S, ev_bool(MC_EV_ZB_REPORT_RESULT, true));
-    TEST_ASSERT_EQUAL_INT_MESSAGE(MC_SLEEP_LIGHT, mc_core_sleep_allowed(&S.core), "fast reporting after a run");
-    sim_advance(&S, (uint32_t)S.core.cfg.fast_report_hold_s * 1000 + 2000);
-    sim_send(&S, ev_bool(MC_EV_ZB_REPORT_RESULT, true));
-    TEST_ASSERT_FALSE(S.core.fast);
+    for (uint8_t mode = MC_POWER_MODE_LIGHT_SLEEP; mode <= MC_POWER_MODE_DEEP_SLEEP; mode++) {
+        mc_board_t b = sleepy_board();
+        operational_on(&b, mode);
+        idle();
+        sim_send(&S, ev_bool(MC_EV_ZB_REPORT_RESULT, true));
+        sim_send(&S, ev_pump_run(500, 2, 20, 60));
+        TEST_ASSERT_TRUE(mc_core_pump_running(&S.core));
+        TEST_ASSERT_EQUAL_INT_MESSAGE(MC_SLEEP_NONE, mc_core_sleep_allowed(&S.core), "a pump run is never slept through");
+        TEST_ASSERT_EQUAL_UINT16(MC_ALWAYS_ON_POLL_MS, mc_core_poll_ms(&S.core));
+        TEST_ASSERT_EQUAL_UINT16(MC_ALWAYS_ON_POLL_MS, S.poll_ms);
+        sim_advance(&S, 21000);
+        TEST_ASSERT_FALSE(mc_core_pump_running(&S.core));
+        TEST_ASSERT_EQUAL_INT_MESSAGE(MC_SLEEP_NONE, mc_core_sleep_allowed(&S.core), "the pause timer is still running");
+    }
 }
 
 static void test_an_open_configuration_transaction_or_the_identify_blink_keeps_it_awake(void)
@@ -361,19 +399,65 @@ static void test_a_stored_mode_the_board_cannot_run_does_not_sleep(void)
     TEST_ASSERT_EQUAL_INT(MC_SLEEP_NONE, mc_core_sleep_allowed(&S.core));
 }
 
-static void test_the_poll_interval_is_capped_at_one_second_while_a_pump_runs(void)
+static void test_the_poll_interval_follows_the_mode_and_what_is_going_on(void)
 {
     mc_board_t b = sleepy_board();
     operational_on(&b, MC_POWER_MODE_LIGHT_SLEEP);
     idle();
+    sim_send(&S, ev_bool(MC_EV_ZB_REPORT_RESULT, true));
     TEST_ASSERT_EQUAL_UINT16(3000, mc_core_poll_ms(&S.core));
+    TEST_ASSERT_EQUAL_UINT16(3000, S.poll_ms);
     sim_send(&S, ev_pump_run(501, 2, 10, 60));
-    TEST_ASSERT_EQUAL_UINT16(1000, mc_core_poll_ms(&S.core));
-    sim_advance(&S, 11000);
-    TEST_ASSERT_EQUAL_UINT16(3000, mc_core_poll_ms(&S.core));
-    S.core.cfg.poll_interval_ms = 500;
-    sim_send(&S, ev_pump_run(502, 2, 10, 60));
-    TEST_ASSERT_EQUAL_UINT16_MESSAGE(500, mc_core_poll_ms(&S.core), "a shorter configured interval stays");
+    TEST_ASSERT_EQUAL_UINT16(MC_ALWAYS_ON_POLL_MS, mc_core_poll_ms(&S.core));
+    operational_on(&b, MC_POWER_MODE_ALWAYS_ON);
+    idle();
+    TEST_ASSERT_EQUAL_UINT16_MESSAGE(MC_ALWAYS_ON_POLL_MS, S.poll_ms, "always on: awake and polling fast");
+    TEST_ASSERT_EQUAL_UINT16(MC_ALWAYS_ON_POLL_MS, mc_core_poll_ms(&S.core));
+}
+
+static void test_traffic_opens_a_fast_poll_window_in_light_sleep(void)
+{
+    mc_board_t b = sleepy_board();
+    operational_on(&b, MC_POWER_MODE_LIGHT_SLEEP);
+    idle();
+    sim_send(&S, ev_bool(MC_EV_ZB_REPORT_RESULT, true));
+    S.poll_fast_ms = 0;
+    sim_send(&S, ev_action(31, MC_DEVICE_ACTION_IDENTIFY));
+    TEST_ASSERT_EQUAL_UINT16(MC_FAST_POLL_MS, S.poll_fast_ms);
+    TEST_ASSERT_EQUAL_UINT16(3000, S.poll_ms);
+    S.poll_fast_ms = 0;
+    sim_send(&S, ev_write_u16(MC_ATTR_REPORT_INTERVAL_S, 60));
+    TEST_ASSERT_EQUAL_UINT16(MC_FAST_POLL_MS, S.poll_fast_ms);
+}
+
+static void test_the_normal_boot_is_awake_for_sixty_seconds_so_esptool_can_get_in(void)
+{
+    mc_board_t b = sleepy_board();
+    mc_config_t cfg;
+    sim_cfg_default(&cfg);
+    cfg.power_mode = MC_POWER_MODE_LIGHT_SLEEP;
+    sim_init_board(&S, &b);
+    sim_to_operational(&S, &cfg);                             /* no GRACE event: a fresh boot */
+    sim_advance(&S, 4000);
+    sim_send(&S, ev_bool(MC_EV_ZB_REPORT_RESULT, true));
+    TEST_ASSERT_TRUE(S.core.grace_active);
+    TEST_ASSERT_EQUAL_INT(MC_SLEEP_NONE, mc_core_sleep_allowed(&S.core));
+    TEST_ASSERT_EQUAL_UINT16(MC_ALWAYS_ON_POLL_MS, S.poll_ms);
+    sim_advance(&S, MC_GRACE_MS);
+    TEST_ASSERT_FALSE(S.core.grace_active);
+    sim_send(&S, ev_bool(MC_EV_ZB_REPORT_RESULT, true));
+    TEST_ASSERT_EQUAL_INT(MC_SLEEP_LIGHT, mc_core_sleep_allowed(&S.core));
+}
+
+static void test_the_led_is_off_in_operational_when_the_module_sleeps(void)
+{
+    mc_board_t b = sleepy_board();
+    operational_on(&b, MC_POWER_MODE_ALWAYS_ON);
+    TEST_ASSERT_EQUAL_INT(MC_LED_SOLID, S.core.led);
+    operational_on(&b, MC_POWER_MODE_LIGHT_SLEEP);
+    TEST_ASSERT_EQUAL_INT(MC_LED_OFF, S.core.led);
+    operational_on(&b, MC_POWER_MODE_DEEP_SLEEP);
+    TEST_ASSERT_EQUAL_INT(MC_LED_OFF, S.core.led);
 }
 
 void run_power_tests(void)
@@ -383,6 +467,8 @@ void run_power_tests(void)
     RUN_TEST(test_the_stored_schema_two_configuration_is_migrated_as_always_on);
     RUN_TEST(test_the_power_settings_are_range_checked);
     RUN_TEST(test_a_mode_the_board_cannot_run_is_refused_as_role_unsupported);
+    RUN_TEST(test_carrier_v1_runs_all_three_modes);
+    RUN_TEST(test_deep_sleep_needs_an_interval_longer_than_its_awake_window);
     RUN_TEST(test_writes_stage_the_power_settings_and_the_commit_applies_them);
     RUN_TEST(test_the_commit_of_an_unsupported_mode_is_rejected_and_nothing_changes);
     RUN_TEST(test_a_write_that_is_too_short_for_its_attribute_is_rejected_at_the_commit);
@@ -395,9 +481,12 @@ void run_power_tests(void)
     RUN_TEST(test_always_on_never_sleeps);
     RUN_TEST(test_light_sleep_is_allowed_when_idle_and_not_while_sampling);
     RUN_TEST(test_a_report_in_flight_keeps_the_module_awake_until_it_is_answered_or_times_out);
-    RUN_TEST(test_deep_sleep_is_only_light_while_a_pump_runs_and_after_it_in_fast_mode);
+    RUN_TEST(test_a_running_pump_keeps_every_sleep_mode_awake_and_polling_fast);
     RUN_TEST(test_an_open_configuration_transaction_or_the_identify_blink_keeps_it_awake);
     RUN_TEST(test_only_an_operational_module_sleeps);
     RUN_TEST(test_a_stored_mode_the_board_cannot_run_does_not_sleep);
-    RUN_TEST(test_the_poll_interval_is_capped_at_one_second_while_a_pump_runs);
+    RUN_TEST(test_the_poll_interval_follows_the_mode_and_what_is_going_on);
+    RUN_TEST(test_traffic_opens_a_fast_poll_window_in_light_sleep);
+    RUN_TEST(test_the_normal_boot_is_awake_for_sixty_seconds_so_esptool_can_get_in);
+    RUN_TEST(test_the_led_is_off_in_operational_when_the_module_sleeps);
 }

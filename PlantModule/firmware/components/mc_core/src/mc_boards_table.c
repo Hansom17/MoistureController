@@ -12,6 +12,7 @@ static const mc_board_t board_carrier_v1 = {
     .button = { .gpio = 21, .active_high = false },
     .battery_gpio = 5,
     .battery_divider_x100 = 200,
+    .power_modes = (1u << 1) | (1u << 2),
     .ports = {
         { .gpio = 1, .roles = MC_ROLE_MOISTURE | MC_ROLE_PUMP },
         { .gpio = 2, .roles = MC_ROLE_MOISTURE | MC_ROLE_PUMP },

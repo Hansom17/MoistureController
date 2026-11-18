@@ -35,7 +35,7 @@ void mc_sense_start(mc_core_t *c, mc_actions_t *out)
     }
     c->sn_active = true;
     c->sn = MC_SN_IDLE;
-    mc_arm(out, MC_TIMER_SAMPLE, 0, MC_FIRST_SAMPLE_MS);
+    mc_arm(out, MC_TIMER_SAMPLE, 0, c->deep_boot ? 50u : MC_FIRST_SAMPLE_MS); /* a deep-sleep wake samples at once */
 }
 
 void mc_sense_stop(mc_core_t *c, mc_actions_t *out)
@@ -235,6 +235,7 @@ static void finish_sample(mc_core_t *c, mc_actions_t *out)
         mc_arm(out, MC_TIMER_REPORT, 0, MC_REPORT_TIMEOUT_MS);
     } else {
         c->sn = MC_SN_IDLE;
+        mc_power_report_done(c, out);
     }
 }
 
@@ -335,6 +336,7 @@ void mc_sense_on_timer(mc_core_t *c, mc_actions_t *out, mc_timer_t id, uint8_t a
     case MC_TIMER_REPORT:
         if (c->sn == MC_SN_REPORTING) {
             c->sn = MC_SN_IDLE;
+            mc_power_report_done(c, out);
         }
         break;
     case MC_TIMER_FAST_HOLD:
@@ -351,6 +353,7 @@ void mc_sense_on_report_result(mc_core_t *c, mc_actions_t *out)
     if (c->sn == MC_SN_REPORTING) {
         mc_cancel(out, MC_TIMER_REPORT, 0);
         c->sn = MC_SN_IDLE; /* a failed report is not repeated: the next sample follows */
+        mc_power_report_done(c, out);
     }
 }
 
