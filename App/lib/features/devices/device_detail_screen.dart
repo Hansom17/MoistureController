@@ -140,7 +140,9 @@ class _DeviceBody extends ConsumerWidget {
                   padding: const EdgeInsets.only(bottom: Spacing.sm),
                   child: Text(l.radioLegacyHint, style: Theme.of(context).textTheme.bodySmall),
                 ),
-              if (device.powerMode != PowerMode.alwaysOn) ...[
+              if (device.powerMode == PowerMode.lightSleep)
+                row(l.diagPollFails, diag('poll_fail_count')), // light sleep has no wake-up to report: only the missed polls
+              if (device.powerMode == PowerMode.deepSleep) ...[
                 row(l.diagWakeReason, diag('wake_reason', fmt: (v) => switch (v) {
                   'timer' => l.wakeTimer,
                   'button' => l.wakeButton,
@@ -152,8 +154,7 @@ class _DeviceBody extends ConsumerWidget {
                 row(l.diagWakeCount, diag('wake_count')),
                 row(l.diagSleepTotal, diag('sleep_total_s', fmt: (v) => formatDuration(l, Duration(seconds: (v as num).toInt())))),
                 row(l.diagPollFails, diag('poll_fail_count')),
-                if (device.powerMode == PowerMode.deepSleep)
-                  row(l.diagNextWake, diag('next_wake_s', fmt: (v) => formatDuration(l, Duration(seconds: (v as num).toInt())))),
+                row(l.diagNextWake, diag('next_wake_s', fmt: (v) => formatDuration(l, Duration(seconds: (v as num).toInt())))),
               ],
             ],
           ),
