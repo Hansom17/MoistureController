@@ -1330,6 +1330,40 @@ class AppLocalizationsDe extends AppLocalizations {
   String get wakeRadio => 'Funk';
 
   @override
+  String get deviceSleeping => 'Schläft';
+
+  @override
+  String get commandQueuedSleeping =>
+      'In der Warteschlange · wird beim nächsten Melden des Moduls gesendet';
+
+  @override
+  String get readingRequestedSleeping =>
+      'Messung angefordert. Das Modul antwortet, wenn es das nächste Mal aufwacht.';
+
+  @override
+  String get diagRadio => 'Funk';
+
+  @override
+  String get radioSleepy => 'Schlafend (alle Energiemodi möglich)';
+
+  @override
+  String get radioLegacy => 'Empfänger immer an (alte Anmeldung)';
+
+  @override
+  String get radioLegacyHint =>
+      'Dieses Modul hat sich mit der alten Firmware angemeldet. Die Schlafmodi gehen erst, nachdem es gelöscht und neu angemeldet wurde: hier entfernen, Modul löschen, neu hinzufügen.';
+
+  @override
+  String get diagWakeCount => 'Aufwachen seit dem Einschalten';
+
+  @override
+  String get diagSleepTotal => 'Zeit im Schlaf';
+
+  @override
+  String get deepRule =>
+      'Tiefschlaf braucht ein Meldeintervall von mindestens 30 s, das größer ist als die Wachzeit plus 10 s.';
+
+  @override
   String get plantMenu => 'Pflanzenmenü';
 
   @override

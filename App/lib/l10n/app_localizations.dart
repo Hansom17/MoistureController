@@ -2438,6 +2438,66 @@ abstract class AppLocalizations {
   /// **'Radio'**
   String get wakeRadio;
 
+  /// No description provided for @deviceSleeping.
+  ///
+  /// In en, this message translates to:
+  /// **'Sleeping'**
+  String get deviceSleeping;
+
+  /// No description provided for @commandQueuedSleeping.
+  ///
+  /// In en, this message translates to:
+  /// **'Queued · sent at the module\'s next check-in'**
+  String get commandQueuedSleeping;
+
+  /// No description provided for @readingRequestedSleeping.
+  ///
+  /// In en, this message translates to:
+  /// **'Reading requested. The module answers when it wakes up next.'**
+  String get readingRequestedSleeping;
+
+  /// No description provided for @diagRadio.
+  ///
+  /// In en, this message translates to:
+  /// **'Radio'**
+  String get diagRadio;
+
+  /// No description provided for @radioSleepy.
+  ///
+  /// In en, this message translates to:
+  /// **'Sleepy (all power modes work)'**
+  String get radioSleepy;
+
+  /// No description provided for @radioLegacy.
+  ///
+  /// In en, this message translates to:
+  /// **'Receiver always on (old join)'**
+  String get radioLegacy;
+
+  /// No description provided for @radioLegacyHint.
+  ///
+  /// In en, this message translates to:
+  /// **'This module joined with the old firmware. The sleep modes only work after it is erased and joined again: remove it here, erase the module, add it again.'**
+  String get radioLegacyHint;
+
+  /// No description provided for @diagWakeCount.
+  ///
+  /// In en, this message translates to:
+  /// **'Wake-ups since power-on'**
+  String get diagWakeCount;
+
+  /// No description provided for @diagSleepTotal.
+  ///
+  /// In en, this message translates to:
+  /// **'Time asleep'**
+  String get diagSleepTotal;
+
+  /// No description provided for @deepRule.
+  ///
+  /// In en, this message translates to:
+  /// **'Deep sleep needs a report interval of at least 30 s that is more than the awake time plus 10 s.'**
+  String get deepRule;
+
   /// No description provided for @plantMenu.
   ///
   /// In en, this message translates to:

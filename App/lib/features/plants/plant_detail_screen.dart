@@ -302,6 +302,7 @@ class _Commands extends ConsumerWidget {
                     CommandStateTile(
                       command: c,
                       deviceOffline: devices.any((d) => d.id == c.deviceId && !d.reachable),
+                      deviceSleeping: devices.any((d) => d.id == c.deviceId && d.status == DeviceStatus.sleeping),
                       onCancel: canCancel ? () => _cancel(context, ref, c) : null,
                     ),
                 ],
@@ -445,7 +446,9 @@ class _RuleTile extends ConsumerWidget {
 Future<void> readNow(BuildContext context, WidgetRef ref, Device device) async {
   try {
     await ref.read(actionsProvider).deviceAction(device.id, DeviceAction.reportNow);
-    if (context.mounted) showSnackBar(context, context.l10n.readingRequested);
+    if (context.mounted) {
+      showSnackBar(context, device.powerMode == PowerMode.deepSleep ? context.l10n.readingRequestedSleeping : context.l10n.readingRequested);
+    }
   } catch (e) {
     if (context.mounted) showErrorSnackBar(context, e);
   }

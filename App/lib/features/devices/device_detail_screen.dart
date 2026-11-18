@@ -133,6 +133,13 @@ class _DeviceBody extends ConsumerWidget {
                 PowerMode.lightSleep => l.powerLightSleep,
                 PowerMode.deepSleep => l.powerDeepSleep,
               }),
+              if (d['radio_mode'] != null)
+                row(l.diagRadio, d['radio_mode'] == 'sleepy' ? l.radioSleepy : l.radioLegacy),
+              if (d['radio_mode'] == 'receiver_on_legacy')
+                Padding(
+                  padding: const EdgeInsets.only(bottom: Spacing.sm),
+                  child: Text(l.radioLegacyHint, style: Theme.of(context).textTheme.bodySmall),
+                ),
               if (device.powerMode != PowerMode.alwaysOn) ...[
                 row(l.diagWakeReason, diag('wake_reason', fmt: (v) => switch (v) {
                   'timer' => l.wakeTimer,
@@ -142,6 +149,8 @@ class _DeviceBody extends ConsumerWidget {
                   _ => l.wakeNone,
                 })),
                 row(l.diagAwake, diag('awake_ms', fmt: (v) => '$v ms')),
+                row(l.diagWakeCount, diag('wake_count')),
+                row(l.diagSleepTotal, diag('sleep_total_s', fmt: (v) => formatDuration(l, Duration(seconds: (v as num).toInt())))),
                 row(l.diagPollFails, diag('poll_fail_count')),
                 if (device.powerMode == PowerMode.deepSleep)
                   row(l.diagNextWake, diag('next_wake_s', fmt: (v) => formatDuration(l, Duration(seconds: (v as num).toInt())))),

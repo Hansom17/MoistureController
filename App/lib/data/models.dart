@@ -107,6 +107,9 @@ enum DeviceStatus {
   unsupported,
   ready,
   online,
+
+  /// A deep-sleep module between two check-ins: asleep, not late.
+  sleeping,
   late,
   offline,
   safeMode,
@@ -358,6 +361,7 @@ class Device {
 
   bool get reachable =>
       status == DeviceStatus.online ||
+      status == DeviceStatus.sleeping ||
       status == DeviceStatus.late ||
       status == DeviceStatus.ready;
 

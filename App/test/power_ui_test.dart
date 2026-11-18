@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:moisture_controller/app/theme/app_theme.dart';
+import 'package:moisture_controller/l10n/app_localizations.dart';
 import 'package:moisture_controller/data/models.dart';
+import 'package:moisture_controller/ui/status_chip.dart';
 import 'package:moisture_controller/data/repositories/fake_moisture_repository.dart';
 
 import 'test_app.dart';
@@ -85,6 +88,59 @@ void main() {
     expect(find.text('Deep sleep'), findsWidgets);
     expect(find.text('Last wake'), findsOneWidget);
     expect(find.text('Next wake in'), findsOneWidget);
+    repo.dispose();
+  });
+
+  testWidgets('a deep-sleep module between check-ins shows the sleeping status, not late', (tester) async {
+    const d = Device(id: 'x', name: 'Shelf', status: DeviceStatus.sleeping, configSync: ConfigSync.inSync);
+    expect(d.reachable, isTrue); // commands can be queued for it
+    await tester.pumpWidget(MaterialApp(
+      localizationsDelegates: AppLocalizations.localizationsDelegates,
+      supportedLocales: AppLocalizations.supportedLocales,
+      theme: AppTheme.light,
+      home: Builder(builder: (context) => StatusChip.device(context, d)),
+    ));
+    expect(find.text('Sleeping'), findsOneWidget);
+  });
+
+  testWidgets('config editor: deep sleep with too short an interval is explained and cannot be saved', (tester) async {
+    await openEditor(tester);
+    await tester.tap(find.text('Deep sleep'));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('Deep sleep needs a report interval'), findsNothing); // 300 s is fine
+    await tester.enterText(find.widgetWithText(TextField, 'Report interval'), '20');
+    await tester.pump();
+    expect(find.textContaining('Deep sleep needs a report interval'), findsOneWidget);
+    expect(tester.widget<FilledButton>(find.widgetWithText(FilledButton, 'Save')).onPressed, isNull);
+    await tester.enterText(find.widgetWithText(TextField, 'Report interval'), '60');
+    await tester.pump();
+    expect(tester.widget<FilledButton>(find.widgetWithText(FilledButton, 'Save')).onPressed, isNotNull);
+  });
+
+  testWidgets('Read now on a deep-sleep module says it answers at the next wake-up', (tester) async {
+    tallScreen(tester, height: 5200);
+    final repo = await pumpApp(tester, deviceDelay: const Duration(milliseconds: 100));
+    await openTab(tester, 'Devices');
+    await tester.tap(find.text('Kitchen window'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Edit configuration'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Deep sleep'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(FilledButton, 'Save'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 600));
+    await tester.pumpAndSettle();
+    goTo(tester, '/plants/p2');
+    await tester.pumpAndSettle();
+    await tester.pump(const Duration(seconds: 5)); // the "configuration sent" message is shown first
+    await tester.pumpAndSettle();
+    final btn = tester.widget<IconButton>(find.widgetWithIcon(IconButton, Icons.refresh));
+    expect(btn.onPressed, isNotNull, reason: 'the refresh button is enabled');
+    await tester.tap(find.byTooltip('Read now'));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('Reading requested'), findsOneWidget);
+    expect(find.textContaining('answers when it wakes up next'), findsOneWidget);
     repo.dispose();
   });
 }

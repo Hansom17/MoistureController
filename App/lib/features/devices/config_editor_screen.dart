@@ -135,6 +135,9 @@ class _EditorState extends ConsumerState<_Editor> {
     };
   }
 
+  /// Deep sleep needs an interval of at least 30 s that is longer than the awake window plus 10 s.
+  bool get _deepRuleOk => _body.reportIntervalS >= 30 && _body.reportIntervalS > _body.awakeS + 10;
+
   Widget _powerCard() {
     final l = context.l10n;
     final canChange = can(ref.watch(currentUserProviderRole), AppAction.setPowerMode);
@@ -161,6 +164,11 @@ class _EditorState extends ConsumerState<_Editor> {
             _IntField(
               label: l.pollInterval, value: _body.pollIntervalMs, min: 500, max: 5000, suffix: 'ms',
               enabled: canChange, onChanged: (v) => setState(() => _body = _body.copyWith(pollIntervalMs: v)),
+            ),
+          if (_body.powerMode == PowerMode.deepSleep && !_deepRuleOk)
+            Padding(
+              padding: const EdgeInsets.only(top: Spacing.sm),
+              child: Text(l.deepRule, style: TextStyle(color: Theme.of(context).colorScheme.error)),
             ),
           if (_body.powerMode == PowerMode.deepSleep)
             _IntField(
@@ -254,7 +262,7 @@ class _EditorState extends ConsumerState<_Editor> {
         FilledButton.icon(
           icon: const Icon(Icons.save_outlined),
           label: Text(l.save),
-          onPressed: _saving ? null : _save,
+          onPressed: _saving || (_body.powerMode == PowerMode.deepSleep && !_deepRuleOk) ? null : _save,
         ),
         const SizedBox(height: Spacing.sm),
         Text(l.configApplyNote, style: theme.textTheme.bodySmall),

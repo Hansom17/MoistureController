@@ -649,6 +649,7 @@ class ApiMoistureRepository implements MoistureRepository {
     'unsupported' => DeviceStatus.unsupported,
     'ready' => DeviceStatus.ready,
     'online' => DeviceStatus.online,
+    'sleeping' => DeviceStatus.sleeping,
     'late' => DeviceStatus.late,
     'safe_mode' => DeviceStatus.safeMode,
     _ => DeviceStatus.offline,

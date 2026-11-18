@@ -1324,6 +1324,40 @@ class AppLocalizationsEn extends AppLocalizations {
   String get wakeRadio => 'Radio';
 
   @override
+  String get deviceSleeping => 'Sleeping';
+
+  @override
+  String get commandQueuedSleeping =>
+      'Queued · sent at the module\'s next check-in';
+
+  @override
+  String get readingRequestedSleeping =>
+      'Reading requested. The module answers when it wakes up next.';
+
+  @override
+  String get diagRadio => 'Radio';
+
+  @override
+  String get radioSleepy => 'Sleepy (all power modes work)';
+
+  @override
+  String get radioLegacy => 'Receiver always on (old join)';
+
+  @override
+  String get radioLegacyHint =>
+      'This module joined with the old firmware. The sleep modes only work after it is erased and joined again: remove it here, erase the module, add it again.';
+
+  @override
+  String get diagWakeCount => 'Wake-ups since power-on';
+
+  @override
+  String get diagSleepTotal => 'Time asleep';
+
+  @override
+  String get deepRule =>
+      'Deep sleep needs a report interval of at least 30 s that is more than the awake time plus 10 s.';
+
+  @override
   String get plantMenu => 'Plant menu';
 
   @override
