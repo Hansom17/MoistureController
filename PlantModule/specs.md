@@ -448,19 +448,19 @@ Goal: answer the open Zigbee questions on the real board before the real firmwar
 
 ## 18. Low power (plan)
 
-**Status: P1 done (core, interface, generators, board description, host tests; the HAL does not sleep yet), everything else planned.** This section is the design for running the module from a single cell. It replaces the earlier "parked" list; whatever is not decided here is listed in 18.12. Until the phases of 18.10 are done the module stays always-on (`power_mode = always_on`, today's behaviour), so nothing in §6 to §8 changes for existing modules.
+**Status: P1 and P2 built (core, interface, HAL, Zigbee layer, hub, app; host-tested, not yet measured on hardware: see 18.13); P3 to P6 planned.** This section is the design for running the module from a single cell. It replaces the earlier "parked" list; whatever is not decided here is listed in 18.12. Until the phases of 18.10 are done the module stays always-on (`power_mode = always_on`, today's behaviour), so nothing in §6 to §8 changes for existing modules.
 
 ### 18.1 Decisions
 
 | # | Decision | Why |
 |---|---|---|
-| L1 | **Three power modes**, chosen by configuration (`power_mode`): `always_on` (today, default), `light_sleep`, `deep_sleep`. The role stays "Zigbee end device" in all of them, so switching modes needs no new join (**verify** on the bench, 18.10 P2). | One firmware for mains-fed modules, cell-powered modules and the tiniest cells; no second product. |
+| L1 | **Three power modes**, chosen by configuration (`power_mode`): `always_on` (default), `light_sleep`, `deep_sleep`. **Every module joins as a sleepy end device** (receiver off when idle): the bench showed that the receiver mode is fixed at the join and stored with the network, so a runtime switch between receiver-on and sleepy does not work. The modes only differ in how often the parent is polled and whether the CPU sleeps, so switching needs no rejoin. | One firmware for mains-fed modules, cell-powered modules and the tiniest cells; no second product. |
 | L2 | **`light_sleep` is the mode that gets built and tuned first.** Sleepy end device: the radio is off between short polls of the parent, RAM, timers, GPIO states and the Zigbee network state are kept, nothing rejoins on wake. | Commands stay near-live (target ≤ 5 s), the hub sender does not change, the pump timers and the state machines keep running unchanged. |
 | L3 | **`deep_sleep` follows** as the mode for the smallest sleep current. The chip sleeps between samples and wakes by timer; commands only get through in a short awake window after a report (a "check-in"). | Lowest average current when latency of minutes is acceptable (a plant that is watered by a rule, not by hand). |
 | L4 | **Target:** the real cell is a **3300 mAh, 3.6 V** Li-ion cell (the curve in `interface.yaml`). It lasts **months** at the default 5 minute report interval: the budget target is **≤ 0.5 mA average at the cell**, which is 6600 h, about **9 months** of the nominal capacity (about 7 months with 80 % usable and some self-discharge; 1 mA would give 4 months, 0.25 mA about 18). The number is measured **at the cell**, so it includes whatever sits between the cell and the chip (18.3). The real value comes from 18.9. | Concrete enough to decide where energy may go. |
 | L5 | **Command latency in `light_sleep`: ≤ 5 s** (95th percentile from the hub's send to the module's acknowledgement), by a poll interval of at most 5 s plus a fast-poll window after traffic (18.4). In `deep_sleep` the latency is up to one wake interval and the app says so. | Water now and Read now must feel live on a cell-powered module. |
 | L6 | **Sensors are powered only around a read** (switched sensor rail). Carrier v1 cannot do this (pin 1 of every port is the always-on 3V3); v1 is used to **measure** and to build the firmware, the target of L4 needs **carrier v2** (18.3). | A capacitive moisture sensor draws milliamps; always on it alone exceeds the whole budget of L4. |
-| L7 | **The pump is never run while the chip sleeps deeply.** During a run the module stays in `light_sleep` at most (timers, no radio gaps longer than the stop poll of 18.4); `deep_sleep` is only entered again after the run. | A stop command must always be able to arrive, and the output must not depend on a held pin. |
+| L7 | **A pump run (and its pause) keeps the module awake in every mode**, polling its parent every 250 ms so a stop arrives within about a second; sleep resumes after the pause. | A stop command must always be able to arrive, and the output must not depend on how the pad behaves in sleep. | A stop command must always be able to arrive, and the output must not depend on a held pin. |
 
 ### 18.2 Where the energy goes (what has to be measured, not assumed)
 
@@ -602,7 +602,7 @@ An optional **Nordic PPK2** (about 100 €) or an Otii Arc would replace all of 
 |---|---|---|
 | **P0** | Measure run A on v1 with the 3300 mAh cell, with scope and multimeter (18.9): the supply chain alone, the module always on, the sensors and the divider. Write the numbers into 18.2; settle the budget of L4. | Table filled with ±20 % numbers. |
 | **P1** (done) | Core: sleep-aware states (`mc_core_sleep_allowed`, `mc_core_poll_ms`, the `Settling` state with its `MC_TIMER_SETTLE` and `ACT_SENSOR_POWER`; the `WAKE`/`POLL_DONE` events come with the HAL in P2 and P4), `power_mode` and the new config/diagnostic attributes in `interface.yaml` and the generators, board description `sensor_power` / `settle_ms`, host tests (no sleep during sampling, pump, transaction; sample sequence with rail; wake bookkeeping). | Host tests pass; behaviour in `always_on` unchanged. |
-| **P2** | Zigbee layer + HAL: sleepy end device with poll interval, fast-poll window, parent timeout, power management config, `light_sleep` on the bench with the v1 board (sensors permanently on); verify that the mode switch needs no rejoin and that configure/attribute changes work. Runs B and E. | L5 met on the bench; no rejoin. |
+| **P2** (built, bench test by the user) | Zigbee layer + HAL: sleepy end device with poll interval, fast-poll window, parent timeout, power management config, `light_sleep` on the bench with the v1 board (sensors permanently on); verify that the mode switch needs no rejoin and that configure/attribute changes work. Runs B and E. | L5 met on the bench; no rejoin. |
 | **P3** | Hub, converter, app: `power_mode` setting, `powerSource`, availability off for battery modules, status and wording, tests (hub 100+, converter, app). | End to end with the real module in `light_sleep`. |
 | **P4** | `deep_sleep`: RTC state, wake handling, awake window, buffering, the hub check-in sender and `sleeping` status. Run D. | A command is delivered inside the window; no data lost over a link outage. |
 | **P5** | Carrier v2 with the switched rail, button on GPIO0, divider and pump-driver changes; run C and the soak F; budget check against L4. | Acceptance criteria of 18.9 met or revised with numbers. |
@@ -629,6 +629,20 @@ Dependencies: P1 and P3 do not need hardware; P2 needs the bench module; P4 need
 - Time at which a sleeping module is allowed to run a stored pump schedule locally (not planned; rules stay in the hub).
 - Zigbee OTA for sleepy modules.
 
+### 18.13 As built (P2): what the firmware does, and what is not verified
+
+| Piece | What it is |
+|---|---|
+| Join | `esp_zb_set_rx_on_when_idle(false)` between init and start in every build; `esp_zb_sleep_enable(true)`; Basic power source = battery; end-device timeout 1024 min. `radio_mode` (0 legacy receiver-on join, 1 sleepy) is reported; a legacy module logs a warning and has to be erased and joined once. |
+| Poll | The core emits `MC_ACT_POLL` (interval, optional fast window); the Zigbee layer applies `zb_zdo_pim_set_long_poll_interval` and `zb_zdo_pim_start_turbo_poll_continuous`. 250 ms whenever the module must be reachable quickly (always on, not operational, pump busy, fast reporting, deep-sleep window, the grace window), otherwise `poll_interval_ms`; plus 3 s fast poll after traffic in light sleep. |
+| Light sleep | `CONFIG_PM_ENABLE`, tickless idle; the HAL turns `light_sleep_enable` on while `mc_core_sleep_allowed()` is not NONE; the stack's `ESP_ZB_COMMON_SIGNAL_CAN_SLEEP` calls `esp_zb_sleep_now()` only then. Every armed core timer is mirrored into the Zigbee scheduler (`mc_zb_wake_at`) so the stack's sleep never overshoots one. |
+| Deep sleep | After a report the awake window (`awake_s`, extended by traffic) opens; when it is over and the core allows, the HAL stores `seq`, `wake_count`, the time slept in RTC memory, holds the pump and sensor-supply pads and sleeps for `report_interval_s − awake time − 0.4 s boot loader`. A wake is not a restart: no boot id, no reset count, no boot event, no flash write; the first sample follows after 50 ms. |
+| Pins | Button by level interrupt and GPIO wake; the 10 ms poll timer runs only while the button is down or a LED pattern moves; pump, LED, sensor-supply and button pads keep their configuration in light sleep (`gpio_sleep_sel_dis`). |
+| Grace | 60 s awake after every boot that is not a deep-sleep wake; RESET always works. |
+| Hub | Status `sleeping` between check-ins (then `late` after three intervals); the sender sends to a deep-sleep module only inside `awake_s` after its last report, one item at a time; commands to it live at least two report intervals; deep sleep is validated (`report_interval_s ≥ 30` and `> awake_s + 10`). |
+
+**Not verified on hardware (check first):** that `esp_zb_sleep_now()` returns in time given the mirrored alarms; that the turbo poll call behaves as documented; the deep-wake restore time (expected about 2.5 s) and that the parent keeps the child over the cycle; power management together with the 802.15.4 radio; the pad levels in light sleep; the real currents. The diagnostics of 18.9 (`wake_count`, `sleep_total_s`, `awake_ms`, `poll_fail_count`, `wake_reason`, `radio_mode`) exist to make a bug report concrete.
+
 ---
 
 # Part B — Zigbee interface (device ↔ Gateway)
@@ -646,7 +660,7 @@ The contract between the PlantModule firmware and the Gateway's Zigbee2MQTT exte
 | Standard clusters | Basic (0x0000), Power Configuration (0x0001), Identify (0x0003) |
 | Custom cluster | `0xFC11`, manufacturer-specific (development uses Espressif's manufacturer code `0x131B`; a production code is decided later) |
 | Identity of a device | The IEEE address |
-| Interface version | `interface_version` attribute, major.minor in one `uint16` (currently 1.1) |
+| Interface version | `interface_version` attribute, major.minor in one `uint16` (currently 1.2) |
 
 ## 2. Encoding rules
 
@@ -677,6 +691,9 @@ The contract between the PlantModule firmware and the Gateway's Zigbee2MQTT exte
 | 0x0142 | `awake_ms` | uint16 | Length of the last awake window |
 | 0x0143 | `poll_fail_count` | uint16 | Parent polls that got no answer |
 | 0x0144 | `next_wake_s` | uint16 | `deep_sleep`: seconds until the next planned wake |
+| 0x0145 | `wake_count` | uint16 | Deep-sleep wake-ups since the last power-on (RTC memory) |
+| 0x0146 | `radio_mode` | uint8 | 0 receiver_on_legacy (joined with the old firmware, cannot sleep), 1 sleepy |
+| 0x0147 | `sleep_total_s` | uint32 | Seconds spent in deep sleep since the last power-on |
 
 Standard clusters carry battery voltage (0x0001/0x0020, 100 mV units; informational while externally powered). **Planned:** millivolt-resolution `batt_mv`, `batt_state`, `batt_critical_mv`, `batt_cal_permille` and the matching event and reason, see Part A §6.1.5.
 

@@ -118,6 +118,40 @@ idf.py -p /dev/cu.usbmodem1101 monitor     # Ctrl+] leaves
 2. A module that has never joined starts looking for a network by itself (fast LED blink, about three minutes). One that belonged to another network: **hold the button for 10 seconds** (factory reset), it restarts and looks for a network. A short press only identifies it (LED blinks); a 3 s hold starts a search when it is not joined.
 3. The module appears in the app (joined, interview, configure, ready); set its slots in **Edit configuration**.
 
+### Power modes (always on, light sleep, deep sleep)
+
+Set per module in the app: **Devices → the module → Edit configuration → Power**. Every module **joins as a sleepy end device**, so switching the mode never needs a rejoin.
+
+| Mode | What the module does | Commands reach it | LED |
+|---|---|---|---|
+| **Always on** | awake, receiver off between polls, asks its parent every 250 ms | within about 0.3 s | on in operation |
+| **Light sleep** | the CPU sleeps between events, asks its parent every `poll interval` (0.5 to 5 s, default 3 s), 250 ms for 3 s after any traffic | within the poll interval | off |
+| **Deep sleep** | the chip is off between cycles; it wakes every `report interval`, samples, reports, listens `awake window` seconds (default 5), sleeps again | only in that window (the hub sends right after the report; the app says "queued until the next check-in") | off |
+
+Always awake whatever the mode: the first **60 s after a normal boot** (so flashing, joining and configuring always work), anything that is going on (joining, sampling, reporting, a pump run and its pause, a configuration being written, the identify blink), safe mode, a lost parent. Deep sleep also stays awake during the fast reporting after a watering. Deep sleep needs a report interval of at least 30 s that is longer than the awake window plus 10 s.
+
+**First flash of this firmware: erase and join once.** The receiver mode is fixed when a module joins and stored with the network. A module that joined with an older firmware is shown as "Receiver always on (old join)" on its device page and cannot sleep. Remove it in the app, then:
+
+```bash
+python -m esptool --port /dev/cu.usbmodem1101 erase-flash
+idf.py -p /dev/cu.usbmodem1101 flash
+```
+
+and join it again (section 6). After that the module can be switched between all three modes freely.
+
+**Getting at a sleeping module.** The USB connection goes away while the chip sleeps. **Press RESET**: the module boots normally and stays awake for 60 s, enough to flash, look at the log, or change its configuration. (In deep sleep the user button cannot wake the chip, RESET can.) Only if the chip does not answer even then: hold BOOT while plugging the USB cable in.
+
+**Checklist for the bench (what to try, what to note).** For each mode, note the diagnostics of the device page (`Last wake`, `Last awake window`, `Missed polls`, `Wake-ups since power-on`, `Time asleep`, `Radio`) with any bug report.
+
+1. Join as described, set the slots, check readings arrive and "Radio" says *Sleepy*.
+2. **Always on:** commands (Read now, Water now, Identify) answered in well under a second; current at the cell with a multimeter or the scope.
+3. **Light sleep:** current drops; Read now answered within the poll interval; the LED stays off; the module stays "online" for hours; press the user button (short = identify, 3 s and 10 s holds still work).
+4. **Deep sleep:** the device page shows *Sleeping* between reports; a command queued in the app goes out at the next report; sleep current; the wake cadence equals the report interval (`Wake-ups` count); RESET wakes it.
+5. Water now in light and deep sleep: the pump runs exactly the requested time, Stop arrives within about a second, the pump pin is not disturbed when the module goes to sleep afterwards (scope on the pump pin).
+6. Switch modes back and forth in the app without a rejoin; set a configuration (slot calibration) while sleeping.
+7. Restart the gateway or Zigbee2MQTT; switch the coordinator off for a minute; the module must come back without a rejoin by hand.
+8. Soak over a day in light and in deep sleep: no rejoins, no "late", battery trend.
+
 ### Changing the attribute set
 
 Adding, removing or re-ordering attributes in `interface.yaml` (or editing its `reporting` table) needs **no erase and no new join**. The Zigbee stack keeps its reporting records in `zb_storage` and with records left over from a different attribute set it aborts at the first report (`zb_assert`). So the firmware hashes what it registers and remembers the hash in NVS (`mc_zb/attr_hash`). On the first start after a change it throws the stored records away and sets up its own from the `reporting` table (log line `attribute set changed: reporting records rebuilt`); the network, the bindings and the settings stay. A module without a network just stores the new hash. Flash the app only (`write-flash 0x20000 build/plantmodule.bin`) and the module comes back on its own.
