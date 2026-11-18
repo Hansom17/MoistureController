@@ -13,7 +13,7 @@ from mc_hub.zigbee import adapter
 from mc_hub.zigbee.messages import CmdAck, ConfigState, Event, Status, Telemetry
 from mc_hub.zigbee.topics import Z2MTopics
 
-from . import alerts, battery, commands, config_sync, devices as devs, rules
+from . import alerts, battery, commands, config_sync, devices as devs, power, rules
 from .join import Join
 from .effects import Effects
 from .views import alert_view, device_view
@@ -21,7 +21,7 @@ from .views import alert_view, device_view
 log = logging.getLogger("mc_hub.ingest")
 
 MODEL = "MC-PLANT"
-OFFLINE_STATES = ("joining", "ready", "late", "offline")
+OFFLINE_STATES = ("joining", "ready", "late", "offline", "sleeping")
 
 
 class Ingest:

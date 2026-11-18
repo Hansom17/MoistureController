@@ -15,6 +15,7 @@ from mc_hub.clock import Clock
 from mc_hub.db.models import Command, ConfigRevision, Device
 from mc_hub.zigbee.topics import Z2MTopics
 
+from . import power
 from .commands import command_view
 from .effects import Effects
 
@@ -23,7 +24,7 @@ log = logging.getLogger("mc_hub.sender")
 ATTEMPT_TIMEOUT_S = 10
 RETRY_PAUSE_S = 2
 MAX_ATTEMPTS = 3
-COMMAND_STATUS_OK = ("ready", "online", "late")       # a device we can talk to
+COMMAND_STATUS_OK = ("ready", "online", "late", "sleeping")       # a device we can talk to (a sleeper: inside its window)
 DEVICE_STATUS_OK = COMMAND_STATUS_OK + ("safe_mode",)  # safe mode: only device actions go out
 
 
@@ -56,6 +57,8 @@ class Sender:
                 return fx
             if not self.zigbee_up:
                 return fx
+            if d.status == "sleeping" or power.window_closed(d, now):
+                return fx            # a module in deep sleep listens only right after a report: wait for the next one
             cmds = (await s.execute(select(Command).where(
                 Command.device_id == d.id, Command.status.in_(("queued", "cancelling", "delivered")))
                 .order_by(Command.created_at, Command.id))).scalars().all()

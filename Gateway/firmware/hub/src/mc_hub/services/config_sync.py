@@ -32,6 +32,8 @@ def validate(body: dict, board: dict, current: dict | None = None) -> dict:
     cfg = {k: _int(body.get(k, base.get(k, c["default"])), k, c["min"], c["max"]) for k, c in CONFIG.items()}
     if cfg["batt_critical_mv"] >= cfg["batt_low_mv"]:
         raise HubError("validation", detail="batt_critical_mv must be below batt_low_mv")
+    if cfg["power_mode"] == 2 and (cfg["report_interval_s"] < 30 or cfg["report_interval_s"] <= cfg["awake_s"] + 10):
+        raise HubError("validation", detail="deep sleep needs report_interval_s of at least 30 s and more than awake_s + 10")
     ports = {p["id"]: p for p in board["ports"]}
     used_slots: set[int] = set()
     used_ports: set[str] = set()
