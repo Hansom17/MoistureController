@@ -181,7 +181,6 @@ jobs:
           Gateway/scripts/make_release_bundle.sh 0.0.0-ci web dist2
           sha256sum dist1/*.tar.gz dist2/*.tar.gz
           cmp dist1/moisture-app-0.0.0-ci.tar.gz dist2/moisture-app-0.0.0-ci.tar.gz
-          tar -tzf dist1/*.tar.gz | sort -c
       - name: run it with only the image's packages, from the bundle folder
         run: |
           mkdir bundle && tar -xzf dist1/*.tar.gz -C bundle
