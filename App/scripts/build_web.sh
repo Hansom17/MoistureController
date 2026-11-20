@@ -16,8 +16,6 @@ flutter build web --release --no-web-resources-cdn
   echo "flutter: $(flutter --version 2>/dev/null | head -1)"
 } > build/web/build-info.txt
 
-tar -C build -czf build/moisture-web.tar.gz web
 echo
 cat build/web/build-info.txt
-echo "web build: App/build/web ($(du -sh build/web | cut -f1)), archive: App/build/moisture-web.tar.gz ($(du -h build/moisture-web.tar.gz | cut -f1))"
-if command -v shasum >/dev/null 2>&1; then shasum -a 256 build/moisture-web.tar.gz; else sha256sum build/moisture-web.tar.gz; fi
+echo "web build: App/build/web ($(du -sh build/web | cut -f1))"

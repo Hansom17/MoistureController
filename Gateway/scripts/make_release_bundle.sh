@@ -22,7 +22,7 @@ out=$(cd "$out" && pwd)
 # a complete buildable source layout: pyproject.toml + src, without environments, caches, tests and container files
 for pkg in api hub; do
   cp -a "$fw/$pkg" "$stage/$pkg"
-  rm -rf "$stage/$pkg"/{tests,.venv,build,dist,.pytest_cache,Dockerfile,.dockerignore}
+  rm -rf "$stage/$pkg"/{tests,.venv,build,dist,.pytest_cache}
   find "$stage/$pkg" \( -name __pycache__ -o -name '*.egg-info' \) -prune -exec rm -rf {} +
   find "$stage/$pkg" -name '*.pyc' -delete
 done

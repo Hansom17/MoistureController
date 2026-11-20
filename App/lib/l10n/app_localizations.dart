@@ -2003,7 +2003,7 @@ abstract class AppLocalizations {
   /// No description provided for @setupCodeHint.
   ///
   /// In en, this message translates to:
-  /// **'Shown in the log of the web service: docker compose logs api'**
+  /// **'Shown in the log of the web service'**
   String get setupCodeHint;
 
   /// No description provided for @setupCreate.

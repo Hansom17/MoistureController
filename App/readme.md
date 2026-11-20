@@ -16,7 +16,7 @@ flutter run -d chrome --dart-define=API_URL=http://localhost:8000 # against a ru
 - `lib/main_dev.dart` uses `FakeMoistureRepository`: sample plants, devices, alerts and users in memory. Sign in as `demo` / `demo` (owner), `anna` / `anna` (member) or `ben` / `ben` (viewer); setup code `DEMOCODE`, invite code `DEMOINVITE`. Watering goes queued → running → done over a few seconds with live events; a join window brings a new device in. Settings → Demo switches your role.
 - `lib/main.dart` talks to the gateway's `api` (`ApiMoistureRepository`, hand-written Dio, SSE for live updates). On web it uses the page's own origin.
 - The web build is self-contained: CanvasKit and Roboto come from the gateway, nothing from a CDN. Texts may only use characters Roboto has (`test/l10n_test.dart` guards this).
-- To try the whole stack on one machine: `Gateway/firmware/` (compose) or the processes described in `Gateway/readme.md`, with `scripts/z2m_sim.py` as the Zigbee side; set `MC_WEB_DIR` to `App/build/web`.
+- To try the whole stack on one machine: the processes described in `Gateway/readme.md` (`Gateway/scripts/bench.sh`), with `scripts/z2m_sim.py` as the Zigbee side; set `MC_WEB_DIR` to `App/build/web`.
 
 ## Theme
 

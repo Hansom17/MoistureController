@@ -2,24 +2,13 @@
 
 The box at home that runs the whole system: Zigbee coordinator with Zigbee2MQTT, Mosquitto, and two services that talk only over MQTT: `hub` (devices, command queue, rules, alerts, Telegram) and `api` (login, REST + SSE, hosting of the Flutter web build; can run on another device). Design: [`specs.md`](specs.md).
 
-**State:** specification, plus the `hub` (`firmware/hub`) and the `api` (`firmware/api`) services (see `specs.md` §18); Dockerfiles and compose files are in `firmware/`. The target layout is in `specs.md` §15.3 (`firmware/hub`, `firmware/api`, compose files, `mqtt-contract.yaml`, `scripts/`, `hardware/`). The previous gateway and server implementation is in git history at commit `eb97b07`; `specs.md` §19 lists what to take from it.
+**State:** specification, plus the `hub` (`firmware/hub`) and the `api` (`firmware/api`) services (see `specs.md` §18). The target layout is in `specs.md` §15.3 (`firmware/hub`, `firmware/api`, `mqtt-contract.yaml`, `scripts/`, `hardware/`). The previous gateway and server implementation is in git history at commit `eb97b07`; `specs.md` §19 lists what to take from it.
 
-## Run
+## Install and run
 
-**Setting it up on a separate device:** [`INSTALL.md`](INSTALL.md) is the step-by-step guide, and `scripts/install.sh` does the checks, the setup and the start (`--check` only looks). The short version:
+The gateway runs as a Yocto image (systemd services, Zigbee2MQTT, Mosquitto) built in the repository [Hansom17/moisture-gateway](https://github.com/Hansom17/moisture-gateway), which is also where installing and flashing it is described. The app code (`hub`, `api`, web build, converter) is updated from the releases of this repository.
 
-```bash
-Gateway/scripts/install.sh --check && Gateway/scripts/install.sh      # everything below in one go
-
-# or by hand:
-cd Gateway/firmware
-../scripts/setup.sh          # .env with generated MQTT passwords, Mosquitto password file
-# edit .env: ZIGBEE_DEVICE (ls /dev/serial/by-id/), WEB_DIR (flutter build web in App/)
-docker compose up -d         # mosquitto, zigbee2mqtt, hub, api
-docker compose logs api | grep 'SETUP CODE'
-```
-
-Open `http://<gateway>/` and create the owner account with that setup code. More: `../scripts/remote-api.sh` (api on another device), `../scripts/backup.sh`; details in `specs.md` §15.
+To try the system on a development machine without a gateway: `scripts/bench.sh` (hub, api and a Zigbee2MQTT bench setup on the host), or `scripts/z2m_sim.py` as the Zigbee side; set `MC_WEB_DIR` to `App/build/web`. Details in `specs.md` §15.
 
 ## Releases and updates
 

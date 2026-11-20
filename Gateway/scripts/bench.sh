@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# The bench setup for testing the PlantModule with the app, without Docker:
+# The bench setup for testing the PlantModule with the app, on the host:
 #   Gateway/scripts/bench.sh start | stop | status
 # Starts a throwaway Mosquitto (127.0.0.1:1884), Zigbee2MQTT on the SONOFF dongle, the hub and the api, with all state
 # in Gateway/.bench (git-ignored): z2m/data, hub/hub.db, api/api.db, credentials.txt. The app (App/build/web) is served at

@@ -42,7 +42,7 @@ flowchart LR
         ZO["later: other Zigbee devices"]
     end
 
-    subgraph GW["Gateway (one box, docker compose)"]
+    subgraph GW["Gateway (one box, Yocto image)"]
         CO["Zigbee coordinator<br/>(USB stick)"]
         Z2M["Zigbee2MQTT"]
         MQ["Mosquitto<br/>(internal only)"]
@@ -184,7 +184,7 @@ ESP32-C6 firmware on **ESP-IDF with `esp-zigbee-sdk`**, plus the carrier board (
 
 ### 4.2 Gateway — `Gateway/`
 
-One box (Raspberry Pi 4/5, a mini PC or any 64-bit Linux with Docker, plus a Zigbee USB coordinator of about €20) running Docker Compose.
+One box (Raspberry Pi 4/5, a mini PC, plus a Zigbee USB coordinator of about €20) running a Yocto image with systemd services.
 
 | Part | Responsibility |
 |---|---|
@@ -348,8 +348,8 @@ See 3.5: open the join window, the device joins, name it, assign plants, configu
 | **Safety** | Hard maximum pump duration and minimum pause, enforced on the device and again in the hub. |
 | **Data** | SQLite on the gateway. History stays local; the owner can export. Backup is copying the database file (documented, automatable later). |
 | **Notifications** | In-app alerts are sent by `api`; Telegram messages are sent by `hub` itself (set per rule), so they work without `api`. Web push needs HTTPS and comes with remote access. |
-| **Deployment** | Docker Compose, multi-arch (arm64 + amd64): Zigbee2MQTT, Mosquitto, `hub`, `api` (serving the web build); `api` can be deployed on another device. |
-| **Updates** | `hub`, `api` and Zigbee2MQTT via `docker compose pull`. Device firmware over Zigbee OTA (supported by Zigbee2MQTT) later. |
+| **Deployment** | Yocto image (repository `Hansom17/moisture-gateway`) with systemd services: Zigbee2MQTT, Mosquitto, `hub`, `api` (serving the web build); `api` can run on another device. |
+| **Updates** | `hub`, `api`, the web build and the converter as a signed update bundle from GitHub Releases (stable or newest channel, with health check and rollback; see `Gateway/docs/RELEASING.md`); dependencies and Zigbee2MQTT with a new image. Device firmware over Zigbee OTA (supported by Zigbee2MQTT) later. |
 | **Remote access** | Not part of this design. Later through a VPN or a tunnel in front of the same web port, together with HTTPS. |
 
 ---
@@ -361,7 +361,7 @@ MoistureController/
 ├── PROJECT.md              ← this file
 ├── readme.md
 ├── PlantModule/            ← firmware/ (ESP-IDF) · hardware/ (KiCad) · scripts/ · specs.md · readme.md
-├── Gateway/                ← hub + api services, compose (Zigbee2MQTT, Mosquitto, hub, api), converter, mqtt-contract.yaml · scripts/ · specs.md · readme.md
+├── Gateway/                ← hub + api services, Zigbee2MQTT converter, update/release pipeline, mqtt-contract.yaml · scripts/ · specs.md · readme.md
 └── App/                    ← Flutter (web, later mobile) · specs.md · readme.md
 ```
 

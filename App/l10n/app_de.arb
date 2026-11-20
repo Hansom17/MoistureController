@@ -453,7 +453,7 @@
   "safeModeTitle": "Abgesicherter Modus",
   "saved": "Gespeichert.",
   "setupCode": "Einrichtungscode",
-  "setupCodeHint": "Steht im Log des Webdienstes: docker compose logs api",
+  "setupCodeHint": "Steht im Log des Webdienstes",
   "setupCreate": "Dieses Gateway einrichten",
   "setupNeedsHub": "Der Gießdienst läuft noch nicht. Die Einrichtung braucht ihn.",
   "setupSubtitle": "Lege das Besitzerkonto an. Das ist nur einmal nötig.",
