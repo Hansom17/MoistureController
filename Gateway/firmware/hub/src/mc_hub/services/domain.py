@@ -10,7 +10,7 @@ from mc_hub.errors import HubError
 from mc_hub.params import CONFIG
 
 from . import alerts, battery, config_sync
-from .views import alert_view, device_view, plant_view, rule_view
+from .views import device_view, plant_view, rule_view
 
 HHMM = re.compile(r"^([01]\d|2[0-3]):[0-5]\d$")
 MAX_WATER_S = 300     # hub hard limit; the module enforces its own max_run_s as well

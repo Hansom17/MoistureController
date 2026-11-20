@@ -14,7 +14,7 @@ from mc_hub.db.models import RequestRecord
 from mc_hub.errors import HubError
 from mc_hub.services.effects import Effects
 
-from .envelope import T_REQUEST, V, Actor, Request, dumps, err, ok
+from .envelope import T_REQUEST, Actor, Request, V, dumps, err, ok
 from .publisher import Publisher
 from .transport import Transport
 

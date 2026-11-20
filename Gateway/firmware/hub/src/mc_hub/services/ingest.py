@@ -13,9 +13,10 @@ from mc_hub.zigbee import adapter
 from mc_hub.zigbee.messages import CmdAck, ConfigState, Event, Status, Telemetry
 from mc_hub.zigbee.topics import Z2MTopics
 
-from . import alerts, battery, commands, config_sync, devices as devs, power, rules
-from .join import Join
+from . import alerts, battery, commands, config_sync, rules
+from . import devices as devs
 from .effects import Effects
+from .join import Join
 from .views import alert_view, device_view
 
 log = logging.getLogger("mc_hub.ingest")

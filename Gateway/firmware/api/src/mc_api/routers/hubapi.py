@@ -3,7 +3,7 @@ from fastapi import APIRouter, Depends, Request
 from pydantic import BaseModel, Field
 
 from mc_api import __version__
-from mc_api.auth import Principal, app_of, audit, reauth, rank, require
+from mc_api.auth import Principal, app_of, audit, rank, reauth, require
 from mc_api.convert import to_api, to_unix
 from mc_api.errors import ApiError
 

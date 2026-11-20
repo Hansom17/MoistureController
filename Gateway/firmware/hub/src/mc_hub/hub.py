@@ -11,12 +11,11 @@ from .bus.transport import Transport
 from .clock import Clock
 from .services import domain, handlers, queries
 from .services.backup import Backup
-from .services.join import Join
+from .services.effects import Effects
+from .services.ingest import Ingest
 from .services.jobs import Jobs
 from .services.notify import Notifier, Send, telegram_send
 from .services.sender import Sender
-from .services.effects import Effects
-from .services.ingest import Ingest
 from .services.snapshots import NAMES, Snapshots
 from .zigbee.topics import Z2MTopics, parse_state_value
 
@@ -161,6 +160,7 @@ class Hub:
 
     async def _all_device_ids(self) -> set[str]:
         from sqlalchemy import select
+
         from .db.models import Device
         async with self.sessions() as s:
             return {d for (d,) in (await s.execute(select(Device.id).where(Device.deleted_at.is_(None)))).all()}

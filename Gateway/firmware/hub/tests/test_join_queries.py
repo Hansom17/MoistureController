@@ -4,7 +4,7 @@ from pathlib import Path
 
 from sqlalchemy import select
 
-from mc_hub.db.models import Alert, Command, ConfigRevision, Device, Plant, Rule
+from mc_hub.db.models import Alert, Command, ConfigRevision, Device
 
 from .conftest import CFG, ack, add_device, device_report, plant_entry, ready_device, ready_plant, sent
 

@@ -2,9 +2,11 @@ from alembic.autogenerate import compare_metadata
 from alembic.migration import MigrationContext
 from sqlalchemy import create_engine
 
-from mc_hub.db import migrate
+from mc_hub.db import (
+    migrate,
+    models,  # noqa: F401
+)
 from mc_hub.db.base import Base
-from mc_hub.db import models  # noqa: F401
 
 
 def test_migrations_match_models(tmp_path):

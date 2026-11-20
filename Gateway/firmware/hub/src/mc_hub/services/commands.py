@@ -1,5 +1,4 @@
 """Commands (Gateway/specs.md section 9): creation checks, cancel, lifecycle from device acks."""
-import re
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from ulid import ULID

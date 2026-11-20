@@ -1,0 +1,15 @@
+# Minimal lint for the Python services (hub and api): errors, pyflakes, import order.
+line-length = 140
+target-version = "py312"
+extend-exclude = ["**/migrations/versions"]
+
+[lint]
+select = ["E", "F", "I"]
+# style choices of this code base: compact one-line statements, lambdas, long lines
+ignore = ["E501", "E702", "E731"]
+
+[lint.per-file-ignores]
+"**/tests/*" = ["F811", "F841"]    # fixtures are redefined as arguments; tests keep results of calls they run for their effect
+
+[lint.isort]
+known-first-party = ["mc_api", "mc_hub"]

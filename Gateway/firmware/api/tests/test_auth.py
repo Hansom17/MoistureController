@@ -1,4 +1,3 @@
-import pytest
 from sqlalchemy import select
 
 from mc_api.db.models import Setting, Token, User

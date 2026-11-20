@@ -1,6 +1,5 @@
 """Everything the request handlers share."""
 import logging
-import time
 from dataclasses import dataclass, field
 
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker

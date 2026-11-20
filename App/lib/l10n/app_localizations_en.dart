@@ -1071,8 +1071,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get setupCode => 'Setup code';
 
   @override
-  String get setupCodeHint =>
-      'Shown in the log of the web service: docker compose logs api';
+  String get setupCodeHint => 'Shown in the log of the web service';
 
   @override
   String get setupCreate => 'Set up this gateway';

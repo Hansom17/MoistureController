@@ -1076,8 +1076,7 @@ class AppLocalizationsDe extends AppLocalizations {
   String get setupCode => 'Einrichtungscode';
 
   @override
-  String get setupCodeHint =>
-      'Steht im Log des Webdienstes: docker compose logs api';
+  String get setupCodeHint => 'Steht im Log des Webdienstes';
 
   @override
   String get setupCreate => 'Dieses Gateway einrichten';

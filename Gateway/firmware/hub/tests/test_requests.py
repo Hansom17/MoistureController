@@ -2,9 +2,9 @@ import json
 
 from sqlalchemy import func, select
 
-from mc_hub.db.models import Plant, RequestRecord
+from mc_hub.db.models import Plant
 
-from .conftest import add_device, report
+from .conftest import add_device
 
 
 async def test_start_publishes_status_and_snapshots(rig):
@@ -69,6 +69,7 @@ async def test_unknown_kind_and_validation_errors(rig):
 
 async def test_bad_version_rejected(rig):
     from datetime import timedelta
+
     from ulid import ULID
     id = str(ULID())
     now = rig.clock.dt()

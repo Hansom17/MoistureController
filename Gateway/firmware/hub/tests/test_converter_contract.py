@@ -10,15 +10,13 @@ import json
 import os
 from pathlib import Path
 
-import pytest
-
 from mc_hub.db.models import Command
 from mc_hub.services import config_sync
 from mc_hub.services.sender import payload_for
 from mc_hub.zigbee import adapter
 from mc_hub.zigbee.messages import CmdAck, ConfigState, Event, Status, Telemetry
 
-from .conftest import add_device, device_report
+from .conftest import add_device
 
 FIXTURES = Path(__file__).resolve().parents[2] / "zigbee2mqtt" / "test" / "fixtures"
 

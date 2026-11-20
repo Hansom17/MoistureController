@@ -1,0 +1,100 @@
+name: Release
+
+# A tag vX.Y.Z (or vX.Y.Z-alpha|beta|rc[.N]) publishes the update bundle that the gateways install:
+#   moisture-app-X.Y.Z.tar.gz   api/ hub/ web/ z2m/ VERSION
+#   manifest.json               {schema, version, channel, app_generation, asset, sha256, size, released_at}
+#   manifest.json.sig           raw ed25519 signature over the exact bytes of manifest.json
+# Stable versions become "latest" (the gateways' stable channel); pre-releases are only seen by the newest channel.
+# How to release, keys and rotation: Gateway/docs/RELEASING.md
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: read
+
+jobs:
+  checks:
+    name: Release / check tag
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0     # is the tagged commit on main?
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - run: pip install packaging
+      - run: python Gateway/scripts/release_checks.py "$GITHUB_REF_NAME" "$GITHUB_SHA"
+        env:
+          GH_TOKEN: ${{ github.token }}
+
+  ci:
+    name: Release / CI
+    needs: checks
+    uses: ./.github/workflows/ci.yml
+
+  release:
+    name: Release / sign and publish
+    needs: [checks, ci]
+    runs-on: ubuntu-latest
+    # the environment holds UPDATE_SIGNING_KEY and asks for approval before this job starts
+    environment: release
+    permissions:
+      contents: write   # create the release and attach files
+    env:
+      TAG: ${{ github.ref_name }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - uses: actions/download-artifact@v4
+        with:
+          name: moisture-web
+          path: web
+      - name: bundle and manifest
+        run: |
+          version="${TAG#v}"
+          Gateway/scripts/make_release_bundle.sh "$version" web dist
+          python -I Gateway/scripts/make_manifest.py "dist/moisture-app-$version.tar.gz" Gateway/update/app_generation dist/manifest.json
+          cat dist/manifest.json
+      - name: sign the manifest
+        env:
+          UPDATE_SIGNING_KEY: ${{ secrets.UPDATE_SIGNING_KEY }}
+        run: |
+          set +x
+          [ -n "$UPDATE_SIGNING_KEY" ] || { echo "UPDATE_SIGNING_KEY is not available (environment 'release')"; exit 1; }
+          umask 077
+          key=$(mktemp -p "$RUNNER_TEMP")
+          trap 'shred -u "$key"' EXIT
+          printf '%s\n' "$UPDATE_SIGNING_KEY" > "$key"
+          openssl pkeyutl -sign -inkey "$key" -rawin -in dist/manifest.json -out dist/manifest.json.sig
+      - name: verify with the public key of the gateways before anything is uploaded
+        run: |
+          Gateway/scripts/verify_release.sh dist
+          # the check must be able to fail: a manifest changed by one byte has to be rejected
+          mkdir tampered && cp dist/* tampered/ && echo " " >> tampered/manifest.json
+          if Gateway/scripts/verify_release.sh tampered 2>/dev/null; then echo "a tampered manifest passed verification"; exit 1; fi
+      - name: draft release with the three files
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          flags=(--latest)
+          case "$TAG" in *-*) flags=(--prerelease --latest=false);; esac
+          gh release create "$TAG" --draft --verify-tag --title "$TAG" --generate-notes "${flags[@]}" \
+            "dist/moisture-app-${TAG#v}.tar.gz" dist/manifest.json dist/manifest.json.sig
+      - name: download the draft again and verify it (what was uploaded is what was signed)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir fetched
+          gh release download "$TAG" --dir fetched
+          cmp fetched/manifest.json dist/manifest.json
+          Gateway/scripts/verify_release.sh fetched
+      - name: publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release edit "$TAG" --draft=false

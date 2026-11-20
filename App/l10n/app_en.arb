@@ -640,7 +640,7 @@
   "safeModeTitle": "Safe mode",
   "saved": "Saved.",
   "setupCode": "Setup code",
-  "setupCodeHint": "Shown in the log of the web service: docker compose logs api",
+  "setupCodeHint": "Shown in the log of the web service",
   "setupCreate": "Set up this gateway",
   "setupNeedsHub": "The watering service is not running yet. Setup needs it.",
   "setupSubtitle": "Create the owner account. This is only needed once.",

@@ -1,11 +1,12 @@
 name: CI
 
 # Every job runs the same commands as the local checks listed in the pull request description.
+# Tags are handled by release.yml, which runs this workflow first (workflow_call) and then builds the release.
 on:
   pull_request:
   push:
     branches: [main]
-    tags: ["v*"]
+  workflow_call:
 
 concurrency:
   group: ci-${{ github.ref }}
@@ -15,8 +16,8 @@ permissions:
   contents: read
 
 jobs:
-  firmware-host:
-    name: Firmware core host tests (ASan/UBSan)
+  firmware-test:
+    name: Firmware / host tests (ASan, UBSan)
     runs-on: ubuntu-latest
     env:
       CC: clang
@@ -29,8 +30,19 @@ jobs:
       # also checks that the generated files (firmware header, board table, converter data, hub parameters) are current
       - run: PlantModule/scripts/test_host.sh
 
-  gateway:
-    name: Hub and api tests
+  gateway-lint:
+    name: Gateway / lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - run: pip install ruff
+      - run: ruff check --config Gateway/firmware/ruff.toml Gateway/firmware
+
+  gateway-test:
+    name: Gateway / hub and api tests
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -49,8 +61,8 @@ jobs:
         working-directory: Gateway/firmware/api
         run: python -m pytest -q
 
-  converter:
-    name: Zigbee2MQTT converter tests
+  converter-test:
+    name: Gateway / Zigbee2MQTT converter tests
     runs-on: ubuntu-latest
     env:
       Z2M_VERSION: "2.14.2"
@@ -72,8 +84,8 @@ jobs:
           pnpm install --frozen-lockfile
       - run: Z2M_DIR="$RUNNER_TEMP/z2m" Gateway/scripts/test_converter.sh
 
-  app:
-    name: App analysis and tests
+  app-test:
+    name: App / analyze and tests
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -94,7 +106,7 @@ jobs:
       - run: flutter test
 
   firmware-build:
-    name: Firmware builds for the ESP32-C6
+    name: Firmware / build for ESP32-C6
     runs-on: ubuntu-latest
     container: espressif/idf:v6.0.2
     steps:
@@ -118,9 +130,9 @@ jobs:
           retention-days: 30
           if-no-files-found: error
 
-  web-build:
-    name: Web build (downloadable for the gateway)
-    needs: app          # only a tested app is published
+  app-web-build:
+    name: App / web build
+    needs: app-test     # only a tested app is built
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -130,7 +142,7 @@ jobs:
           channel: stable
           cache: true
       - run: App/scripts/build_web.sh
-      # the artifact holds the files the api serves: unzip it into App/build/web on the gateway device
+      # the artifact holds the files the api serves; release.yml packs it into the update bundle
       - uses: actions/upload-artifact@v4
         with:
           name: moisture-web
@@ -138,29 +150,64 @@ jobs:
           retention-days: 30
           if-no-files-found: error
 
-  release:
-    name: GitHub release with build outputs
-    if: startsWith(github.ref, 'refs/tags/v')
-    needs: [firmware-host, gateway, converter, web-build, firmware-build]
+  gateway-compat:
+    name: Gateway / update compatibility (dependencies, migrations)
     runs-on: ubuntu-latest
-    permissions:
-      contents: write   # needed to create the release and attach files
     steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0     # the migration check compares with the base branch
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - run: pip install packaging
+      # the Python dependencies of api and hub against Gateway/update/deps-<app_generation>.txt
+      - run: python Gateway/scripts/check_deps.py
+      - name: migrations of this change are safe for the previous release
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            python Gateway/scripts/check_migrations.py --base "origin/${{ github.base_ref }}"
+          else
+            python Gateway/scripts/check_migrations.py
+          fi
+
+  gateway-bundle:
+    name: Gateway / update bundle (build, determinism, run from folder)
+    needs: app-web-build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
       - uses: actions/download-artifact@v4
         with:
           name: moisture-web
-          path: moisture-web
-      - uses: actions/download-artifact@v4
-        with:
-          name: moisture-firmware
-          path: moisture-firmware
-      - name: pack
+          path: web
+      - name: build the bundle twice, the bytes must be identical
         run: |
-          mkdir dist
-          (cd moisture-web && zip -r ../dist/moisture-web.zip .)
-          tar -czf dist/moisture-web.tar.gz -C moisture-web .
-          (cd moisture-firmware && zip -r ../dist/moisture-firmware.zip .)
-      - uses: softprops/action-gh-release@v2
-        with:
-          files: dist/*
-          generate_release_notes: true
+          Gateway/scripts/make_release_bundle.sh 0.0.0-ci web dist1
+          Gateway/scripts/make_release_bundle.sh 0.0.0-ci web dist2
+          sha256sum dist1/*.tar.gz dist2/*.tar.gz
+          cmp dist1/moisture-app-0.0.0-ci.tar.gz dist2/moisture-app-0.0.0-ci.tar.gz
+      - name: run it with only the image's packages, from the bundle folder
+        run: |
+          mkdir bundle && tar -xzf dist1/*.tar.gz -C bundle
+          python -m venv "$RUNNER_TEMP/venv"
+          "$RUNNER_TEMP/venv/bin/pip" install -r <(tail -n +2 Gateway/update/deps-1.txt)
+          export PYTHONPATH="$PWD/bundle/api/src:$PWD/bundle/hub/src" MC_DATA_DIR="$RUNNER_TEMP/data"
+          cd "$RUNNER_TEMP"
+          py="$RUNNER_TEMP/venv/bin/python"
+          "$py" -m mc_api migrate
+          "$py" -m mc_hub migrate
+          "$py" - <<PY
+          import mc_api, mc_hub
+          from mc_hub.services import boards
+          root = "$GITHUB_WORKSPACE/bundle"
+          assert mc_api.__file__.startswith(root) and mc_hub.__file__.startswith(root), (mc_api.__file__, mc_hub.__file__)
+          assert mc_api.__version__ == mc_hub.__version__ == "0.0.0-ci"
+          assert list(boards.DIR.glob("*.json")), "boards missing from the bundle"
+          print("running from", root)
+          PY
+          # the api never imports the hub (they only meet over MQTT)
+          if grep -rn "mc_hub" "$GITHUB_WORKSPACE/bundle/api/src"; then echo "the api must not import the hub"; exit 1; fi
