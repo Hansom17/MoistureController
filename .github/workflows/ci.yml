@@ -16,8 +16,8 @@ permissions:
   contents: read
 
 jobs:
-  firmware-host:
-    name: Firmware core host tests (ASan/UBSan)
+  firmware-test:
+    name: Firmware / host tests (ASan, UBSan)
     runs-on: ubuntu-latest
     env:
       CC: clang
@@ -30,8 +30,19 @@ jobs:
       # also checks that the generated files (firmware header, board table, converter data, hub parameters) are current
       - run: PlantModule/scripts/test_host.sh
 
-  gateway:
-    name: Hub and api tests and lint
+  gateway-lint:
+    name: Gateway / lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - run: pip install ruff
+      - run: ruff check --config Gateway/firmware/ruff.toml Gateway/firmware
+
+  gateway-test:
+    name: Gateway / hub and api tests
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -42,9 +53,7 @@ jobs:
           cache-dependency-path: |
             Gateway/firmware/hub/pyproject.toml
             Gateway/firmware/api/pyproject.toml
-      - run: pip install -e "Gateway/firmware/hub[dev]" -e "Gateway/firmware/api[dev]" ruff
-      - name: lint (Gateway/firmware/ruff.toml)
-        run: ruff check --config Gateway/firmware/ruff.toml Gateway/firmware
+      - run: pip install -e "Gateway/firmware/hub[dev]" -e "Gateway/firmware/api[dev]"
       - name: hub
         working-directory: Gateway/firmware/hub
         run: python -m pytest -q
@@ -52,8 +61,8 @@ jobs:
         working-directory: Gateway/firmware/api
         run: python -m pytest -q
 
-  converter:
-    name: Zigbee2MQTT converter tests
+  converter-test:
+    name: Gateway / Zigbee2MQTT converter tests
     runs-on: ubuntu-latest
     env:
       Z2M_VERSION: "2.14.2"
@@ -75,8 +84,8 @@ jobs:
           pnpm install --frozen-lockfile
       - run: Z2M_DIR="$RUNNER_TEMP/z2m" Gateway/scripts/test_converter.sh
 
-  app:
-    name: App analysis and tests
+  app-test:
+    name: App / analyze and tests
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -97,7 +106,7 @@ jobs:
       - run: flutter test
 
   firmware-build:
-    name: Firmware builds for the ESP32-C6
+    name: Firmware / build for ESP32-C6
     runs-on: ubuntu-latest
     container: espressif/idf:v6.0.2
     steps:
@@ -121,9 +130,9 @@ jobs:
           retention-days: 30
           if-no-files-found: error
 
-  web-build:
-    name: Web build (downloadable for the gateway)
-    needs: app          # only a tested app is published
+  app-web-build:
+    name: App / web build
+    needs: app-test     # only a tested app is built
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -141,8 +150,8 @@ jobs:
           retention-days: 30
           if-no-files-found: error
 
-  deps-gate:
-    name: Dependencies match the gateway image, migrations are update-safe
+  gateway-compat:
+    name: Gateway / update compatibility (dependencies, migrations)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -162,9 +171,9 @@ jobs:
             python Gateway/scripts/check_migrations.py
           fi
 
-  bundle-smoke:
-    name: Update bundle builds, is deterministic and runs from its folder
-    needs: web-build
+  gateway-bundle:
+    name: Gateway / update bundle (build, determinism, run from folder)
+    needs: app-web-build
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4

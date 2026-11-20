@@ -3,7 +3,7 @@
 #   make_release_bundle.sh <version> <web build dir> <output dir>
 # e.g. make_release_bundle.sh 1.2.3 App/build/web dist
 # The archive is deterministic: the same inputs give the same bytes (sorted names, fixed mtime, owner and modes, no gzip name/time).
-# Needs GNU tar and gzip. Used by .github/workflows/release.yml and the bundle-smoke job of ci.yml.
+# Needs GNU tar and gzip. Used by .github/workflows/release.yml and the "Gateway / update bundle" job of ci.yml.
 set -euo pipefail
 
 version=${1:?usage: make_release_bundle.sh <version> <web build dir> <output dir>}

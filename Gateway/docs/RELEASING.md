@@ -35,7 +35,7 @@ If a release is bad, do not delete the tag: publish a higher version. Devices th
 
 `Gateway/update/app_generation` holds one integer. A gateway only installs releases whose `app_generation` equals the one of its image. **Bump it whenever something differs that an update cannot bring to the device**:
 
-- Python dependencies or `requires-python` of `api` or `hub` (the CI gate `deps-gate` fails with "bump app_generation and reflash required"),
+- Python dependencies or `requires-python` of `api` or `hub` (the CI job "Gateway / update compatibility" fails with "bump app_generation and reflash required"),
 - the Zigbee2MQTT version or the converters (`z2m/` ships in the bundle for the image build; the updater does not apply it),
 - the MQTT contract, Mosquitto users or ACL, systemd units, anything that needs an OS-level change.
 
@@ -72,4 +72,4 @@ The private key is the secret `UPDATE_SIGNING_KEY` of the GitHub **environment `
 
 - Environment `release`: required reviewer (you), "Prevent self-review" off when you are the only reviewer, deployment tags `v*`.
 - Tag ruleset for `v*`: only admins create, update or delete; no force push.
-- `main`: pull request and green checks required (`Hub and api tests and lint`, `App analysis and tests`, `Zigbee2MQTT converter tests`, `Dependencies match the gateway image, migrations are update-safe`, `Update bundle builds, is deterministic and runs from its folder`).
+- `main`: pull request and green checks required (`Gateway / lint`, `Gateway / hub and api tests`, `Gateway / Zigbee2MQTT converter tests`, `Gateway / update compatibility (dependencies, migrations)`, `Gateway / update bundle (build, determinism, run from folder)`, `App / analyze and tests`).

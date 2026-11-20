@@ -15,7 +15,7 @@ permissions:
 
 jobs:
   checks:
-    name: Tag is a valid next release
+    name: Release / check tag
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -32,12 +32,12 @@ jobs:
           GH_TOKEN: ${{ github.token }}
 
   ci:
-    name: Tests and builds
+    name: Release / CI
     needs: checks
     uses: ./.github/workflows/ci.yml
 
   release:
-    name: Sign and publish
+    name: Release / sign and publish
     needs: [checks, ci]
     runs-on: ubuntu-latest
     # the environment holds UPDATE_SIGNING_KEY and asks for approval before this job starts
