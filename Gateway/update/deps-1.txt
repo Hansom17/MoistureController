@@ -1,0 +1,11 @@
+python>=3.12
+aiomqtt>=2.0
+aiosqlite
+alembic
+argon2-cffi
+fastapi>=0.110
+pydantic>=2
+python-ulid
+sqlalchemy[asyncio]>=2.0
+tzdata
+uvicorn

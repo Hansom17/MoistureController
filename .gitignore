@@ -34,3 +34,6 @@ Gateway/firmware/mosquitto/conf.d/*.conf
 # Zigbee2MQTT converter tests link the node_modules of a Zigbee2MQTT checkout
 Gateway/firmware/zigbee2mqtt/node_modules
 Gateway/.bench/
+
+# Release bundle staging (Gateway/scripts/make_release_bundle.sh)
+Gateway/.release/
