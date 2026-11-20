@@ -124,4 +124,5 @@ if [ -n "$code" ]; then
 else
   echo "  no setup code in the log: the gateway was set up before (sign in as usual)"
 fi
+echo "To start the stack at every boot even after a docker compose down: Gateway/scripts/autostart.sh"
 echo "Next: add your modules (Gateway/INSTALL.md, step 7). Back up with Gateway/scripts/backup.sh."

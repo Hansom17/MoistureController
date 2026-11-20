@@ -13,7 +13,7 @@ from mc_hub.zigbee import adapter
 from mc_hub.zigbee.messages import CmdAck, ConfigState, Event, Status, Telemetry
 from mc_hub.zigbee.topics import Z2MTopics
 
-from . import alerts, battery, commands, config_sync, devices as devs, rules
+from . import alerts, battery, commands, config_sync, devices as devs, power, rules
 from .join import Join
 from .effects import Effects
 from .views import alert_view, device_view
@@ -21,7 +21,7 @@ from .views import alert_view, device_view
 log = logging.getLogger("mc_hub.ingest")
 
 MODEL = "MC-PLANT"
-OFFLINE_STATES = ("joining", "ready", "late", "offline")
+OFFLINE_STATES = ("joining", "ready", "late", "offline", "sleeping")
 
 
 class Ingest:
@@ -39,7 +39,13 @@ class Ingest:
         now = int(self.clock.now())
         renames: list[tuple[str, str]] = []
         async with self.sessions() as s:
-            known = {d.ieee: d for d in (await s.execute(select(Device))).scalars()}
+            known = {}
+            for old in (await s.execute(select(Device))).scalars():
+                if old.deleted_at is not None:      # removed earlier (rows from before the address was freed too)
+                    if "~" not in old.ieee:
+                        await devs.bury(s, now, old)
+                else:
+                    known[old.ieee] = old
             seen: set[str] = set()
             for e in devices:
                 if e.get("type") == "Coordinator":
@@ -67,8 +73,6 @@ class Ingest:
                     if new != d.status:
                         d.status, d.updated_at = new, now
                     d.model = model_id or d.model
-                if d.deleted_at is not None:
-                    d.deleted_at, d.updated_at = None, now   # rejoined
                 if (model_id or d.model) == MODEL and d.desired_config is None:
                     # first seen before its interview (or before the converter knew the model): it is supported
                     # now, so it gets the initial configuration it would have had

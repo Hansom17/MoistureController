@@ -344,7 +344,7 @@ See 3.5: open the join window, the device joins, name it, assign plants, configu
 | **Security** | One service for people (the hub's web port); everything else is internal to the box. Passwords and tokens hashed. Zigbee network key plus install codes on the radio side. HTTPS and rate limiting come with remote access. |
 | **Time** | The hub stamps every message with its own receive time; the device sends only relative information unless the Zigbee Time cluster is used. The gateway needs NTP. |
 | **Offline detection** | The hub marks a device *late* after 3 missed reports and *offline* when Zigbee2MQTT's availability check fails; link quality and the last report are shown. |
-| **Power** | The module is externally powered for now. Low power (sleepy end device, deep sleep, switched sensor supply) is a planned later step and is parked in `PlantModule/specs.md` Part A §18; the design keeps the hooks for it. |
+| **Power** | The module is externally powered for now. Low power is **planned** (D24): three power modes (`always_on`, `light_sleep`, `deep_sleep`), a switched sensor supply on carrier v2, a target of months on one 1S Li-ion cell; the plan, budget, measurements and phases are in `PlantModule/specs.md` Part A §18. |
 | **Safety** | Hard maximum pump duration and minimum pause, enforced on the device and again in the hub. |
 | **Data** | SQLite on the gateway. History stays local; the owner can export. Backup is copying the database file (documented, automatable later). |
 | **Notifications** | In-app alerts are sent by `api`; Telegram messages are sent by `hub` itself (set per rule), so they work without `api`. Web push needs HTTPS and comes with remote access. |
@@ -397,7 +397,7 @@ Planned order of work:
 | D2 | Radio | **Zigbee**, ESP32-C6 as end device with the receiver on (low power later), **`esp-zigbee-sdk` on ESP-IDF** | Firmware moves from Zephyr to ESP-IDF; no WiFi/MQTT/TLS on the device. Going to a sleepy end device later is a configuration change, not a new role. |
 | D3 | Zigbee side of the gateway | **Zigbee2MQTT** with a Zigbee USB coordinator and one external converter for the PlantModule | Standard clusters where possible; a custom cluster for slots, calibration, limits and report intervals. |
 | D4 | Hub | **One Python service** (rules, command queue, API, SSE, hosting of the web build) with **SQLite** | PostgreSQL, the WebSocket uplink and the separate Server are dropped. |
-| D5 | Commands to devices | **The hub sends at once while the device is online and queues while it is offline** (until the ttl ends) | A sleepy low-power mode later adds a check-in sender (`Gateway/specs.md` 9.4). |
+| D5 | Commands to devices | **The hub sends at once while the device is online and queues while it is offline** (until the ttl ends) | The sleep modes (D24) add a per-device sender mode; deep sleep uses a check-in sender (`Gateway/specs.md` 9.4). |
 | D6 | Rules | **Evaluated in the hub**, next to the data | No dependency on any browser or the internet. |
 | D7 | Login | **Username + password on the gateway; per-device (per-browser) tokens**, hashed at rest, revocable | Plain HTTP on the LAN until remote access brings HTTPS. |
 | D8 | Roles | **Owner / Admin / Member / Viewer**, one household per gateway | Matrix in 3.2. |
@@ -416,6 +416,7 @@ Planned order of work:
 | D21 | Hub split | **Two services, `api` and `hub`, that talk only over MQTT**; each has its own SQLite file; no shared code library, a contract file instead | Watering and alerts do not depend on the web side; `api` can run on another device. `api` decides who may do something, `hub` decides whether it can be done. |
 | D22 | Notifications | **`api` sends in-app notifications, `hub` sends Telegram** (chosen per rule) | Telegram alerts work while `api` is down. |
 | D23 | Battery level detection | **Built (not yet verified with a real cell):** the module measures and classifies a **1S Li-ion/LiPo** cell (`batt_mv`, `batt_state`, thresholds 3600 / 3400 mV, calibration per device), the hub raises `battery_low` / `battery_critical` alerts and computes an estimated percentage, the app shows "about NN %" with the volts in the device detail; a critical cell refuses pump runs | The module stays cell-agnostic and honest (no charge detection on carrier v1); interpretation lives where it can be changed without reflashing. Low-power effects stay parked. Details: `PlantModule/specs.md` §6.1, `Gateway/specs.md` §13.1, `App/specs.md` §10.1. |
+| D24 | Low power | **Planned (not built):** three power modes chosen by configuration (`always_on` default, `light_sleep` sleepy end device polling every ≤ 5 s, `deep_sleep` with a check-in window), one 1S Li-ion/LiPo cell lasting months, sensors powered only around a read (switched rail on carrier v2), the pump never runs under deep sleep | One firmware for mains and cell; light sleep keeps commands near-live and the hub sender unchanged; deep sleep for the smallest current. Plan, measurements and phases: `PlantModule/specs.md` §18. |
 
 ### Still open
 
@@ -424,5 +425,5 @@ Planned order of work:
 - **Zigbee2MQTT with the custom device:** publication of transient acknowledgements/events, install-code registration, repeated interview/configure requests (`Gateway/specs.md` §7).
 - **Data retention** on the gateway: keep raw readings forever, or downsample after N months.
 - **Backup** of the SQLite file and the Zigbee network settings (losing the coordinator's network data forces re-joining every device).
-- **Low power later:** everything parked in `PlantModule/specs.md` Part A §18.
+- **Low power:** planned in `PlantModule/specs.md` Part A §18; open questions in 18.12 (cell capacity, whether light sleep is enough, combined report frames, OTA for sleepy modules).
 - **Battery (D23):** final thresholds and the percentage curve after a measured discharge of the real cell with the real pump; a charger-status input on the next carrier revision.

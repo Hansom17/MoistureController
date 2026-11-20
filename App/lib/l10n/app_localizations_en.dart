@@ -1213,6 +1213,151 @@ class AppLocalizationsEn extends AppLocalizations {
   String get batteryLevel => 'Level (estimate)';
 
   @override
+  String get showMeasured => 'Show measured values';
+
+  @override
+  String get showPercent => 'Show percent';
+
+  @override
+  String moistureRawSemantics(int value) {
+    return 'Measured value $value';
+  }
+
+  @override
+  String chartSummaryRaw(int min, int max) {
+    return 'Measured value between $min and $max in this period';
+  }
+
+  @override
+  String measuredAs(int value) {
+    return 'Measured value $value';
+  }
+
+  @override
+  String calibratedAs(int percent) {
+    return 'Calibrated: $percent %';
+  }
+
+  @override
+  String get powerTitle => 'Power';
+
+  @override
+  String get powerAlwaysOn => 'Always on';
+
+  @override
+  String get powerLightSleep => 'Light sleep';
+
+  @override
+  String get powerDeepSleep => 'Deep sleep';
+
+  @override
+  String get powerAlwaysOnBody =>
+      'For USB or mains power. The module listens all the time; commands arrive at once.';
+
+  @override
+  String get powerLightSleepBody =>
+      'For a battery. The radio rests between short checks, so commands arrive within a few seconds.';
+
+  @override
+  String get powerDeepSleepBody =>
+      'Smallest current. The module sleeps between readings; commands wait for its next check-in.';
+
+  @override
+  String get powerNotSupported =>
+      'Greyed-out modes cannot run on this board yet.';
+
+  @override
+  String get powerAdminOnly => 'Only an admin can change the power mode.';
+
+  @override
+  String get pollInterval => 'Check for messages every';
+
+  @override
+  String get awakeWindow => 'Listen after each report for';
+
+  @override
+  String calCurrent(int raw) {
+    return 'Current reading: $raw';
+  }
+
+  @override
+  String get calNoReading => 'No reading from this sensor yet';
+
+  @override
+  String get calUseDry => 'Use as dry';
+
+  @override
+  String get calUseWet => 'Use as wet';
+
+  @override
+  String get calHint =>
+      'Hold the sensor dry (in air), press Read now on the plant page, then use the reading as dry. Do the same in water for wet.';
+
+  @override
+  String get diagPowerMode => 'Power mode';
+
+  @override
+  String get diagWakeReason => 'Last wake';
+
+  @override
+  String get diagAwake => 'Last awake window';
+
+  @override
+  String get diagPollFails => 'Missed polls';
+
+  @override
+  String get diagNextWake => 'Next wake in';
+
+  @override
+  String get wakeNone => '—';
+
+  @override
+  String get wakeTimer => 'Timer';
+
+  @override
+  String get wakeButton => 'Button';
+
+  @override
+  String get wakePumpEnd => 'End of a pump run';
+
+  @override
+  String get wakeRadio => 'Radio';
+
+  @override
+  String get deviceSleeping => 'Sleeping';
+
+  @override
+  String get commandQueuedSleeping =>
+      'Queued · sent at the module\'s next check-in';
+
+  @override
+  String get readingRequestedSleeping =>
+      'Reading requested. The module answers when it wakes up next.';
+
+  @override
+  String get diagRadio => 'Radio';
+
+  @override
+  String get radioSleepy => 'Sleepy (all power modes work)';
+
+  @override
+  String get radioLegacy => 'Receiver always on (old join)';
+
+  @override
+  String get radioLegacyHint =>
+      'This module joined with the old firmware. The sleep modes only work after it is erased and joined again: remove it here, erase the module, add it again.';
+
+  @override
+  String get diagWakeCount => 'Wake-ups since power-on';
+
+  @override
+  String get diagSleepTotal => 'Time asleep';
+
+  @override
+  String get deepRule =>
+      'Deep sleep needs a report interval of at least 30 s that is more than the awake time plus 10 s.';
+
+  @override
   String get plantMenu => 'Plant menu';
 
   @override

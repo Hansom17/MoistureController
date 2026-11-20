@@ -12,12 +12,16 @@ class CommandStateTile extends StatelessWidget {
     required this.command,
     this.onCancel,
     this.deviceOffline = false,
+    this.deviceSleeping = false,
   });
 
   final Command command;
 
   /// The module is offline, so a queued command waits for it.
   final bool deviceOffline;
+
+  /// The module sleeps between check-ins, so a queued command waits for its next report.
+  final bool deviceSleeping;
 
   /// Shown for queued and running commands; null hides the cancel button.
   final VoidCallback? onCancel;
@@ -29,7 +33,7 @@ class CommandStateTile extends StatelessWidget {
     final (kind, label) = switch (c.state) {
       CommandState.queued => (
         StatusKind.pending,
-        deviceOffline ? l.commandQueuedOffline : l.commandQueued,
+        deviceOffline ? l.commandQueuedOffline : (deviceSleeping ? l.commandQueuedSleeping : l.commandQueued),
       ),
       CommandState.running => (
         StatusKind.pending,

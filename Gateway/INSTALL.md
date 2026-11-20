@@ -101,12 +101,35 @@ docker compose logs --tail 30 hub api
 ```
 In the app, **Settings → Gateway** shows Zigbee2MQTT, the coordinator, the hub, the clock and the database size. It starts on every boot (`restart: unless-stopped`); reboot the device once and check that the app comes back.
 
+## 8a. Start at boot
+
+Docker is enabled at boot and every container has `restart: unless-stopped`, so a crashed container restarts and a rebooted device comes back by itself. One more piece makes it complete: a systemd service that runs `docker compose up -d` at boot (it also brings back containers that were removed, for example after a `docker compose down`) and stops the stack gracefully at shutdown so the SQLite files are closed cleanly:
+```bash
+Gateway/scripts/autostart.sh            # installs and enables it; asks for the sudo password
+Gateway/scripts/autostart.sh --print    # only shows the unit file
+Gateway/scripts/autostart.sh --remove   # takes it away again
+```
+Check with `systemctl status moisture-gateway` and, once, reboot the device and look at `docker compose ps`.
+
+## 8b. Backup and restore of a packaged (Yocto) gateway
+
+A gateway that runs the packaged services (systemd units `moisture-hub`, `moisture-api`, `zigbee2mqtt`, `mosquitto`) is backed up from your computer, so the file survives when the image is installed again:
+
+```bash
+Gateway/scripts/gateway_backup.sh [--encrypt] [--out DIR] [root@moisture.local]
+Gateway/scripts/gateway_restore.sh [--dry-run] [--yes] ARCHIVE [root@moisture.local]
+```
+
+The archive holds consistent copies of `hub.db` (devices, plants, rules, readings, settings) and `api.db` (users, logins) and the Zigbee2MQTT files (`configuration.yaml` with the network key and channel, `coordinator_backup.json`, `database.db` with the paired devices, `state.json`). With the same coordinator dongle plugged in, a restore brings the Zigbee network back as it was, and the modules keep working without joining again. It contains secrets (network key, password hashes, Telegram token): keep it private or use `--encrypt` (passphrase asked, or `MC_BACKUP_PASSPHRASE`).
+
+Restore: install the image, make sure ssh as root works, plug in the dongle, then `gateway_restore.sh ARCHIVE`. `--dry-run` checks the archive and the databases on the gateway and changes nothing. A real restore keeps the current files in `/root/before-restore-<time>.tgz`, stops the three services, replaces the files and starts them again; it refuses a backup whose database schema is newer than the software on the gateway. Make a backup before every update of the image.
+
 ## 9. Everyday operation
 
 | Task | Command (in `Gateway/firmware`) |
 |---|---|
 | **Update** | `git pull`, get the new web app (step 4) if the app changed, then `docker compose up -d --build`. The databases migrate themselves. |
-| **Backup** | `../scripts/backup.sh` copies the databases and the whole Zigbee2MQTT data (**the network key: without it every module has to join again**). Run it before updates and keep the folder off the device. The hub also makes a nightly copy of its database. |
+| **Backup** | (Docker install) `../scripts/backup.sh` copies the databases and the whole Zigbee2MQTT data (**the network key: without it every module has to join again**). Run it before updates and keep the folder off the device. The hub also makes a nightly copy of its database. |
 | **Restore Zigbee data** | `docker compose down`, then `docker run --rm -v moisture_z2m-data:/data -v "$PWD/<backup>/z2m-data:/in" alpine cp -r /in/. /data/`, then `docker compose up -d`. |
 | **Logs** | `docker compose logs -f hub` (or `api`, `zigbee2mqtt`, `mosquitto`) |
 | **Restart one service** | `docker compose restart hub` |

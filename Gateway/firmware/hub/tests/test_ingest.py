@@ -56,7 +56,7 @@ async def test_telemetry_stores_reading_for_assigned_plant(rig):
     d = rig.api.state["state/devices"][0]
     assert d["status"] == "online" and d["link_quality"] == 112 and d["latest_readings"]["0"]["value"] == 41.5
     assert d["board"] == "carrier-v1"
-    assert rig.api.state["state/plants"][0]["latest_value"] == 41.5
+    assert rig.api.state["state/plants"][0]["latest_value"] == 41.5 and rig.api.state["state/plants"][0]["latest_raw"] == 2143
     assert "reading" in [e["kind"] for e in rig.api.events]
 
 
@@ -170,3 +170,11 @@ async def test_plant_snapshot_has_a_trend(rig):
     await rig.z2m.state(dev, report(seq=seq, v0=80))
     await rig.api.settle()
     assert rig.api.state["state/plants"][0]["trend"] == "rising"
+
+
+async def test_sleep_diagnostics_are_kept_with_the_others(rig):
+    dev = await add_device(rig)
+    await rig.z2m.state(dev, report(seq=1, uptime_s=5, wake_reason="timer", awake_ms=1800, poll_fail_count=2, next_wake_s=240))
+    await rig.api.settle()
+    diag = rig.api.state["state/devices"][0]["diagnostics"]
+    assert diag["wake_reason"] == "timer" and diag["awake_ms"] == 1800 and diag["poll_fail_count"] == 2 and diag["next_wake_s"] == 240

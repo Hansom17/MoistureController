@@ -1,7 +1,7 @@
 #include "esp_timer.h"
 #include "mc_hal.h"
 
-#define N_IDS 16
+#define N_IDS 20
 #define N_ARGS MC_NUM_SLOTS
 
 typedef struct {
@@ -11,6 +11,19 @@ typedef struct {
 } slot_t;
 
 static slot_t timers[N_IDS][N_ARGS];
+static void (*wake_at)(uint8_t key, uint32_t ms);
+static void (*wake_cancel)(uint8_t key);
+
+static uint8_t key_of(mc_timer_t id, uint8_t arg)
+{
+    return (uint8_t)((int)id * N_ARGS + arg);
+}
+
+void mc_hal_set_wake_hooks(void (*at)(uint8_t, uint32_t), void (*cancel)(uint8_t))
+{
+    wake_at = at;
+    wake_cancel = cancel;
+}
 
 static void fired(void *ctx)
 {
@@ -42,12 +55,18 @@ void mc_hal_timer_arm(mc_timer_t id, uint8_t arg, uint32_t delay_ms)
     esp_timer_handle_t h = timers[id][arg].h;
     esp_timer_stop(h);
     ESP_ERROR_CHECK(esp_timer_start_once(h, (uint64_t)delay_ms * 1000u));
+    if (wake_at != NULL) {
+        wake_at(key_of(id, arg), delay_ms);
+    }
 }
 
 void mc_hal_timer_cancel(mc_timer_t id, uint8_t arg)
 {
     if ((int)id < N_IDS && arg < N_ARGS) {
         esp_timer_stop(timers[id][arg].h);
+        if (wake_cancel != NULL) {
+            wake_cancel(key_of(id, arg));
+        }
     }
 }
 

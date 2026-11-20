@@ -3,9 +3,9 @@
 export default {
   "interfaceVersion": [
     1,
-    0
+    2
   ],
-  "configSchema": 2,
+  "configSchema": 3,
   "identity": {
     "manufacturer": "MoistureController",
     "model": "MC-PLANT",
@@ -322,6 +322,104 @@ export default {
       "default": null
     },
     {
+      "id": 321,
+      "name": "wake_reason",
+      "type": "enum8",
+      "access": [
+        "r",
+        "report"
+      ],
+      "mqtt": "wake_reason",
+      "layout": null,
+      "enum": "wake_reason",
+      "range": null,
+      "default": null
+    },
+    {
+      "id": 322,
+      "name": "awake_ms",
+      "type": "uint16",
+      "access": [
+        "r",
+        "report"
+      ],
+      "mqtt": "awake_ms",
+      "layout": null,
+      "enum": null,
+      "range": null,
+      "default": null
+    },
+    {
+      "id": 323,
+      "name": "poll_fail_count",
+      "type": "uint16",
+      "access": [
+        "r",
+        "report"
+      ],
+      "mqtt": "poll_fail_count",
+      "layout": null,
+      "enum": null,
+      "range": null,
+      "default": null
+    },
+    {
+      "id": 324,
+      "name": "next_wake_s",
+      "type": "uint16",
+      "access": [
+        "r",
+        "report"
+      ],
+      "mqtt": "next_wake_s",
+      "layout": null,
+      "enum": null,
+      "range": null,
+      "default": null
+    },
+    {
+      "id": 325,
+      "name": "wake_count",
+      "type": "uint16",
+      "access": [
+        "r",
+        "report"
+      ],
+      "mqtt": "wake_count",
+      "layout": null,
+      "enum": null,
+      "range": null,
+      "default": null
+    },
+    {
+      "id": 326,
+      "name": "radio_mode",
+      "type": "enum8",
+      "access": [
+        "r",
+        "report"
+      ],
+      "mqtt": "radio_mode",
+      "layout": null,
+      "enum": "radio_mode",
+      "range": null,
+      "default": null
+    },
+    {
+      "id": 327,
+      "name": "sleep_total_s",
+      "type": "uint32",
+      "access": [
+        "r",
+        "report"
+      ],
+      "mqtt": "sleep_total_s",
+      "layout": null,
+      "enum": null,
+      "range": null,
+      "default": null
+    },
+    {
       "id": 48,
       "name": "cfg_rev",
       "type": "uint16",
@@ -458,6 +556,54 @@ export default {
         1100
       ],
       "default": 1000
+    },
+    {
+      "id": 7,
+      "name": "power_mode",
+      "type": "enum8",
+      "access": [
+        "rw"
+      ],
+      "mqtt": null,
+      "layout": null,
+      "enum": "power_mode",
+      "range": [
+        0,
+        2
+      ],
+      "default": 0
+    },
+    {
+      "id": 8,
+      "name": "poll_interval_ms",
+      "type": "uint16",
+      "access": [
+        "rw"
+      ],
+      "mqtt": null,
+      "layout": null,
+      "enum": null,
+      "range": [
+        500,
+        5000
+      ],
+      "default": 3000
+    },
+    {
+      "id": 9,
+      "name": "awake_s",
+      "type": "uint8",
+      "access": [
+        "rw"
+      ],
+      "mqtt": null,
+      "layout": null,
+      "enum": null,
+      "range": [
+        2,
+        30
+      ],
+      "default": 5
     },
     {
       "id": 16,
@@ -717,7 +863,24 @@ export default {
       "2": "panic",
       "3": "watchdog",
       "4": "brownout",
-      "5": "other"
+      "5": "other",
+      "6": "deep_sleep_wake"
+    },
+    "power_mode": {
+      "0": "always_on",
+      "1": "light_sleep",
+      "2": "deep_sleep"
+    },
+    "wake_reason": {
+      "0": "none",
+      "1": "timer",
+      "2": "button",
+      "3": "pump_end",
+      "4": "radio"
+    },
+    "radio_mode": {
+      "0": "receiver_on_legacy",
+      "1": "sleepy"
     },
     "cfg_result": {
       "0": "ok",
@@ -813,6 +976,20 @@ export default {
         "rejoin_count",
         "last_error",
         "free_heap"
+      ],
+      "min_s": 10,
+      "max_s": 600,
+      "change": "any"
+    },
+    {
+      "attributes": [
+        "wake_reason",
+        "awake_ms",
+        "poll_fail_count",
+        "next_wake_s",
+        "wake_count",
+        "radio_mode",
+        "sleep_total_s"
       ],
       "min_s": 10,
       "max_s": 600,

@@ -7,7 +7,7 @@ from ulid import ULID
 from mc_hub.db.models import Command, Device, Plant, Setting
 from mc_hub.errors import HubError
 
-from . import alerts
+from . import alerts, power
 from .effects import Effects
 from .views import alert_view
 
@@ -15,7 +15,7 @@ DEFAULT_TTL_S = 900
 HARD_LIMIT_S = 300           # no pump run longer than this, whatever the device says
 OPEN = ("queued", "delivered", "cancelling")
 PUMP_ACTIONS = ("pump.run", "pump.stop")
-NOT_NEW = ("ready", "online", "late", "offline", "safe_mode")
+NOT_NEW = ("ready", "online", "late", "offline", "safe_mode", "sleeping")
 DEVICE_ACTIONS = {"identify": "device.identify", "reboot": "device.reboot", "clear_safe_mode": "device.clear_safe_mode",
                   "report_now": "device.report_now"}
 
@@ -84,8 +84,11 @@ def _check_device(d: Device | None, *, allow_safe_mode: bool = False) -> Device:
     return d
 
 
-def _ttl(ttl_s: int | None) -> int:
-    ttl = DEFAULT_TTL_S if ttl_s is None else int(ttl_s)
+def _ttl(ttl_s: int | None, d: Device | None = None) -> int:
+    default = DEFAULT_TTL_S
+    if d is not None and power.is_deep(d):   # it only listens once per report interval: the command has to outlive two
+        default = max(DEFAULT_TTL_S, 2 * power.settings(d)[2] + 60)
+    ttl = default if ttl_s is None else int(ttl_s)
     if not 30 <= ttl <= 86400:
         raise HubError("validation", detail="ttl_s must be 30..86400")
     return ttl
@@ -111,7 +114,7 @@ async def create_pump_run(s: AsyncSession, fx: Effects, now: int, d: Device | No
     if await _open_pump_command(s, d.id, slot) is not None:
         raise HubError("busy", "Pump is busy", "A pump command for this slot is queued or running.")
     c = _new(now, d.id, "pump.run", {"slot": slot, "seconds": seconds}, zb_id=await next_zb_id(s),
-             ttl_s=_ttl(ttl_s), source=source, created_by=created_by, request_id=request_id,
+             ttl_s=_ttl(ttl_s, d), source=source, created_by=created_by, request_id=request_id,
              plant_id=plant_id, rule_id=rule_id)
     s.add(c)
     await s.flush()
@@ -125,7 +128,7 @@ async def create_device_action(s: AsyncSession, fx: Effects, now: int, d: Device
     if action not in DEVICE_ACTIONS:
         raise HubError("validation", detail=f"action must be one of {sorted(DEVICE_ACTIONS)}")
     d = _check_device(d, allow_safe_mode=True)
-    c = _new(now, d.id, DEVICE_ACTIONS[action], {"arg": arg}, zb_id=await next_zb_id(s), ttl_s=DEFAULT_TTL_S,
+    c = _new(now, d.id, DEVICE_ACTIONS[action], {"arg": arg}, zb_id=await next_zb_id(s), ttl_s=_ttl(None, d),
              source="manual", created_by=created_by, request_id=request_id)
     s.add(c)
     await s.flush()

@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 
 import '../app/theme/app_colors.dart';
 import '../core/format.dart';
+import '../core/settings.dart';
 
 enum GaugeSize {
   small(48, 5, 13),
@@ -24,21 +25,28 @@ class MoistureGauge extends StatelessWidget {
     super.key,
     required this.percent,
     this.size = GaugeSize.medium,
+    this.raw,
+    this.mode = ValueMode.percent,
   });
 
   /// Null = no reading yet; shows "—" and an empty ring.
   final double? percent;
   final GaugeSize size;
 
+  /// The measured value; shown instead of the percentage in [ValueMode.measured] (the ring still shows the percentage).
+  final int? raw;
+  final ValueMode mode;
+
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     final p = percent;
-    final value = p?.round();
+    final measured = mode == ValueMode.measured;
+    final value = measured ? raw : p?.round();
     return Semantics(
       label: value == null
           ? context.l10n.noReading
-          : context.l10n.moistureSemantics(value),
+          : (measured ? context.l10n.moistureRawSemantics(value) : context.l10n.moistureSemantics(value)),
       excludeSemantics: true,
       child: SizedBox.square(
         dimension: size.diameter,
@@ -51,7 +59,7 @@ class MoistureGauge extends StatelessWidget {
           ),
           child: Center(
             child: Text(
-              value == null ? '—' : '$value%',
+              value == null ? '—' : (measured ? '$value' : '$value%'),
               style: TextStyle(
                 fontSize: size.fontSize,
                 fontWeight: FontWeight.w600,

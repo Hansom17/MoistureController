@@ -22,6 +22,13 @@ void mc_set_error(mc_core_t *c, uint16_t code);
 void mc_led_update(mc_core_t *c, mc_actions_t *out);
 void mc_lifecycle_reboot(mc_core_t *c, mc_actions_t *out, bool clear_crash);
 
+/* ---- power (mc_power.c) ---- */
+void mc_power_report_done(mc_core_t *c, mc_actions_t *out);
+void mc_power_traffic(mc_core_t *c, mc_actions_t *out);
+void mc_power_config_applied(mc_core_t *c, mc_actions_t *out, uint8_t old_mode);
+void mc_power_on_timer(mc_core_t *c, mc_timer_t id);
+void mc_power_after_step(mc_core_t *c, mc_actions_t *out);
+
 /* ---- sensing machine (mc_sense.c) ---- */
 void mc_sense_start(mc_core_t *c, mc_actions_t *out);
 void mc_sense_stop(mc_core_t *c, mc_actions_t *out);

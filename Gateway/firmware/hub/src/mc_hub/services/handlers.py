@@ -96,9 +96,10 @@ def register(h: RequestHandler, hub) -> None:
         d = await ctx.session.get(Device, b["device_id"])
         if d is None or d.deleted_at is not None:
             raise HubError("not_found", "Device not found")
+        ieee = d.ieee
         await devs.soft_delete(ctx.session, ctx.fx, ctx.now, d)
         ctx.fx.publish(hub.topics.request("device/remove"),
-                       json.dumps({"id": d.ieee, "force": bool(b.get("force", False))}).encode())
+                       json.dumps({"id": ieee, "force": bool(b.get("force", False))}).encode())
         return {}
 
     @h.register("backup")

@@ -9,6 +9,7 @@ enum AppAction {
   identifyDevice(Role.member),
   acknowledgeAlert(Role.member),
   manageDevices(Role.admin),
+  setPowerMode(Role.admin),
   manageUsers(Role.admin),
   backup(Role.admin),
   manageInstallation(Role.owner),

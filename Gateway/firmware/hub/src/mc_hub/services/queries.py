@@ -74,13 +74,15 @@ def register(h: RequestHandler, snapshots) -> None:
         if size is None:
             raise HubError("validation", detail="bucket must be raw, hour or day")
         t = (Reading.ts // size * size).label("t")
-        q = select(t, func.avg(Reading.value), func.min(Reading.value), func.max(Reading.value), func.count()) \
+        q = select(t, func.avg(Reading.value), func.min(Reading.value), func.max(Reading.value), func.count(),
+                   func.avg(Reading.raw)) \
             .where(Reading.plant_id == b["plant_id"], Reading.value.is_not(None))
         q = _range(q, Reading.ts, b).group_by(t).order_by(t)
         if cur:
             q = q.having(t > cur[0])
         rows = (await s.execute(q.limit(n + 1))).all()
-        items = [{"ts": r[0], "avg": round(r[1], 2), "min": r[2], "max": r[3], "count": r[4]} for r in rows[:n]]
+        items = [{"ts": r[0], "avg": round(r[1], 2), "min": r[2], "max": r[3], "count": r[4],
+                  "avg_raw": round(r[5], 1) if r[5] is not None else None} for r in rows[:n]]
         return {"items": items, "next_cursor": enc([rows[n - 1][0]]) if len(rows) > n else None}
 
     @h.register("query/commands")

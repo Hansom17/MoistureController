@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../app/theme/app_colors.dart';
 import '../app/theme/tokens.dart';
 import '../core/format.dart';
+import '../core/settings.dart';
 import '../data/models.dart';
 import 'moisture_gauge.dart';
 import 'battery_chip.dart';
@@ -17,12 +18,14 @@ class PlantCard extends StatelessWidget {
     this.hasPendingCommand = false,
     this.onTap,
     this.onReadNow,
+    this.valueMode = ValueMode.percent,
   });
 
   final Plant plant;
   final Device? device;
   final bool hasPendingCommand;
   final VoidCallback? onTap;
+  final ValueMode valueMode;
 
   /// Shown as a menu entry when set (the caller decides who may and whether the device is reachable).
   final VoidCallback? onReadNow;
@@ -49,7 +52,7 @@ class PlantCard extends StatelessWidget {
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              MoistureGauge(percent: plant.moisturePercent),
+              MoistureGauge(percent: plant.moisturePercent, raw: plant.rawValue, mode: valueMode),
               const SizedBox(width: Spacing.lg),
               Expanded(
                 child: Column(

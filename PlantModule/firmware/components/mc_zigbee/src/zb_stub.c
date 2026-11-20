@@ -56,6 +56,28 @@ void mc_zb_send_ack(uint16_t n, uint32_t cmd_id, uint8_t state, uint8_t reason, 
     ESP_LOGI(TAG, "ack n=%u cmd=%lu state=%u reason=%u ends_in=%u", n, (unsigned long)cmd_id, state, reason, ends_in_s);
 }
 
+void mc_zb_set_poll(uint16_t ms, uint16_t fast_ms)
+{
+    (void)ms;
+    (void)fast_ms;
+}
+
+void mc_zb_set_sleep_ok(bool ok)
+{
+    (void)ok;
+}
+
+void mc_zb_wake_at(uint8_t key, uint32_t ms)
+{
+    (void)key;
+    (void)ms;
+}
+
+void mc_zb_wake_cancel(uint8_t key)
+{
+    (void)key;
+}
+
 void mc_zb_send_event(uint16_t n, uint8_t code, uint8_t slot, uint16_t arg)
 {
     ESP_LOGI(TAG, "event n=%u code=%u slot=%u arg=%u", n, code, slot, arg);

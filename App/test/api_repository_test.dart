@@ -20,6 +20,9 @@ class CannedApi implements HttpClientAdapter {
     'fast_report_interval_s': 30,
     'fast_report_hold_s': 120,
     'batt_low_mv': 3500,
+    'power_mode': 1,
+    'poll_interval_ms': 2000,
+    'awake_s': 8,
     'slots': [
       {'slot': 0, 'module': 'moisture', 'port': 'P1', 'cal_dry': 3000, 'cal_wet': 1200, 'samples': 16},
       {'slot': 2, 'module': 'pump', 'port': 'P3', 'max_run_s': 45, 'min_pause_s': 600, 'active_high': true},
@@ -44,7 +47,11 @@ class CannedApi implements HttpClientAdapter {
     'desired_config': pumpConfig,
     'reported_config': pumpConfig,
     'config_error': null,
-    'diagnostics': {'uptime_s': 3600, 'boot_reason': 'power_on'},
+    'diagnostics': {'uptime_s': 3600, 'boot_reason': 'power_on', 'wake_reason': 'timer'},
+    'latest_readings': {
+      '0': {'type': 'moisture', 'value': 41.5, 'raw': 2250, 'error': 'ok', 'ts': 1792770000},
+      '2': {'type': 'pump', 'value': 0, 'raw': 0, 'error': 'ok', 'ts': 1792770000},
+    },
   };
 
   static const user = {
@@ -66,7 +73,7 @@ class CannedApi implements HttpClientAdapter {
         return [
           {
             'id': 'p1', 'name': 'Ficus', 'notes': '', 'sensor': {'device_id': 'dev-abc', 'slot': 0},
-            'pump': {'device_id': 'dev-abc', 'slot': 2}, 'latest_value': 41.5, 'latest_ts': '2026-10-09T20:00:00Z',
+            'pump': {'device_id': 'dev-abc', 'slot': 2}, 'latest_value': 41.5, 'latest_raw': 2250, 'latest_ts': '2026-10-09T20:00:00Z',
             'trend': 'falling', 'archived': false,
           },
           {'id': 'p2', 'name': 'Moss', 'sensor': {'device_id': null, 'slot': null}, 'pump': {'device_id': null, 'slot': null},
@@ -84,7 +91,7 @@ class CannedApi implements HttpClientAdapter {
         };
       case 'GET /plants/p1/readings':
         return o.queryParameters['cursor'] == null
-            ? {'items': [{'ts': '2026-10-09T10:00:00Z', 'avg': 40.0, 'min': 38.0, 'max': 42.0, 'count': 12}], 'next_cursor': 'abc'}
+            ? {'items': [{'ts': '2026-10-09T10:00:00Z', 'avg': 40.0, 'min': 38.0, 'max': 42.0, 'count': 12, 'avg_raw': 2280.4}], 'next_cursor': 'abc'}
             : {'items': [{'ts': '2026-10-09T11:00:00Z', 'avg': 38.0, 'min': 37.0, 'max': 39.0, 'count': 12}], 'next_cursor': null};
       case 'GET /plants/p1/rules':
         return [
@@ -127,6 +134,12 @@ class CannedApi implements HttpClientAdapter {
         return {'id': 'i1', 'role': 'member', 'status': 'open', 'expires_at': '2026-10-11T00:00:00Z', 'code': 'ABCDEFGH23456789JKLM', 'path': '/join#c=ABCDEFGH23456789JKLM'};
       case 'PUT /devices/dev-abc/config':
         return {'rev': 9};
+      case 'GET /devices/dev-abc/config':
+        return {'desired_rev': 8, 'reported_rev': 7, 'sync_state': 'pending', 'desired': pumpConfig, 'reported': pumpConfig, 'board': 'carrier-v1'};
+      case 'GET /meta/boards/carrier-v1':
+        return {'name': 'carrier-v1', 'ports': [{'id': 'P1', 'roles': ['moisture', 'pump']}], 'low_power': {'modes': ['light_sleep']}};
+      case 'GET /meta/boards/old-board':
+        return {'name': 'old-board', 'ports': [{'id': 'P1', 'roles': ['moisture']}]};
       case 'GET /status':
         return {
           'api': {'version': '0.1.0', 'db_size': 73728},
@@ -222,6 +235,8 @@ void main() {
 
   test('plants: moisture, trend and the pump limit come from the device configuration', () async {
     final plants = await repo.plants();
+    expect(plants[0].rawValue, 2250);
+    expect(plants[1].rawValue, isNull);
     expect(plants.first.moisturePercent, 41.5);
     expect(plants.first.trend, Trend.falling);
     expect(plants.first.maxRunS, 45);
@@ -247,6 +262,7 @@ void main() {
   test('readings: hourly buckets for a week, all pages are followed', () async {
     final r = await repo.readings('p1', ChartRange.week);
     expect(r.map((x) => x.moisturePercent), [40.0, 38.0]);
+    expect(r.map((x) => x.raw), [2280.4, null]); // the second bucket came without a measured value
     final first = api.requests.firstWhere((x) => x.path == '/plants/p1/readings');
     expect(first.queryParameters['bucket'], 'hour');
     expect(first.queryParameters['from'], startsWith('2026-10-02T20'));
@@ -331,6 +347,20 @@ void main() {
     expect(cfg['report_interval_s'], 120);
     expect((cfg['slots'] as List)[0], {'slot': 0, 'module': 'moisture', 'port': 'P1', 'cal_dry': 2900, 'cal_wet': 1100, 'samples': 16});
     expect((cfg['slots'] as List)[1], {'slot': 2, 'module': 'pump', 'port': 'P3', 'max_run_s': 20, 'min_pause_s': 300, 'active_high': false});
+  });
+
+  test('power settings: read from the configuration, sent when saving, and what a board can do from its description', () async {
+    final d = (await repo.devices()).first;
+    expect(d.powerMode, PowerMode.lightSleep);
+    expect(d.latestRaw, {0: 2250, 2: 0});
+    expect(d.diagnostics['wake_reason'], 'timer');
+    final cfg = (await repo.deviceConfig('dev-abc')).desired!;
+    expect([cfg.powerMode, cfg.pollIntervalMs, cfg.awakeS], [PowerMode.lightSleep, 2000, 8]);
+    await repo.saveDeviceConfig('dev-abc', 8, cfg.copyWith(powerMode: PowerMode.deepSleep, awakeS: 12));
+    final sent = (api.bodies['PUT /devices/dev-abc/config'] as Map)['config'] as Map;
+    expect([sent['power_mode'], sent['poll_interval_ms'], sent['awake_s']], [2, 2000, 12]);
+    expect((await repo.board('carrier-v1'))!.powerModes, {PowerMode.alwaysOn, PowerMode.lightSleep});
+    expect((await repo.board('old-board'))!.powerModes, {PowerMode.alwaysOn}, reason: 'a board without low_power only does always-on');
   });
 
   test('join window and invites', () async {

@@ -110,8 +110,29 @@ static void exec(sim_t *s, const mc_action_t *a)
             set_pump(s, i, false);
         }
         break;
+    case MC_ACT_POLL:
+        s->poll_ms = a->u.poll.ms;
+        s->poll_fast_ms = a->u.poll.fast_ms;
+        s->poll_actions++;
+        break;
+    case MC_ACT_SENSOR_POWER:
+        if (a->u.sensor_power.on) {
+            s->rail_on_calls++;
+            s->rail_on_since = s->now;
+        } else {
+            s->rail_off_calls++;
+        }
+        s->rail_on = a->u.sensor_power.on;
+        break;
     case MC_ACT_READ_SLOT:
         s->read_slot_calls++;
+        if (s->core.board != NULL && s->core.board->sensor_power.present) {
+            if (!s->rail_on) {
+                s->reads_without_power++;
+            } else if (s->now - s->rail_on_since < s->core.board->sensor_power.settle_ms) {
+                s->reads_before_settled++;
+            }
+        }
         if (!s->adc_silent[a->u.read.slot]) {
             mc_event_t ev = {.kind = MC_EV_ADC_DONE};
             ev.u.adc.slot = a->u.read.slot;
@@ -199,6 +220,13 @@ void sim_advance(sim_t *s, uint32_t ms)
 
 /* ---- setup ---------------------------------------------------------------------------------------------- */
 
+void sim_init_board(sim_t *s, const mc_board_t *board)
+{
+    sim_init(s, NULL);
+    s->custom_board = *board;
+    mc_core_init(&s->core, &s->custom_board, 4095);
+}
+
 void sim_init(sim_t *s, const char *board_name)
 {
     memset(s, 0, sizeof *s);
@@ -235,6 +263,12 @@ void sim_boot(sim_t *s, const sim_boot_opts_t *o)
     b->crash_count_stored = o->crash_count_stored;
     b->boot_id = o->boot_id ? o->boot_id : 7;
     b->config_valid = !o->config_invalid;
+    b->deep_sleep_wake = o->deep_sleep_wake;
+    b->wake_reason = o->wake_reason;
+    b->rtc_seq = o->rtc_seq;
+    b->rtc_wake_count = o->rtc_wake_count;
+    b->rtc_sleep_total_s = o->rtc_sleep_total_s;
+    b->rtc_last_awake_ms = o->rtc_last_awake_ms;
     if (o->config) {
         b->config = *o->config;
     } else {

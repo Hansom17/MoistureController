@@ -305,7 +305,7 @@ static void test_the_stored_schema_one_configuration_is_migrated(void)
     uint8_t v1[MC_CONFIG_BLOB_SIZE_V1];
     v1[0] = 1;
     memcpy(v1 + 1, blob + 1, 10);          /* rev, three intervals, batt_low */
-    memcpy(v1 + 11, blob + 15, 72);        /* the slot table */
+    memcpy(v1 + 11, blob + 19, 72);        /* the slot table (after the power settings) */
     uint32_t crc = mc_crc32(v1, MC_CONFIG_BLOB_SIZE_V1 - 4);
     for (int k = 0; k < 4; k++) {
         v1[MC_CONFIG_BLOB_SIZE_V1 - 4 + k] = (uint8_t)(crc >> (8 * k));

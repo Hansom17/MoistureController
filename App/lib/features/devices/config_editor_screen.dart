@@ -6,6 +6,8 @@ import '../../app/theme/tokens.dart';
 import '../../core/actions.dart';
 import '../../core/app_data.dart';
 import '../../core/format.dart';
+import '../../core/permissions.dart';
+import '../../core/session.dart';
 import '../../data/api_problem.dart';
 import '../../data/models.dart';
 import '../../ui/app_scope.dart';
@@ -115,11 +117,75 @@ class _EditorState extends ConsumerState<_Editor> {
     }
   }
 
+  String _modeName(PowerMode m) {
+    final l = context.l10n;
+    return switch (m) {
+      PowerMode.alwaysOn => l.powerAlwaysOn,
+      PowerMode.lightSleep => l.powerLightSleep,
+      PowerMode.deepSleep => l.powerDeepSleep,
+    };
+  }
+
+  String _modeBody(PowerMode m) {
+    final l = context.l10n;
+    return switch (m) {
+      PowerMode.alwaysOn => l.powerAlwaysOnBody,
+      PowerMode.lightSleep => l.powerLightSleepBody,
+      PowerMode.deepSleep => l.powerDeepSleepBody,
+    };
+  }
+
+  /// Deep sleep needs an interval of at least 30 s that is longer than the awake window plus 10 s.
+  bool get _deepRuleOk => _body.reportIntervalS >= 30 && _body.reportIntervalS > _body.awakeS + 10;
+
+  Widget _powerCard() {
+    final l = context.l10n;
+    final canChange = can(ref.watch(currentUserProviderRole), AppAction.setPowerMode);
+    final modes = widget.board.powerModes;
+    return SectionCard(
+      title: l.powerTitle,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          SegmentedButton<PowerMode>(
+            showSelectedIcon: false,
+            segments: [
+              for (final m in PowerMode.values)
+                ButtonSegment(value: m, label: Text(_modeName(m)), enabled: modes.contains(m) || m == _body.powerMode),
+            ],
+            selected: {_body.powerMode},
+            onSelectionChanged: canChange ? (s) => setState(() => _body = _body.copyWith(powerMode: s.first)) : null,
+          ),
+          const SizedBox(height: Spacing.sm),
+          Text(_modeBody(_body.powerMode), style: Theme.of(context).textTheme.bodySmall),
+          if (modes.length < PowerMode.values.length) Text(l.powerNotSupported, style: Theme.of(context).textTheme.bodySmall),
+          if (!canChange) Text(l.powerAdminOnly, style: Theme.of(context).textTheme.bodySmall),
+          if (_body.powerMode == PowerMode.lightSleep)
+            _IntField(
+              label: l.pollInterval, value: _body.pollIntervalMs, min: 500, max: 5000, suffix: 'ms',
+              enabled: canChange, onChanged: (v) => setState(() => _body = _body.copyWith(pollIntervalMs: v)),
+            ),
+          if (_body.powerMode == PowerMode.deepSleep && !_deepRuleOk)
+            Padding(
+              padding: const EdgeInsets.only(top: Spacing.sm),
+              child: Text(l.deepRule, style: TextStyle(color: Theme.of(context).colorScheme.error)),
+            ),
+          if (_body.powerMode == PowerMode.deepSleep)
+            _IntField(
+              label: l.awakeWindow, value: _body.awakeS, min: 2, max: 30, suffix: 's',
+              enabled: canChange, onChanged: (v) => setState(() => _body = _body.copyWith(awakeS: v)),
+            ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final l = context.l10n;
     final theme = Theme.of(context);
     final rejected = widget.config.sync == ConfigSync.rejected;
+    final device = ref.watch(devicesProvider).value?.where((d) => d.id == widget.deviceId).firstOrNull;
     return ListView(
       padding: const EdgeInsets.all(Spacing.lg),
       children: [
@@ -175,11 +241,14 @@ class _EditorState extends ConsumerState<_Editor> {
             ],
           ),
         ),
+        const SizedBox(height: Spacing.md),
+        _powerCard(),
         for (var i = 0; i < 6; i++) ...[
           const SizedBox(height: Spacing.md),
           _SlotCard(
             index: i,
             slot: _slot(i),
+            currentRaw: device?.latestRaw[i],
             freePorts: (m) => _freePorts(m, i),
             onChanged: (s) => _setSlot(i, s),
           ),
@@ -193,7 +262,7 @@ class _EditorState extends ConsumerState<_Editor> {
         FilledButton.icon(
           icon: const Icon(Icons.save_outlined),
           label: Text(l.save),
-          onPressed: _saving ? null : _save,
+          onPressed: _saving || (_body.powerMode == PowerMode.deepSleep && !_deepRuleOk) ? null : _save,
         ),
         const SizedBox(height: Spacing.sm),
         Text(l.configApplyNote, style: theme.textTheme.bodySmall),
@@ -203,9 +272,10 @@ class _EditorState extends ConsumerState<_Editor> {
 }
 
 class _SlotCard extends StatelessWidget {
-  const _SlotCard({required this.index, required this.slot, required this.freePorts, required this.onChanged});
+  const _SlotCard({required this.index, required this.slot, required this.freePorts, required this.onChanged, this.currentRaw});
 
   final int index;
+  final int? currentRaw;
   final SlotConfig? slot;
   final List<String> Function(String module) freePorts;
   final ValueChanged<SlotConfig?> onChanged;
@@ -275,6 +345,22 @@ class _SlotCard extends StatelessWidget {
           if (s != null && !s.isPump) ...[
             _IntField(label: l.calDry, value: s.calDry, min: 0, max: 4095, onChanged: (v) => onChanged(s.copyWith(calDry: v))),
             _IntField(label: l.calWet, value: s.calWet, min: 0, max: 4095, onChanged: (v) => onChanged(s.copyWith(calWet: v))),
+            const SizedBox(height: Spacing.sm),
+            Text(currentRaw == null ? l.calNoReading : l.calCurrent(currentRaw!), style: Theme.of(context).textTheme.bodyMedium),
+            Wrap(
+              spacing: Spacing.sm,
+              children: [
+                TextButton(
+                  onPressed: currentRaw == null ? null : () => onChanged(s.copyWith(calDry: currentRaw)),
+                  child: Text(l.calUseDry),
+                ),
+                TextButton(
+                  onPressed: currentRaw == null ? null : () => onChanged(s.copyWith(calWet: currentRaw)),
+                  child: Text(l.calUseWet),
+                ),
+              ],
+            ),
+            Text(l.calHint, style: Theme.of(context).textTheme.bodySmall),
           ],
         ],
       ),
@@ -291,8 +377,10 @@ class _IntField extends StatefulWidget {
     required this.max,
     required this.onChanged,
     this.suffix,
+    this.enabled = true,
   });
 
+  final bool enabled;
   final String label;
   final int value;
   final int min;
@@ -308,6 +396,15 @@ class _IntFieldState extends State<_IntField> {
   late final _controller = TextEditingController(text: '${widget.value}');
 
   @override
+  void didUpdateWidget(_IntField old) {
+    super.didUpdateWidget(old);
+    // a value set from outside (a calibration point taken from the current reading) replaces the typed text
+    if (widget.value != old.value && int.tryParse(_controller.text) != widget.value) {
+      _controller.text = '${widget.value}';
+    }
+  }
+
+  @override
   void dispose() {
     _controller.dispose();
     super.dispose();
@@ -321,6 +418,7 @@ class _IntFieldState extends State<_IntField> {
       padding: const EdgeInsets.only(top: Spacing.md),
       child: TextField(
         controller: _controller,
+        enabled: widget.enabled,
         keyboardType: TextInputType.number,
         decoration: InputDecoration(
           labelText: widget.label,
