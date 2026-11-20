@@ -93,6 +93,12 @@ static void execute(const mc_action_t *a)
     case MC_ACT_READ_BATTERY:
         read_battery();
         break;
+    case MC_ACT_SENSOR_POWER:
+        mc_hal_sensor_power(a->u.sensor_power.on);
+        break;
+    case MC_ACT_POLL:
+        mc_zb_set_poll(a->u.poll.ms, a->u.poll.fast_ms);
+        break;
     case MC_ACT_PERSIST_CONFIG:
         if (!mc_hal_config_store(&core.cfg)) {
             ESP_LOGE(TAG, "configuration not stored");
@@ -120,6 +126,18 @@ static void execute(const mc_action_t *a)
     }
 }
 
+/* After every step: what may the chip do now? Light sleep follows by itself (power management), deep sleep is entered
+ * here, but only when nothing else waits in the queue. */
+static void after_step(void)
+{
+    mc_sleep_t allowed = mc_core_sleep_allowed(&core);
+    mc_zb_set_sleep_ok(allowed != MC_SLEEP_NONE);
+    mc_hal_sleep_apply(allowed);
+    if (allowed == MC_SLEEP_DEEP && uxQueueMessagesWaiting(queue) == 0) {
+        mc_hal_deep_sleep(mc_core_deep_sleep_ms(&core), core.seq, &core.cfg); /* does not return */
+    }
+}
+
 static void step(mc_event_t *ev)
 {
     ev->now_ms = mc_hal_now_ms();
@@ -130,6 +148,7 @@ static void step(mc_event_t *ev)
     for (size_t i = 0; i < actions.n; i++) {
         execute(&actions.a[i]);
     }
+    after_step();
 }
 
 static void app_task(void *arg)
@@ -137,6 +156,7 @@ static void app_task(void *arg)
     (void)arg;
     mc_event_t ev = {.kind = MC_EV_BOOT};
     mc_hal_boot_info(&ev.u.boot);
+    mc_hal_sleep_boot(&ev.u.boot);
     ev.u.boot.factory_valid = factory_ok;
     ESP_LOGI(TAG, "boot reason %u, boot id %u, first boot %d, config %s", ev.u.boot.reset_reason, ev.u.boot.boot_id,
              ev.u.boot.first_boot, ev.u.boot.config_valid ? "ok" : "INVALID");
@@ -163,6 +183,7 @@ void mc_app_start(const mc_board_t *board, const mc_factory_t *factory, bool fac
         mc_hal_adc_init(board);
         mc_hal_button_start();
     }
+    mc_hal_set_wake_hooks(mc_zb_wake_at, mc_zb_wake_cancel);
     mc_hal_timers_init();
     xTaskCreate(app_task, "mc_app", 6144, NULL, 5, NULL);
 }

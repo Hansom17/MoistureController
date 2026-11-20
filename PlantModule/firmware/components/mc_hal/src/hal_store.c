@@ -61,6 +61,8 @@ static uint8_t reset_reason(void)
         return MC_BOOT_REASON_WATCHDOG;
     case ESP_RST_BROWNOUT:
         return MC_BOOT_REASON_BROWNOUT;
+    case ESP_RST_DEEPSLEEP:
+        return MC_BOOT_REASON_DEEP_SLEEP_WAKE;
     default:
         return MC_BOOT_REASON_OTHER;
     }
@@ -124,10 +126,12 @@ void mc_hal_boot_info(mc_boot_t *b)
         nvs_get_u16(h, "rejoins", &rejoins);
         nvs_get_u16(h, "last_err", &last_err);
         nvs_get_u16(h, "boot_id", &boot_id);
-        boot_id++;
-        nvs_set_u16(h, "boot_id", boot_id);
-        nvs_set_u8(h, "booted", 1);
-        nvs_commit(h);
+        if (!mc_hal_sleep_is_deep_wake()) { /* a wake from deep sleep is not a boot: no counter, no flash write */
+            boot_id++;
+            nvs_set_u16(h, "boot_id", boot_id);
+            nvs_set_u8(h, "booted", 1);
+            nvs_commit(h);
+        }
         nvs_close(h);
     }
     b->first_boot = booted == 0;

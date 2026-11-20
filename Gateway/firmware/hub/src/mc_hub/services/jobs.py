@@ -7,7 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from mc_hub.clock import Clock
 from mc_hub.db.models import Command, Device
 
-from . import alerts
+from . import alerts, power
 from .commands import command_view
 from .effects import Effects
 from .views import alert_view, device_view
@@ -114,11 +114,15 @@ class Jobs:
                     fx.notify(f"Watering failed: {reason}", [], "alert", alert_kind="command_failed")
 
     async def _late(self, s: AsyncSession, fx: Effects, now: int) -> None:
-        rows = (await s.execute(select(Device).where(Device.status == "online", Device.deleted_at.is_(None)))).scalars()
+        rows = (await s.execute(select(Device).where(Device.status.in_(("online", "sleeping")),
+                                                     Device.deleted_at.is_(None)))).scalars()
         for d in rows:
             limit = LATE_AFTER_REPORTS * (d.report_interval_s or DEFAULT_REPORT_INTERVAL_S)
             if d.last_seen_at is not None and now - d.last_seen_at > limit:
                 d.status, d.updated_at = "late", now
+                fx.emit("device", device_view(d)); fx.touch("devices")
+            elif d.status == "online" and power.is_deep(d) and power.window_closed(d, now, power.SLEEP_AFTER_MARGIN_S):
+                d.status, d.updated_at = "sleeping", now     # between two check-ins: asleep, not late
                 fx.emit("device", device_view(d)); fx.touch("devices")
 
     async def _devices_with_work(self, s: AsyncSession) -> set[str]:

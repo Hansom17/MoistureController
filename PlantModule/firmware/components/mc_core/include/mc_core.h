@@ -29,6 +29,7 @@ typedef enum {
 
 typedef enum {
     MC_SN_IDLE,
+    MC_SN_SETTLING, /* the switched sensor supply is on, the sensors settle (PlantModule/specs.md 18.4) */
     MC_SN_SAMPLING,
     MC_SN_REPORTING,
 } mc_sn_state_t;
@@ -66,6 +67,13 @@ enum {
 #define MC_TOMBSTONE_MS 600000u
 #define MC_CRASH_LOOP_COUNT 3
 /* The battery tunables (MC_BATT_*) come from the generated mc_interface.h. */
+
+/* Low power (PlantModule/specs.md 18) */
+#define MC_GRACE_MS 60000u          /* awake after every boot that is not a deep-sleep wake, so esptool and the app can reach the module */
+#define MC_FAST_POLL_MS 3000u       /* fast poll window after traffic (light sleep) */
+#define MC_ALWAYS_ON_POLL_MS 250u   /* parent poll interval while the module is awake for commands */
+#define MC_BOOT_COMP_MS 400u        /* boot loader time added to a deep-sleep cycle so the wake cadence matches report_interval_s */
+#define MC_DEEP_MIN_SLEEP_MS 1000u
 
 #define MC_MAX_PENDING_MSGS 8
 #define MC_MAX_CMD_RECORDS 8
@@ -111,6 +119,9 @@ typedef enum {
     MC_TIMER_STABLE,
     MC_TIMER_IDENTIFY,
     MC_TIMER_BATTERY,
+    MC_TIMER_SETTLE,
+    MC_TIMER_AWAKE, /* deep sleep: the awake window after a report is over */
+    MC_TIMER_GRACE, /* the 60 s after a normal boot are over */
 } mc_timer_t;
 
 typedef enum {
@@ -144,6 +155,13 @@ typedef struct {
     uint16_t boot_id;
     bool config_valid;
     mc_config_t config;
+    /* deep-sleep wake (the HAL keeps these in RTC memory) */
+    bool deep_sleep_wake;
+    uint8_t wake_reason;      /* mc_wake_reason_t */
+    uint16_t rtc_seq;
+    uint16_t rtc_wake_count;
+    uint32_t rtc_sleep_total_s;
+    uint16_t rtc_last_awake_ms;
 } mc_boot_t;
 
 typedef struct {
@@ -177,6 +195,8 @@ typedef enum {
     MC_ACT_ALL_OUTPUTS_OFF,
     MC_ACT_READ_SLOT,
     MC_ACT_READ_BATTERY,    /* measure the pin of the battery divider, answer with BATT_SAMPLE */
+    MC_ACT_SENSOR_POWER,    /* switch the sensor supply (boards with a switched rail only) */
+    MC_ACT_POLL,            /* parent poll interval to use now; fast_ms > 0: poll fast for that long first */
     MC_ACT_PERSIST_CONFIG,  /* store core->cfg atomically */
     MC_ACT_PERSIST_DIAG,    /* store core->diag */
     MC_ACT_SET_LED,
@@ -202,6 +222,8 @@ typedef struct {
         struct { uint16_t n; uint8_t code; uint8_t slot; uint16_t arg; } event;
         struct { uint8_t slot; uint8_t port; bool active_high; bool on; } pump;
         struct { uint8_t slot; uint8_t port; } read;
+        struct { bool on; } sensor_power;
+        struct { uint16_t ms; uint16_t fast_ms; } poll;
         mc_led_t led;
         struct { mc_timer_t id; uint8_t arg; uint32_t delay_ms; } timer;
     } u;
@@ -244,6 +266,11 @@ typedef struct {
     uint16_t last_error;
     uint16_t voltage_mv; /* filtered cell voltage, 0 without a cell */
     uint8_t batt_state;  /* mc_batt_state_t */
+    uint8_t wake_reason;      /* mc_wake_reason_t */
+    uint16_t awake_ms;        /* length of the previous awake window (deep sleep) */
+    uint16_t next_wake_s;     /* deep sleep: seconds until the next planned wake */
+    uint16_t wake_count;
+    uint32_t sleep_total_s;
 } mc_attrs_t;
 
 typedef struct {
@@ -332,6 +359,18 @@ typedef struct mc_core {
     uint8_t bat_n;            /* how many of them are valid */
     uint8_t bat_bad_streak;   /* consecutive samples at or below the threshold of the next worse state */
     bool bat_pending;         /* a READ_BATTERY is out and the sample waits for it */
+    bool sensor_rail_on;      /* the switched sensor supply is on */
+
+    /* power (mc_power.c) */
+    bool deep_boot;           /* this boot is a deep-sleep wake */
+    bool grace_active;        /* inside the awake window after a normal boot */
+    bool awake_over;          /* deep sleep: the window after the report is over */
+    bool poll_fast_request;   /* traffic seen: ask for a fast poll window */
+    uint16_t last_poll_ms;    /* what the last MC_ACT_POLL said */
+    uint8_t wake_reason;
+    uint16_t wake_count;
+    uint32_t sleep_total_s;
+    uint16_t last_awake_ms;
     bool have_pump_end;
     uint32_t last_pump_end_ms;
 
@@ -355,5 +394,25 @@ void mc_core_step(mc_core_t *c, const mc_event_t *ev, mc_actions_t *out);
 void mc_core_attrs(const mc_core_t *c, mc_attrs_t *out);
 void mc_encode_slot_reading(const mc_reading_t *r, uint8_t out[8]);
 bool mc_core_pump_running(const mc_core_t *c);
+
+/* ---- sleeping (PlantModule/specs.md 18.4); the core never sleeps itself, the HAL asks ---------------------- */
+
+typedef enum {
+    MC_SLEEP_NONE,  /* stay awake with the receiver on */
+    MC_SLEEP_LIGHT, /* radio off between parent polls, RAM and timers kept */
+    MC_SLEEP_DEEP,  /* chip off until the next wake */
+} mc_sleep_t;
+
+/* What the HAL may do right now: NONE while anything is going on (not operational, sampling or settling, a report in
+ * flight, a configuration transaction, messages waiting for the link, the LED showing a state of its own) and in
+ * `always_on`; with a pump running or in fast mode a configured deep sleep is only light sleep (rule L7). */
+mc_sleep_t mc_core_sleep_allowed(const mc_core_t *c);
+
+/* The parent poll interval to use now: 250 ms whenever the module must be reachable quickly (always on, not
+ * operational, a pump busy, fast reporting, the deep-sleep awake window), otherwise the configured light-sleep one. */
+uint16_t mc_core_poll_ms(const mc_core_t *c);
+
+/* Deep sleep: how long the chip sleeps now so that the wake-ups keep `report_interval_s` apart. */
+uint32_t mc_core_deep_sleep_ms(const mc_core_t *c);
 
 #endif

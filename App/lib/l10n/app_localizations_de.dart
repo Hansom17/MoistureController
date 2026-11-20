@@ -1218,6 +1218,151 @@ class AppLocalizationsDe extends AppLocalizations {
   String get batteryLevel => 'Stand (geschätzt)';
 
   @override
+  String get showMeasured => 'Messwerte anzeigen';
+
+  @override
+  String get showPercent => 'Prozent anzeigen';
+
+  @override
+  String moistureRawSemantics(int value) {
+    return 'Messwert $value';
+  }
+
+  @override
+  String chartSummaryRaw(int min, int max) {
+    return 'Messwert zwischen $min und $max in diesem Zeitraum';
+  }
+
+  @override
+  String measuredAs(int value) {
+    return 'Messwert $value';
+  }
+
+  @override
+  String calibratedAs(int percent) {
+    return 'Kalibriert: $percent %';
+  }
+
+  @override
+  String get powerTitle => 'Energie';
+
+  @override
+  String get powerAlwaysOn => 'Immer an';
+
+  @override
+  String get powerLightSleep => 'Leichter Schlaf';
+
+  @override
+  String get powerDeepSleep => 'Tiefschlaf';
+
+  @override
+  String get powerAlwaysOnBody =>
+      'Für USB- oder Netzstrom. Das Modul hört dauernd zu; Befehle kommen sofort an.';
+
+  @override
+  String get powerLightSleepBody =>
+      'Für Akkubetrieb. Das Funkmodul ruht zwischen kurzen Abfragen, Befehle kommen nach wenigen Sekunden an.';
+
+  @override
+  String get powerDeepSleepBody =>
+      'Geringster Strom. Das Modul schläft zwischen den Messungen; Befehle warten auf sein nächstes Melden.';
+
+  @override
+  String get powerNotSupported =>
+      'Ausgegraute Modi laufen auf dieser Platine noch nicht.';
+
+  @override
+  String get powerAdminOnly => 'Nur ein Admin kann den Energiemodus ändern.';
+
+  @override
+  String get pollInterval => 'Nachrichten abfragen alle';
+
+  @override
+  String get awakeWindow => 'Nach jedem Bericht zuhören für';
+
+  @override
+  String calCurrent(int raw) {
+    return 'Aktueller Messwert: $raw';
+  }
+
+  @override
+  String get calNoReading => 'Noch kein Messwert von diesem Sensor';
+
+  @override
+  String get calUseDry => 'Als trocken übernehmen';
+
+  @override
+  String get calUseWet => 'Als nass übernehmen';
+
+  @override
+  String get calHint =>
+      'Sensor trocken (an der Luft) halten, auf der Pflanzenseite \'Jetzt messen\' drücken und den Wert als trocken übernehmen. Im Wasser genauso für nass.';
+
+  @override
+  String get diagPowerMode => 'Energiemodus';
+
+  @override
+  String get diagWakeReason => 'Letztes Aufwachen';
+
+  @override
+  String get diagAwake => 'Letztes Wachfenster';
+
+  @override
+  String get diagPollFails => 'Verpasste Abfragen';
+
+  @override
+  String get diagNextWake => 'Nächstes Aufwachen in';
+
+  @override
+  String get wakeNone => '—';
+
+  @override
+  String get wakeTimer => 'Timer';
+
+  @override
+  String get wakeButton => 'Taste';
+
+  @override
+  String get wakePumpEnd => 'Ende eines Pumpenlaufs';
+
+  @override
+  String get wakeRadio => 'Funk';
+
+  @override
+  String get deviceSleeping => 'Schläft';
+
+  @override
+  String get commandQueuedSleeping =>
+      'In der Warteschlange · wird beim nächsten Melden des Moduls gesendet';
+
+  @override
+  String get readingRequestedSleeping =>
+      'Messung angefordert. Das Modul antwortet, wenn es das nächste Mal aufwacht.';
+
+  @override
+  String get diagRadio => 'Funk';
+
+  @override
+  String get radioSleepy => 'Schlafend (alle Energiemodi möglich)';
+
+  @override
+  String get radioLegacy => 'Empfänger immer an (alte Anmeldung)';
+
+  @override
+  String get radioLegacyHint =>
+      'Dieses Modul hat sich mit der alten Firmware angemeldet. Die Schlafmodi gehen erst, nachdem es gelöscht und neu angemeldet wurde: hier entfernen, Modul löschen, neu hinzufügen.';
+
+  @override
+  String get diagWakeCount => 'Aufwachen seit dem Einschalten';
+
+  @override
+  String get diagSleepTotal => 'Zeit im Schlaf';
+
+  @override
+  String get deepRule =>
+      'Tiefschlaf braucht ein Meldeintervall von mindestens 30 s, das größer ist als die Wachzeit plus 10 s.';
+
+  @override
   String get plantMenu => 'Pflanzenmenü';
 
   @override

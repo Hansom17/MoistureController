@@ -43,7 +43,7 @@ class Snapshots:
                     r = (await s.execute(select(Reading).where(Reading.plant_id == p.id)
                                          .order_by(Reading.ts.desc(), Reading.id.desc()).limit(1))).scalar_one_or_none()
                     if r is not None:
-                        latest = {"value": r.value, "ts": r.ts}
+                        latest = {"value": r.value, "raw": r.raw, "ts": r.ts}
                 out.append(plant_view(p, latest, await self._trend(s, p.id, latest)))
             return out
         if name == "rules":

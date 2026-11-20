@@ -7,6 +7,8 @@ import '../../core/app_data.dart';
 import '../../core/format.dart';
 import '../../core/permissions.dart';
 import '../../core/session.dart';
+import '../../core/settings.dart';
+import '../../ui/value_mode_button.dart';
 import '../../data/models.dart';
 import '../../ui/app_scope.dart';
 import '../../ui/common.dart';
@@ -27,6 +29,7 @@ class DashboardScreen extends StatelessWidget {
             appBar: AppBar(
               title: Text(name.isEmpty ? context.l10n.appTitle : name),
               centerTitle: false,
+              actions: const [ValueModeButton()],
             ),
             floatingActionButton: can(user.role, AppAction.editPlants)
                 ? FloatingActionButton.extended(
@@ -107,6 +110,7 @@ class _PlantGrid extends ConsumerWidget {
                           child: PlantCard(
                             plant: plant,
                             device: byId[plant.deviceId],
+                            valueMode: ref.watch(valueModeProvider),
                             hasPendingCommand: (ref.watch(commandsProvider(plant.id)).value ?? const <Command>[])
                                 .any((c) => !c.state.isFinal),
                             onTap: () => context.go('/plants/${plant.id}'),

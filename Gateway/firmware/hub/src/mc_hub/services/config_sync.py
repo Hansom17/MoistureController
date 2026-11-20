@@ -13,6 +13,7 @@ from .views import alert_view
 SCALARS = tuple(CONFIG)                      # the device-level attributes, in interface order
 DEFAULTS = {k: v["default"] for k, v in CONFIG.items()}
 BATTERY_KEYS = ("batt_low_mv", "batt_critical_mv", "batt_cal_permille")
+KEPT_KEYS = BATTERY_KEYS + ("power_mode", "poll_interval_ms", "awake_s")   # an editor that does not know them leaves them alone
 MODULES = ("moisture", "pump")
 
 
@@ -25,12 +26,14 @@ def _int(v, name, lo, hi):
 def validate(body: dict, board: dict, current: dict | None = None) -> dict:
     """Returns the normalized configuration (without `rev`); raises validation errors.
 
-    A battery value the caller leaves out keeps the one of `current` (the installation's thresholds and the
-    calibration of the device must not be reset by an editor that does not know them)."""
-    base = {k: (current or {}).get(k, DEFAULTS[k]) for k in BATTERY_KEYS}
+    A battery or power value the caller leaves out keeps the one of `current` (the installation's thresholds, the
+    calibration and the power mode of the device must not be reset by an editor that does not know them)."""
+    base = {k: (current or {}).get(k, DEFAULTS[k]) for k in KEPT_KEYS}
     cfg = {k: _int(body.get(k, base.get(k, c["default"])), k, c["min"], c["max"]) for k, c in CONFIG.items()}
     if cfg["batt_critical_mv"] >= cfg["batt_low_mv"]:
         raise HubError("validation", detail="batt_critical_mv must be below batt_low_mv")
+    if cfg["power_mode"] == 2 and (cfg["report_interval_s"] < 30 or cfg["report_interval_s"] <= cfg["awake_s"] + 10):
+        raise HubError("validation", detail="deep sleep needs report_interval_s of at least 30 s and more than awake_s + 10")
     ports = {p["id"]: p for p in board["ports"]}
     used_slots: set[int] = set()
     used_ports: set[str] = set()
@@ -102,12 +105,29 @@ def initial(d: Device, now: int, s: AsyncSession, low: int = battery.DEFAULT_LOW
     s.add(ConfigRevision(device_id=d.id, rev=1, kind="initial", body=cfg, created_at=now))
 
 
+async def _adopt_foreign_revision(s: AsyncSession, now: int, d: Device, cfg_rev: int, unknown: bool) -> None:
+    """A new device whose untouched initial configuration is at or below the revision its module runs: the module still
+    carries the configuration of an earlier life (it was removed while out of reach and never erased itself). The
+    hub owns the configuration, so the initial one moves above the module's revision and replaces the old one;
+    otherwise the module would refuse it as stale and keep the old slots."""
+    if not unknown or d.desired_rev <= 0 or cfg_rev < d.desired_rev:
+        return
+    first = await s.get(ConfigRevision, (d.id, d.desired_rev))
+    if first is None or first.kind != "initial":
+        return
+    new_rev = cfg_rev + 1
+    body = {**first.body, "rev": new_rev}
+    s.add(ConfigRevision(device_id=d.id, rev=new_rev, kind="initial", body=body, created_at=now))
+    d.desired_rev, d.desired_config = new_rev, body
+
+
 async def apply_state(s: AsyncSession, fx: Effects, now: int, d: Device, cfg_rev: int, result: str | None,
                       error) -> None:
     """The device reported its configuration state."""
     d.reported_rev = cfg_rev
     rev = await s.get(ConfigRevision, (d.id, cfg_rev))
     d.reported_config = rev.body if rev is not None else None
+    await _adopt_foreign_revision(s, now, d, cfg_rev, rev is None)
     if rev is not None and rev.confirmed_at is None and result == "ok":
         rev.confirmed_at, rev.result = now, "ok"
     if result == "rejected" and d.desired_rev > cfg_rev:

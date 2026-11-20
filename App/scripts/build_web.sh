@@ -1,8 +1,7 @@
 #!/bin/sh
-# Builds the web app the way the gateway serves it (no CDN, everything bundled) and packs it.
-#   App/scripts/build_web.sh            builds App/build/web and App/build/moisture-web.tar.gz
-# Used the same way by the CI job "Web build". Copy App/build/web (or unpack the archive) to the gateway device,
-# see Gateway/INSTALL.md step 4.
+# Builds the web app the way the gateway serves it (no CDN, everything bundled).
+#   App/scripts/build_web.sh            builds App/build/web
+# Used the same way by the CI job "App / web build"; the release workflow packs that build into the update bundle.
 set -eu
 cd "$(dirname "$0")/.."
 

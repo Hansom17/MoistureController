@@ -8,7 +8,7 @@ The box at home that runs the whole system: Zigbee coordinator with Zigbee2MQTT,
 
 The gateway runs as a Yocto image (systemd services, Zigbee2MQTT, Mosquitto) built in the repository [Hansom17/moisture-gateway](https://github.com/Hansom17/moisture-gateway), which is also where installing and flashing it is described. The app code (`hub`, `api`, web build, converter) is updated from the releases of this repository.
 
-To try the system on a development machine without a gateway: `scripts/bench.sh` (hub, api and a Zigbee2MQTT bench setup on the host), or `scripts/z2m_sim.py` as the Zigbee side; set `MC_WEB_DIR` to `App/build/web`. Details in `specs.md` §15.
+To try the system on a development machine without a gateway: `scripts/bench.sh` (hub, api and a Zigbee2MQTT bench setup on the host), or `scripts/z2m_sim.py` as the Zigbee side; set `MC_WEB_DIR` to `App/build/web`. Details in `specs.md` §15. Backup and restore of a gateway: [docs/BACKUP.md](docs/BACKUP.md).
 
 ## Releases and updates
 

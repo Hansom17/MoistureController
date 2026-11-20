@@ -26,6 +26,7 @@ class StatusChip extends StatelessWidget {
     final l = context.l10n;
     final (kind, label, icon) = switch (device.status) {
       DeviceStatus.online => (StatusKind.ok, l.deviceOnline, Icons.check_circle_outline),
+      DeviceStatus.sleeping => (StatusKind.sleeping, l.deviceSleeping, Icons.bedtime_outlined),
       DeviceStatus.ready => (StatusKind.pending, l.deviceReady, Icons.hourglass_empty),
       DeviceStatus.joining => (StatusKind.pending, l.deviceJoining, Icons.sync),
       DeviceStatus.joinFailed => (StatusKind.error, l.deviceJoinFailed, Icons.error_outline),

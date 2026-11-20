@@ -128,11 +128,11 @@ test('config: the writable attributes first, then commit_config with the revisio
     assert.equal(w.op, 'write');
     assert.equal(w.cluster, 'mcPlant');
     assert.deepEqual(w.options, {manufacturerCode: MANUFACTURER_CODE});
-    assert.ok(Object.keys(w.attributes).length <= 8, 'a write stays small');
+    assert.ok(Object.keys(w.attributes).length <= 12, 'a write stays small');
   }
   const write = {attributes: Object.assign({}, ...writes.map((w) => w.attributes))};
   assert.deepEqual(Object.keys(write.attributes), [
-    'report_interval_s', 'fast_report_interval_s', 'fast_report_hold_s', 'batt_low_mv', 'batt_critical_mv', 'batt_cal_permille',
+    'report_interval_s', 'fast_report_interval_s', 'fast_report_hold_s', 'batt_low_mv', 'batt_critical_mv', 'batt_cal_permille', 'power_mode', 'poll_interval_ms', 'awake_s',
     'slot_cfg_0', 'slot_cfg_1', 'slot_cfg_2', 'slot_cfg_3', 'slot_cfg_4', 'slot_cfg_5',
   ]);
   for (const name of Object.keys(write.attributes)) {

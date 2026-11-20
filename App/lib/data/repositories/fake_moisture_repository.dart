@@ -452,6 +452,7 @@ class FakeMoistureRepository implements MoistureRepository {
           sensor: sensor ?? p.sensor,
           pump: pump ?? p.pump,
           moisturePercent: p.moisturePercent,
+          rawValue: p.rawValue,
           trend: p.trend,
           lastReadingAt: p.lastReadingAt,
           maxRunS: pump == null ? p.maxRunS : _pumpLimit(pump),
@@ -474,7 +475,10 @@ class FakeMoistureRepository implements MoistureRepository {
     final count = range.span.inMinutes ~/ range.bucket.inMinutes;
     return [
       for (var i = count; i >= 0; i--)
-        Reading(now.subtract(range.bucket * i), curve.at(now.subtract(range.bucket * i))),
+        () {
+          final v = curve.at(now.subtract(range.bucket * i));
+          return Reading(now.subtract(range.bucket * i), v, fakeRaw(v).toDouble());
+        }(),
     ];
   });
 
@@ -541,7 +545,7 @@ class FakeMoistureRepository implements MoistureRepository {
     final i = _plants.indexWhere((p) => p.id == plantId);
     final now = _clock();
     final value = min(95.0, (_plants[i].moisturePercent ?? 0) + seconds * 2.5);
-    _plants[i] = _plants[i].copyWith(moisturePercent: value, trend: Trend.rising, lastReadingAt: now);
+    _plants[i] = _plants[i].copyWith(moisturePercent: value, rawValue: fakeRaw(value), trend: Trend.rising, lastReadingAt: now);
     _curves[plantId] = _curves[plantId]!.wateredTo(value, now);
     _emit(LiveEvent(LiveEventKind.reading, entityId: plantId));
   }
@@ -621,6 +625,7 @@ class FakeMoistureRepository implements MoistureRepository {
     () => Board(
       name: name,
       ports: [for (var i = 1; i <= 4; i++) BoardPort(id: 'P$i', roles: const ['moisture', 'pump'])],
+      powerModes: PowerMode.values.toSet(), // the demo board can do everything
     ),
   );
 
@@ -642,6 +647,9 @@ class FakeMoistureRepository implements MoistureRepository {
       reportIntervalS: config.reportIntervalS,
       fastReportIntervalS: config.fastReportIntervalS,
       fastReportHoldS: config.fastReportHoldS,
+      powerMode: config.powerMode,
+      pollIntervalMs: config.pollIntervalMs,
+      awakeS: config.awakeS,
       slots: config.slots,
     );
     _devices[i] = _copy(d, desiredRev: rev, sync: ConfigSync.pending);
@@ -649,7 +657,7 @@ class FakeMoistureRepository implements MoistureRepository {
     _after(deviceDelay, () {
       final j = _devices.indexWhere((x) => x.id == deviceId);
       if (j < 0) return;
-      _devices[j] = _copy(_devices[j], reportedRev: rev, sync: ConfigSync.inSync, slots: config.slots);
+      _devices[j] = _copy(_devices[j], reportedRev: rev, sync: ConfigSync.inSync, slots: config.slots, powerMode: config.powerMode);
       _syncPlantLimits();
       _emit(LiveEvent(LiveEventKind.device, entityId: deviceId));
     });
@@ -661,7 +669,7 @@ class FakeMoistureRepository implements MoistureRepository {
       final p = _plants[i];
       _plants[i] = Plant(
         id: p.id, name: p.name, notes: p.notes, sensor: p.sensor, pump: p.pump,
-        moisturePercent: p.moisturePercent, trend: p.trend, lastReadingAt: p.lastReadingAt,
+        moisturePercent: p.moisturePercent, rawValue: p.rawValue, trend: p.trend, lastReadingAt: p.lastReadingAt,
         maxRunS: _pumpLimit(p.pump),
       );
     }
@@ -719,6 +727,7 @@ class FakeMoistureRepository implements MoistureRepository {
     String? name,
     String? configError,
     Battery? battery,
+    PowerMode? powerMode,
   }) => Device(
     id: d.id,
     name: name ?? d.name,
@@ -737,6 +746,8 @@ class FakeMoistureRepository implements MoistureRepository {
     configError: configError ?? d.configError,
     slots: slots ?? d.slots,
     diagnostics: d.diagnostics,
+    powerMode: powerMode ?? d.powerMode,
+    latestRaw: d.latestRaw,
   );
 
   @override
@@ -902,7 +913,9 @@ class FakeMoistureRepository implements MoistureRepository {
         diagnostics: const {
           'uptime_s': 86400, 'boot_reason': 'power_on', 'reset_count': 0, 'rejoin_count': 1,
           'last_error': 0, 'free_heap': 143000,
+          'wake_reason': 'none', 'awake_ms': 0, 'poll_fail_count': 0, 'next_wake_s': 0,
         },
+        latestRaw: {0: fakeRaw(18), 1: fakeRaw(47)},
       );
     }
 
@@ -920,7 +933,8 @@ class FakeMoistureRepository implements MoistureRepository {
       return Plant(
         id: id, name: name, sensor: SlotRef(deviceId: device, slot: sensorSlot),
         pump: pump ? SlotRef(deviceId: device, slot: 2) : const SlotRef(),
-        moisturePercent: value, trend: trend, lastReadingAt: value == null ? null : ago(seen), maxRunS: pump ? 30 : 0,
+        moisturePercent: value, rawValue: value == null ? null : fakeRaw(value), trend: trend,
+        lastReadingAt: value == null ? null : ago(seen), maxRunS: pump ? 30 : 0,
       );
     }
 
@@ -976,3 +990,6 @@ class _Curve {
   _Curve wateredTo(double value, DateTime when) =>
       _Curve(current, at0, wateredAt: value, wateredTime: when);
 }
+
+/// The demo sensors' raw counts for a percentage: the default calibration (dry 3000, wet 1200) run backwards.
+int fakeRaw(double percent) => (3000 - percent.clamp(0, 100) / 100 * 1800).round();

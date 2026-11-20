@@ -16,6 +16,7 @@ BOARDS = ROOT / "PlantModule" / "firmware" / "boards"
 HUB_COPY = ROOT / "Gateway" / "firmware" / "hub" / "src" / "mc_hub" / "boards"
 OUT = ROOT / "PlantModule" / "firmware" / "components" / "mc_core" / "src" / "mc_boards_table.c"
 ROLES = {"moisture": "MC_ROLE_MOISTURE", "pump": "MC_ROLE_PUMP"}
+POWER_MODES = {"light_sleep": 1, "deep_sleep": 2}   # bit numbers, as mc_power_mode_t
 
 
 def load() -> list[dict]:
@@ -26,6 +27,7 @@ def load() -> list[dict]:
         for i, p in enumerate(b["ports"]):
             assert p["id"] == f"P{i + 1}", f"{b['name']}: ports must be P1..Pn in order"
             assert set(p["roles"]) <= set(ROLES), f"{b['name']}: unknown role"
+        assert set(b.get("low_power", {}).get("modes", [])) <= set(POWER_MODES), f"{b['name']}: unknown power mode"
     return boards
 
 
@@ -49,6 +51,12 @@ def render() -> str:
         out.append(f'    .button = {{ .gpio = {btn["gpio"] if btn else -1}, .active_high = {"false" if not btn or btn["active_low"] else "true"} }},')
         out.append(f'    .battery_gpio = {bat["gpio"] if bat else -1},')
         out.append(f'    .battery_divider_x100 = {round(bat["divider"] * 100) if bat else 100},')
+        sp = b.get("sensor_power")
+        if sp:
+            out.append(f'    .sensor_power = {{ .present = true, .gpio = {sp["gpio"]}, .active_high = {"true" if sp.get("active_high", True) else "false"}, .settle_ms = {sp["settle_ms"]} }},')
+        modes = b.get("low_power", {}).get("modes", [])
+        if modes:
+            out.append(f'    .power_modes = {" | ".join(f"(1u << {POWER_MODES[m]})" for m in modes)},')
         out.append("    .ports = {")
         for p in b["ports"]:
             roles = " | ".join(ROLES[r] for r in p["roles"]) or "0"

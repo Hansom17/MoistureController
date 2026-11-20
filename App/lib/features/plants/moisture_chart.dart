@@ -1,4 +1,5 @@
 import 'dart:math';
+import 'dart:math' as math;
 
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
@@ -6,6 +7,7 @@ import 'package:intl/intl.dart';
 
 import '../../app/theme/app_colors.dart';
 import '../../core/format.dart';
+import '../../core/settings.dart';
 import '../../data/models.dart';
 
 /// Moisture line chart coloured with the moisture scale along the value axis
@@ -17,11 +19,15 @@ class MoistureChart extends StatelessWidget {
     required this.range,
     this.thresholds = const [],
     this.now,
+    this.mode = ValueMode.percent,
   });
 
   final List<Reading> readings;
   final ChartRange range;
   final List<int> thresholds;
+
+  /// [ValueMode.measured] plots the raw counts on a scale of their own (no percentage lines).
+  final ValueMode mode;
 
   /// The right edge of the chart; the current time unless a test fixes it.
   final DateTime? now;
@@ -39,11 +45,20 @@ class MoistureChart extends StatelessWidget {
     final start = (now ?? DateTime.now()).subtract(range.span);
     double x(DateTime t) => t.difference(start).inSeconds / 3600;
 
-    final values = readings.map((r) => r.moisturePercent);
+    final measured = mode == ValueMode.measured;
+    final shown = measured ? readings.where((r) => r.raw != null).toList() : readings;
+    if (shown.isEmpty) {
+      return SizedBox(height: 120, child: Center(child: Text(context.l10n.noReadings)));
+    }
+    double valueOf(Reading r) => measured ? r.raw! : r.moisturePercent;
+    final values = shown.map(valueOf);
     final lowest = values.reduce(min);
     final highest = values.reduce(max);
     final minV = lowest.round();
     final maxV = highest.round();
+    // the raw scale follows the data: a little room, about four grid lines
+    final pad = math.max(10.0, (highest - lowest) * 0.1);
+    final yStep = math.max(10.0, ((highest - lowest + 2 * pad) / 4 / 10).ceilToDouble() * 10);
 
     final axisFormat = switch (range) {
       ChartRange.day => DateFormat.Hm(locale),
@@ -57,19 +72,19 @@ class MoistureChart extends StatelessWidget {
     );
 
     return Semantics(
-      label: context.l10n.chartSummary(minV, maxV),
+      label: measured ? context.l10n.chartSummaryRaw(minV, maxV) : context.l10n.chartSummary(minV, maxV),
       excludeSemantics: true,
       child: SizedBox(
         height: 220,
         child: LineChart(
           LineChartData(
-            minY: 0,
-            maxY: 100,
+            minY: measured ? (lowest - pad).floorToDouble() : 0,
+            maxY: measured ? (highest + pad).ceilToDouble() : 100,
             minX: 0,
             maxX: spanH,
             gridData: FlGridData(
               drawVerticalLine: false,
-              horizontalInterval: 25,
+              horizontalInterval: measured ? yStep : 25,
               getDrawingHorizontalLine: (_) =>
                   FlLine(color: scheme.outlineVariant, strokeWidth: 0.5),
             ),
@@ -80,10 +95,10 @@ class MoistureChart extends StatelessWidget {
               leftTitles: AxisTitles(
                 sideTitles: SideTitles(
                   showTitles: true,
-                  interval: 25,
-                  reservedSize: 36,
+                  interval: measured ? yStep : 25,
+                  reservedSize: measured ? 44 : 36,
                   getTitlesWidget: (v, _) =>
-                      Text('${v.round()}%', style: labelStyle),
+                      Text(measured ? '${v.round()}' : '${v.round()}%', style: labelStyle),
                 ),
               ),
               bottomTitles: AxisTitles(
@@ -104,8 +119,9 @@ class MoistureChart extends StatelessWidget {
             ),
             extraLinesData: ExtraLinesData(
               horizontalLines: [
-                for (final t in thresholds)
-                  HorizontalLine(
+                if (!measured)
+                  for (final t in thresholds)
+                    HorizontalLine(
                     y: t.toDouble(),
                     color: scheme.outline,
                     strokeWidth: 1,
@@ -125,7 +141,7 @@ class MoistureChart extends StatelessWidget {
                 getTooltipItems: (spots) => [
                   for (final s in spots)
                     LineTooltipItem(
-                      '${s.y.round()}%\n${DateFormat.MMMd(locale).add_Hm().format(start.add(Duration(minutes: (s.x * 60).round())))}',
+                      '${s.y.round()}${measured ? '' : '%'}\n${DateFormat.MMMd(locale).add_Hm().format(start.add(Duration(minutes: (s.x * 60).round())))}',
                       TextStyle(color: scheme.onInverseSurface, fontSize: 12),
                     ),
                 ],
@@ -134,7 +150,7 @@ class MoistureChart extends StatelessWidget {
             lineBarsData: [
               LineChartBarData(
                 spots: [
-                  for (final r in readings) FlSpot(x(r.at), r.moisturePercent),
+                  for (final r in shown) FlSpot(x(r.at), valueOf(r)),
                 ],
                 isCurved: true,
                 preventCurveOverShooting: true,

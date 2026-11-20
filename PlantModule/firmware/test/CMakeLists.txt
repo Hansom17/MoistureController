@@ -10,7 +10,7 @@ add_link_options(-fsanitize=address,undefined)
 set(CORE ${CMAKE_CURRENT_LIST_DIR}/../components/mc_core)
 add_library(mc_core STATIC
     ${CORE}/src/mc_boards_table.c ${CORE}/src/mc_cfg.c ${CORE}/src/mc_cmd.c ${CORE}/src/mc_config.c
-    ${CORE}/src/mc_core.c ${CORE}/src/mc_factory.c ${CORE}/src/mc_moisture.c ${CORE}/src/mc_sense.c
+    ${CORE}/src/mc_core.c ${CORE}/src/mc_factory.c ${CORE}/src/mc_moisture.c ${CORE}/src/mc_power.c ${CORE}/src/mc_sense.c
     ${CORE}/src/mc_ui.c)
 target_include_directories(mc_core PUBLIC ${CORE}/include PRIVATE ${CORE}/src)
 

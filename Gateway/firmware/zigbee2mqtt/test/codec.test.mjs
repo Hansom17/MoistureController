@@ -110,6 +110,16 @@ test('battery thresholds: critical must be below low, calibration within 10 %', 
   assert.deepEqual([a.batt_low_mv, a.batt_critical_mv, a.batt_cal_permille], [3600, 3400, 1000], 'defaults');
 });
 
+test('power settings: always on by default, ranges from the interface file', () => {
+  const a = codec.encodeConfig({rev: 1});
+  assert.deepEqual([a.power_mode, a.poll_interval_ms, a.awake_s], [0, 3000, 5], 'defaults');
+  const b = codec.encodeConfig({rev: 1, power_mode: 2, poll_interval_ms: 1500, awake_s: 12});
+  assert.deepEqual([b.power_mode, b.poll_interval_ms, b.awake_s], [2, 1500, 12]);
+  assert.throws(() => codec.encodeConfig({rev: 1, power_mode: 3}), /power_mode/);
+  assert.throws(() => codec.encodeConfig({rev: 1, poll_interval_ms: 100}), /poll_interval_ms/);
+  assert.throws(() => codec.encodeConfig({rev: 1, awake_s: 31}), /awake_s/);
+});
+
 test('whole configuration: intervals and six slot tables, absent slots emptied', () => {
   const a = codec.encodeConfig({
     rev: 9, report_interval_s: 120, fast_report_interval_s: 20, fast_report_hold_s: 60, batt_low_mv: 3700, batt_critical_mv: 3450, batt_cal_permille: 1012,

@@ -107,6 +107,9 @@ enum DeviceStatus {
   unsupported,
   ready,
   online,
+
+  /// A deep-sleep module between two check-ins: asleep, not late.
+  sleeping,
   late,
   offline,
   safeMode,
@@ -167,6 +170,19 @@ class SlotConfig {
   );
 }
 
+/// How a module powers itself (PlantModule/specs.md 18): `power_mode` of the configuration.
+enum PowerMode {
+  alwaysOn(0),
+  lightSleep(1),
+  deepSleep(2);
+
+  const PowerMode(this.wire);
+
+  final int wire;
+
+  static PowerMode fromWire(Object? v) => PowerMode.values.firstWhere((m) => m.wire == v, orElse: () => PowerMode.alwaysOn);
+}
+
 /// A whole device configuration revision.
 class DeviceConfigBody {
   const DeviceConfigBody({
@@ -175,6 +191,9 @@ class DeviceConfigBody {
     this.fastReportIntervalS = 30,
     this.fastReportHoldS = 120,
     this.battLowMv = 3500,
+    this.powerMode = PowerMode.alwaysOn,
+    this.pollIntervalMs = 3000,
+    this.awakeS = 5,
     this.slots = const [],
   });
 
@@ -183,12 +202,22 @@ class DeviceConfigBody {
   final int fastReportIntervalS;
   final int fastReportHoldS;
   final int battLowMv;
+  final PowerMode powerMode;
+
+  /// light sleep: how often the module asks its parent for messages
+  final int pollIntervalMs;
+
+  /// deep sleep: how long it listens after each report
+  final int awakeS;
   final List<SlotConfig> slots;
 
   DeviceConfigBody copyWith({
     int? reportIntervalS,
     int? fastReportIntervalS,
     int? fastReportHoldS,
+    PowerMode? powerMode,
+    int? pollIntervalMs,
+    int? awakeS,
     List<SlotConfig>? slots,
   }) => DeviceConfigBody(
     rev: rev,
@@ -196,6 +225,9 @@ class DeviceConfigBody {
     fastReportIntervalS: fastReportIntervalS ?? this.fastReportIntervalS,
     fastReportHoldS: fastReportHoldS ?? this.fastReportHoldS,
     battLowMv: battLowMv,
+    powerMode: powerMode ?? this.powerMode,
+    pollIntervalMs: pollIntervalMs ?? this.pollIntervalMs,
+    awakeS: awakeS ?? this.awakeS,
     slots: slots ?? this.slots,
   );
 }
@@ -230,10 +262,13 @@ class BoardPort {
 }
 
 class Board {
-  const Board({required this.name, required this.ports});
+  const Board({required this.name, required this.ports, this.powerModes = const {PowerMode.alwaysOn}});
 
   final String name;
   final List<BoardPort> ports;
+
+  /// The power modes the board can run; every board can run always-on.
+  final Set<PowerMode> powerModes;
 }
 
 /// Battery state of a module (PlantModule/specs.md 6.1): `absent` means no cell is connected (USB only).
@@ -287,6 +322,8 @@ class Device {
     this.configError,
     this.slots = const [],
     this.diagnostics = const {},
+    this.powerMode = PowerMode.alwaysOn,
+    this.latestRaw = const {},
   });
 
   final String id;
@@ -312,11 +349,19 @@ class Device {
   /// The slots of the configuration the device runs.
   final List<SlotConfig> slots;
 
-  /// uptime_s, boot_reason, reset_count, rejoin_count, last_error, free_heap
+  /// uptime_s, boot_reason, reset_count, rejoin_count, last_error, free_heap, and while the module sleeps
+  /// wake_reason, awake_ms, poll_fail_count, next_wake_s
   final Map<String, Object?> diagnostics;
+
+  /// The power mode of the configuration the device runs.
+  final PowerMode powerMode;
+
+  /// The latest measured value (raw counts) per slot, for taking calibration points.
+  final Map<int, int> latestRaw;
 
   bool get reachable =>
       status == DeviceStatus.online ||
+      status == DeviceStatus.sleeping ||
       status == DeviceStatus.late ||
       status == DeviceStatus.ready;
 
@@ -344,6 +389,8 @@ class Device {
         configError: configError,
         slots: slots,
         diagnostics: diagnostics,
+        powerMode: powerMode,
+        latestRaw: latestRaw,
       );
 }
 
@@ -387,6 +434,7 @@ class Plant {
     required this.trend,
     required this.lastReadingAt,
     required this.maxRunS,
+    this.rawValue,
     this.notes = '',
     this.sensor = const SlotRef(),
     this.pump = const SlotRef(),
@@ -400,6 +448,9 @@ class Plant {
 
   /// Null until the first reading arrives.
   final double? moisturePercent;
+
+  /// The same reading as the sensor measured it (raw ADC counts), before the calibration made a percentage of it.
+  final int? rawValue;
   final Trend trend;
   final DateTime? lastReadingAt;
 
@@ -413,6 +464,7 @@ class Plant {
 
   Plant copyWith({
     double? moisturePercent,
+    int? rawValue,
     Trend? trend,
     DateTime? lastReadingAt,
   }) => Plant(
@@ -422,6 +474,7 @@ class Plant {
     sensor: sensor,
     pump: pump,
     moisturePercent: moisturePercent ?? this.moisturePercent,
+    rawValue: rawValue ?? this.rawValue,
     trend: trend ?? this.trend,
     lastReadingAt: lastReadingAt ?? this.lastReadingAt,
     maxRunS: maxRunS,
@@ -429,10 +482,13 @@ class Plant {
 }
 
 class Reading {
-  const Reading(this.at, this.moisturePercent);
+  const Reading(this.at, this.moisturePercent, [this.raw]);
 
   final DateTime at;
   final double moisturePercent;
+
+  /// The measured value (raw ADC counts), when the gateway has it.
+  final double? raw;
 }
 
 /// Chart range with its bucket size (App/specs.md Part A §4, plant detail).

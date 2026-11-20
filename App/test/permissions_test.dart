@@ -12,6 +12,7 @@ void main() {
     AppAction.identifyDevice: [Role.owner, Role.admin, Role.member],
     AppAction.acknowledgeAlert: [Role.owner, Role.admin, Role.member],
     AppAction.manageDevices: [Role.owner, Role.admin],
+    AppAction.setPowerMode: [Role.owner, Role.admin],
     AppAction.manageUsers: [Role.owner, Role.admin],
     AppAction.backup: [Role.owner, Role.admin],
     AppAction.manageInstallation: [Role.owner],

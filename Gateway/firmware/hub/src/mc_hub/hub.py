@@ -49,6 +49,7 @@ class Hub:
         await self.t.subscribe(self.topics.bridge_state, self._on_bridge_state)
         await self.t.subscribe(self.topics.bridge_devices, self._on_bridge_devices)
         await self.t.subscribe(self.topics.bridge_response_permit_join, self._on_permit_join)
+        await self.t.subscribe(self.topics.bridge_response_remove, self._on_remove_response)
         await self.t.subscribe(self.topics.device_state, self._on_device)
         await self.t.subscribe(self.topics.device_availability, self._on_device)
 
@@ -111,6 +112,20 @@ class Hub:
         if state == "online":
             await self._flush(Effects(wake=await self._all_device_ids()))
         await self.snapshots.publish({"status"})
+
+    async def _on_remove_response(self, topic: str, payload: bytes) -> None:
+        """Zigbee2MQTT could not remove the device the polite way (the module did not answer: asleep, out of reach):
+        take it out of its own database anyway, or it keeps the device and its cached state and the next module that
+        joins under that address starts with the old values."""
+        try:
+            m = json.loads(payload)
+        except ValueError:
+            return
+        data = m.get("data") or {}
+        if m.get("status") == "error" and data.get("id") and not data.get("force"):
+            log.warning("Zigbee2MQTT could not remove %s (%s): removing it by force", data["id"], m.get("error"))
+            await self.t.publish(self.topics.request("device/remove"),
+                                 json.dumps({"id": data["id"], "force": True}).encode())
 
     async def _on_bridge_devices(self, topic: str, payload: bytes) -> None:
         try:
