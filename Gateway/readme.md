@@ -21,6 +21,10 @@ docker compose logs api | grep 'SETUP CODE'
 
 Open `http://<gateway>/` and create the owner account with that setup code. More: `../scripts/remote-api.sh` (api on another device), `../scripts/backup.sh`; details in `specs.md` §15.
 
+## Releases and updates
+
+A tag `vX.Y.Z` publishes a signed update bundle for the gateway image: see [docs/RELEASING.md](docs/RELEASING.md) (what a release holds, `app_generation`, key handling, migration rules).
+
 ## Developing
 
 ```bash
