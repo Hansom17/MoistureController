@@ -1,5 +1,5 @@
 """api.db tables (Gateway/specs.md 4.1). Timestamps are UTC Unix seconds."""
-from sqlalchemy import ForeignKey, Index, Integer, String, JSON, text
+from sqlalchemy import JSON, ForeignKey, Index, Integer, String, text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from .base import Base

@@ -2,7 +2,7 @@ from sqlalchemy import select
 
 from mc_hub.db.models import Command
 
-from .conftest import CFG, ack, add_device, device_report, ready_device, ready_plant, report, sent
+from .conftest import CFG, ack, add_device, device_report, ready_plant, sent
 
 
 async def commands_in_db(rig):
@@ -282,8 +282,9 @@ async def test_commands_are_not_sent_while_zigbee_is_down(rig):
 
 def test_pump_limits_match_the_firmware_ceiling():
     import pytest
-    from mc_hub.services import commands, config_sync, domain
+
     from mc_hub.errors import HubError
+    from mc_hub.services import commands, config_sync, domain
     assert commands.HARD_LIMIT_S == 300 and domain.MAX_WATER_S == 300
     board = {"name": "carrier-v1", "ports": [{"id": "P3", "roles": ["moisture", "pump"]}]}
 

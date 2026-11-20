@@ -4,9 +4,9 @@ from pathlib import Path
 
 from sqlalchemy import select
 
-from mc_hub.db.models import Command, Plant, Rule
+from mc_hub.db.models import Command
 
-from .conftest import CFG, ack, add_device, device_report, plant_entry, ready_device, ready_plant, sent
+from .conftest import CFG, ack, device_report, plant_entry, ready_plant, sent
 
 
 def load_sim():

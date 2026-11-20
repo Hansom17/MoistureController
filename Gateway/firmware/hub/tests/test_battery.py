@@ -4,8 +4,7 @@ import pytest
 from mc_hub.params import BATTERY
 from mc_hub.services import battery
 
-from .conftest import add_device, ack, device_report, ready_device, ready_plant, sent
-
+from .conftest import ack, add_device, device_report, ready_device, ready_plant, sent
 
 # ---- the pure parts --------------------------------------------------------------------------------
 

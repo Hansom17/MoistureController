@@ -4,10 +4,8 @@ import json
 
 from fastapi import APIRouter, Depends, Request
 from fastapi.responses import StreamingResponse
-from sqlalchemy import select
 
 from mc_api.auth import Principal, app_of, require
-from mc_api.convert import to_api
 from mc_api.db.models import Token, User
 from mc_api.errors import ApiError
 from mc_api.realtime.bus import CLOSE

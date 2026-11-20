@@ -4,7 +4,7 @@ from pydantic import BaseModel
 from sqlalchemy import select, update
 from ulid import ULID
 
-from mc_api.auth import Principal, app_of, audit, rank, reauth, require
+from mc_api.auth import Principal, app_of, audit, reauth, require
 from mc_api.convert import iso
 from mc_api.db.models import AuditLog, Invite, Token, User
 from mc_api.errors import ApiError

@@ -2,7 +2,7 @@ import io
 import json
 import zipfile
 
-from .conftest import CFG, Stack, join_device, start_sim
+from .conftest import CFG, Stack, join_device
 
 
 async def test_device_plant_water_flow_through_the_hub(stack: Stack):

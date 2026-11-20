@@ -1,8 +1,8 @@
 from alembic import context
 from sqlalchemy import create_engine
 
-from mc_api.db.base import Base
 from mc_api.db import models  # noqa: F401
+from mc_api.db.base import Base
 
 config = context.config
 target_metadata = Base.metadata

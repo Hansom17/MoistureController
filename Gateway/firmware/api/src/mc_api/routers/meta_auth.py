@@ -8,7 +8,7 @@ from sqlalchemy import func, select, update
 from ulid import ULID
 
 from mc_api import CONTRACT, __version__
-from mc_api.auth import Principal, app_of, audit, current, require
+from mc_api.auth import Principal, app_of, audit, current
 from mc_api.convert import iso
 from mc_api.db.models import Setting, Token, User
 from mc_api.errors import ApiError

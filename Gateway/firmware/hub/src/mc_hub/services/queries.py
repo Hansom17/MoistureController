@@ -6,7 +6,7 @@ from sqlalchemy import func, select
 from sqlalchemy.inspection import inspect
 
 from mc_hub.bus.requests import Ctx, RequestHandler
-from mc_hub.db.models import (Command, Device, DeviceEvent, HealthReport, Plant, Reading, Rule, RuleExecution)
+from mc_hub.db.models import Command, Device, DeviceEvent, HealthReport, Plant, Reading, Rule, RuleExecution
 from mc_hub.errors import HubError
 
 from .commands import command_view

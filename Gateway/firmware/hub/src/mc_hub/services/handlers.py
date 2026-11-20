@@ -1,13 +1,14 @@
 """Request handlers for watering, device actions, cancel and device configuration."""
+import json
+
 from mc_hub.bus.requests import Ctx, RequestHandler
 from mc_hub.db.models import Device, Plant
 from mc_hub.errors import HubError
 
-import json
-
-from . import commands, config_sync, devices as devs
-from .join import clean_install_code
+from . import commands, config_sync
+from . import devices as devs
 from .domain import _need
+from .join import clean_install_code
 from .views import device_view
 
 

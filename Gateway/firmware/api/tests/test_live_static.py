@@ -4,14 +4,13 @@ import json
 import httpx
 import pytest
 import uvicorn
+from sqlalchemy import select
 
 from mc_api.app import cleanup_tokens, create_app
 from mc_api.db.models import Token
 from mc_api.realtime.bus import RING_SIZE, EventBus
-from sqlalchemy import select
 
 from .conftest import Stack
-
 
 # ---- the SSE bus ----------------------------------------------------------------------------------
 
