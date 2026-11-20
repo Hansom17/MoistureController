@@ -107,7 +107,7 @@ echo "current files kept in $keep"
 systemctl stop moisture-api moisture-hub zigbee2mqtt
 
 put() { # file destination-directory
-  own=$(stat -c %u:%g "$2")
+  own=$(stat -L -c %u:%g "$2")   # -L: the data directories are symlinks, the owner is the one of the real directory
   cp "$1" "$2/"
   chown "$own" "$2/$(basename "$1")"
 }
@@ -117,7 +117,28 @@ put "$st/api.db" /var/lib/moisture/api
 for f in "$st"/zigbee2mqtt/*; do put "$f" /var/lib/zigbee2mqtt; done
 
 systemctl start zigbee2mqtt moisture-hub moisture-api
-sleep 12
-systemctl is-active zigbee2mqtt moisture-hub moisture-api mosquitto
-echo "restored. Open the web app in a private window (the browser may hold the old build) and sign in with your old login."
+sleep 15
+bad=""
+for u in zigbee2mqtt moisture-hub moisture-api mosquitto; do
+  systemctl is-active --quiet "$u" || bad="$bad $u"
+done
+# the services must be able to write what they were given
+for pair in /var/lib/moisture/hub:hub.db /var/lib/moisture/api:api.db; do
+  d=${pair%%:*}; f=${pair##*:}
+  [ "$(stat -L -c %u "$d/$f")" = "$(stat -L -c %u "$d")" ] || bad="$bad owner-of-$f"
+done
+if [ -n "$bad" ]; then
+  echo "RESTORE PROBLEM: not running or wrong owner:$bad"
+  for u in moisture-hub moisture-api zigbee2mqtt; do journalctl -u "$u" --no-pager -n 6 2>/dev/null | cut -c1-160; done
+  echo "The files from before the restore are in $keep"
+  exit 1
+fi
+python3 - <<'PY'
+import sqlite3
+h = sqlite3.connect("/var/lib/moisture/hub/hub.db")
+n = lambda t: h.execute("select count(*) from %s" % t).fetchone()[0]
+print("restored: %d devices (%d live), %d plants, %d readings" % (n("devices"), h.execute("select count(*) from devices where deleted_at is null").fetchone()[0], n("plants"), n("readings")))
+PY
+systemctl is-active zigbee2mqtt moisture-hub moisture-api mosquitto | tr '\n' ' '; echo
+echo "Open the web app in a private window (the browser may hold the old build) and sign in with your old login."
 REMOTE
